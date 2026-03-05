@@ -118,7 +118,7 @@ describe("api proxy route", function () {
  const mod = await import("./route");
  const req = new NextRequest("http://localhost/api/proxy?x=1", { method: "GET" });
 
- await mod.GET(req, { params: { path: undefined as unknown as string[] } });
+ await mod.GET(req, { params: { path: undefined } });
 
  expect(fetchMock).toHaveBeenCalledTimes(1);
  expect(fetchMock.mock.calls[0][0]).toBe("http://api.internal/?x=1");
@@ -174,6 +174,7 @@ describe("api proxy route", function () {
  expect(res.status).toBe(200);
  });
 });
+
 
 
 
