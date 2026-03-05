@@ -84,7 +84,7 @@ export default function CopilotScreen() {
               {agent.name}
             </Text>
           ))}
-          <Pressable onPress={() => router.push("/(app)/copilot/agents")} style={styles.agentButton}>
+          <Pressable onPress={() => router.push("./agents")} style={styles.agentButton}>
             <Text style={styles.agentButtonText}>View all agents</Text>
           </Pressable>
         </View>
