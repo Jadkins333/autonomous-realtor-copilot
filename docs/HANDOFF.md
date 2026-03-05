@@ -520,3 +520,11 @@ Resolved in branch `codex/phase2-sources-ui-tests`:
 New regression coverage:
 - `apps/api/tests/test_phase2_handoff_regressions.py` verifies retry+jitter behavior, outreach pack-status safety in approve/send error path, and authenticated `/sources/status` response shape.
 - `apps/web/app/api/proxy/[...path]/route.test.ts` verifies proxy forwarding for GET query/header stripping and POST body forwarding.
+
+## P) Mobile Fixture Banner Follow-up (2026-03-05)
+- Added mobile fixture-mode visibility in app shell via `/sources/status` polling.
+- New banner component: `apps/mobile/components/fixture-mode-banner.tsx`.
+- App tabs shell now mounts the banner globally: `apps/mobile/app/(app)/_layout.tsx`.
+- Mobile API now exposes typed source-status client call: `apps/mobile/lib/api.ts`, `apps/mobile/lib/types.ts`.
+- Failure path is dev-visible (warning text + console warning) rather than silently hidden.
+- Verification: `pnpm --filter mobile exec tsc --noEmit -p tsconfig.check.json` passed.
