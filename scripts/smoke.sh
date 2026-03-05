@@ -56,6 +56,11 @@ copilot_response="$(curl -fsS -X POST "${API_BASE}/copilot/chat" \
   -H "Authorization: Bearer ${token}" \
   -H 'Content-Type: application/json' \
   -d '{"message":"columbus market snapshot"}')"
+copilot_draft_response="$(curl -fsS -X POST "${API_BASE}/copilot/chat" \
+  -H "Authorization: Bearer ${token}" \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"draft outreach to Ava"}')"
+outreach_drafts_response="$(curl -fsS "${API_BASE}/outreach/drafts" -H "Authorization: Bearer ${token}")"
 copilot_agents_status="$(curl -sS -o /dev/null -w '%{http_code}' "${API_BASE}/copilot/agents" -H "Authorization: Bearer ${token}")"
 if [ "${copilot_agents_status}" != "200" ]; then
   echo "copilot agents endpoint failed: ${copilot_agents_status}"
@@ -119,6 +124,20 @@ if missing:
 if "selected_agent" not in payload.get("trace", {}):
     raise SystemExit("copilot trace missing selected_agent")
 print("copilot chat shape ok")
+PY
+
+python3 - <<'PY' "${copilot_draft_response}" "${outreach_drafts_response}"
+import json,sys
+draft_payload=json.loads(sys.argv[1])
+drafts=json.loads(sys.argv[2])
+message_id = ((draft_payload.get("data") or {}).get("message_id"))
+if not message_id:
+    raise SystemExit("copilot draft response missing message_id")
+if not isinstance(drafts, list) or not drafts:
+    raise SystemExit("outreach drafts response empty")
+if not any(str(row.get("id")) == str(message_id) for row in drafts):
+    raise SystemExit("copilot-created draft not found in outreach drafts")
+print("copilot outreach draft persisted ok")
 PY
 
 python3 - <<'PY' "${sources_status_response}"

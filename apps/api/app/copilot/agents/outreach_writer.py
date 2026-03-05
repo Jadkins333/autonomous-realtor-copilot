@@ -3,7 +3,8 @@ from __future__ import annotations
 from sqlalchemy import select
 
 from app.copilot.agents.base import AgentContext, AgentMatch, AgentResult, CopilotAgent
-from app.models.entities import Contact
+from app.models.entities import Contact, Message
+from app.models.enums import Channel, MessageDirection, MessageStatus
 
 
 class OutreachWriterAgent(CopilotAgent):
@@ -61,8 +62,27 @@ class OutreachWriterAgent(CopilotAgent):
             ],
         }
 
+        message = Message(
+            tenant_id=context.tenant_id,
+            contact_id=contact.id,
+            channel=Channel.email,
+            direction=MessageDirection.outbound,
+            status=MessageStatus.draft,
+            subject=draft["subject"],
+            body=draft["body"],
+            meta_json={
+                "created_by": "copilot",
+                "source_agent": self.key,
+                "sandbox_default": True,
+            },
+        )
+        context.db.add(message)
+        context.db.flush()
+        context.db.commit()
+        draft["message_id"] = str(message.id)
+
         return AgentResult(
-            text="Draft created in sandbox mode and ready for approval.",
+            text="Draft created in sandbox mode, saved to outreach drafts, and ready for approval.",
             data=draft,
-            tools_used=["contacts.search", "compliance.policy"],
+            tools_used=["contacts.search", "messages.create_draft", "compliance.policy"],
         )
