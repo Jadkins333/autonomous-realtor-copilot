@@ -519,7 +519,7 @@ Resolved in branch `codex/phase2-sources-ui-tests`:
 
 New regression coverage:
 - `apps/api/tests/test_phase2_handoff_regressions.py` verifies retry+jitter behavior, outreach pack-status safety in approve/send error path, and authenticated `/sources/status` response shape.
-- `apps/web/app/api/proxy/[...path]/route.test.ts` verifies proxy forwarding for GET query/header stripping and POST body forwarding.
+- `apps/web/app/api/proxy/[...path]/route.test.ts` verifies GET query/header stripping, POST body forwarding, response header sanitization, path-segment encoding, and undefined-path root fallback.
 
 ## P) Mobile Fixture Banner Follow-up (2026-03-05)
 - Added mobile fixture-mode visibility in app shell via `/sources/status` polling.
@@ -559,3 +559,4 @@ New regression coverage:
 - Middleware now derives `allow_credentials` from origin mode (`false` for wildcard, `true` otherwise).
 - Files: `apps/api/app/core/config.py`, `apps/api/app/main.py`, `.env.example`.
 - Added regression coverage: `apps/api/tests/test_cors_policy.py` (config parsing, wildcard handling, preflight allow-origin behavior).
+
