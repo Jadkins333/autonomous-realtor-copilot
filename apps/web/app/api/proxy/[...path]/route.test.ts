@@ -137,7 +137,7 @@ describe("api proxy route", function () {
  }
  });
 
- const res = await mod.GET(req, { params: { path: ["sources", "status"] } });
+ const res = await mod.HEAD(req, { params: { path: ["sources", "status"] } });
 
  expect(fetchMock).toHaveBeenCalledTimes(1);
  const call = fetchMock.mock.calls[0];
@@ -174,4 +174,6 @@ describe("api proxy route", function () {
  expect(res.status).toBe(200);
  });
 });
+
+
 

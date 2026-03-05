@@ -41,6 +41,10 @@ export async function GET(request: NextRequest, context: { params: { path: strin
   return proxy(request, context.params.path);
 }
 
+export async function HEAD(request: NextRequest, context: { params: { path: string[] } }) {
+ return proxy(request, context.params.path);
+}
+
 export async function POST(request: NextRequest, context: { params: { path: string[] } }) {
   return proxy(request, context.params.path);
 }
@@ -60,3 +64,5 @@ export async function DELETE(request: NextRequest, context: { params: { path: st
 export async function OPTIONS(request: NextRequest, context: { params: { path: string[] } }) {
   return proxy(request, context.params.path);
 }
+
+
