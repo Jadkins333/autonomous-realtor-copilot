@@ -2,6 +2,7 @@
 set -euo pipefail
 
 API_BASE="${API_BASE:-http://localhost:8000}"
+WEB_BASE="${WEB_BASE:-http://localhost:3000}"
 EMAIL="${DEMO_USER_EMAIL:-agent@demo.local}"
 PASSWORD="${DEMO_USER_PASSWORD:-demo123}"
 
@@ -17,6 +18,13 @@ health="$(curl -fsS "${API_BASE}/healthz")"
 metrics="$(curl -fsS "${API_BASE}/metrics")"
 echo "healthz: ${health}"
 echo "metrics: ${metrics}"
+
+web_login_status="$(curl -sS -o /dev/null -w '%{http_code}' "${WEB_BASE}/login")"
+if [ "${web_login_status}" != "200" ]; then
+  echo "web route check failed: ${WEB_BASE}/login returned ${web_login_status}"
+  exit 1
+fi
+echo "web route check: ${WEB_BASE}/login -> ${web_login_status}"
 
 login_response="$(curl -fsS -X POST "${API_BASE}/auth/login" \
   -H 'Content-Type: application/json' \
@@ -43,6 +51,19 @@ PY
 )"
 
 detail_response="$(curl -fsS "${API_BASE}/parcels/${parcel_id}" -H "Authorization: Bearer ${token}")"
+copilot_agents_status="$(curl -sS -o /dev/null -w '%{http_code}' "${API_BASE}/copilot/agents" -H "Authorization: Bearer ${token}")"
+if [ "${copilot_agents_status}" != "200" ]; then
+  echo "copilot agents endpoint failed: ${copilot_agents_status}"
+  exit 1
+fi
+echo "copilot agents endpoint -> ${copilot_agents_status}"
+
+db_count="$(docker compose exec -T db psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-realtor_copilot}" -tAc "select count(*) from parcels;" | tr -d '[:space:]')"
+if [ -z "${db_count}" ] || [ "${db_count}" = "0" ]; then
+  echo "db read check failed: parcels count is ${db_count:-empty}"
+  exit 1
+fi
+echo "db read check: parcels=${db_count}"
 
 python3 - <<'PY' "${detail_response}"
 import json,sys
@@ -55,4 +76,3 @@ print("parcel detail shape ok")
 PY
 
 echo "Smoke test passed."
-

@@ -35,6 +35,7 @@ services:
       DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/realtor_copilot
       REDIS_URL: redis://redis:6379/0
       SANDBOX_MODE: ${SANDBOX_MODE:-true}
+      SEED_DETERMINISTIC_ONLY: ${SEED_DETERMINISTIC_ONLY:-true}
       NEXT_PUBLIC_API_URL: http://api:8000
       SEED_DIR: /tmp/app_seed
     depends_on:

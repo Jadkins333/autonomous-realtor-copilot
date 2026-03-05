@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "packageManager": "pnpm@9.12.2",
   "scripts": {
+    "setup": "bash scripts/setup.sh",
+    "doctor": "bash scripts/doctor.sh",
+    "demo": "bash scripts/demo.sh",
     "dev:web": "pnpm --filter web dev",
     "dev:api": "docker compose up --build db redis api worker beat",
     "dev:mobile": "pnpm --filter mobile start",

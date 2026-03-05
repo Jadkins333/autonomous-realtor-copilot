@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+import os
+from datetime import UTC, date, datetime
 
+from geoalchemy2.shape import from_shape
+from shapely.geometry import MultiPolygon, Point, Polygon
 from sqlalchemy import select
 
 from app.core.config import get_settings
@@ -10,18 +13,43 @@ from app.db.session import SessionLocal
 from app.models.entities import (
     ConsentEvent,
     Contact,
+    FloodZone,
     Message,
     MetricDefinition,
+    Parcel,
+    Permit,
+    PoiFeature,
+    ProvenanceRecord,
     Sequence,
     SequenceStep,
+    Source,
     Tenant,
+    TransitStop,
     User,
 )
 from app.models.enums import Channel, ConsentStatus, MessageDirection, MessageStatus, UserRole
 from app.services.ingestion import run_ingestion
+from app.services.seed_loader import load_seed_json
+from app.utils.hash import stable_hash
 from app.utils.security import get_password_hash
 
 settings = get_settings()
+
+
+def _truthy_env(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _parse_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
 
 
 def _ensure_tenant_and_user(db):
@@ -184,9 +212,7 @@ def _ensure_sequences(db, tenant_id):
             db.add(seq)
             db.flush()
 
-        existing_steps = list(
-            db.execute(select(SequenceStep).where(SequenceStep.sequence_id == seq.id)).scalars()
-        )
+        existing_steps = list(db.execute(select(SequenceStep).where(SequenceStep.sequence_id == seq.id)).scalars())
         if existing_steps:
             continue
 
@@ -252,16 +278,348 @@ def _ensure_demo_drafts(db, tenant_id):
     )
 
 
+def _ensure_seed_source(db) -> Source:
+    source = db.execute(select(Source).where(Source.name == "seed_public_dataset")).scalar_one_or_none()
+    if source:
+        return source
+
+    source = Source(
+        name="seed_public_dataset",
+        base_url="seed://",
+        license_notes="synthetic demo seed data",
+        default_ttl_seconds=86400,
+    )
+    db.add(source)
+    db.flush()
+    return source
+
+
+def _upsert_seed_provenance(db, source: Source, external_id: str, raw_url: str, raw_json: dict) -> ProvenanceRecord:
+    raw_hash = stable_hash(raw_json)
+    existing = db.execute(
+        select(ProvenanceRecord)
+        .where(ProvenanceRecord.source_id == source.id, ProvenanceRecord.external_id == external_id)
+        .order_by(ProvenanceRecord.fetched_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+
+    if existing and existing.raw_hash == raw_hash:
+        return existing
+
+    provenance = ProvenanceRecord(
+        source_id=source.id,
+        external_id=external_id,
+        fetched_at=datetime.now(tz=UTC),
+        raw_url=raw_url,
+        raw_hash=raw_hash,
+        ttl_seconds=86400,
+        raw_json=raw_json,
+    )
+    db.add(provenance)
+    db.flush()
+    return provenance
+
+
+def _seed_parcels(db, tenant_id, source: Source) -> None:
+    rows = load_seed_json("parcels.json")
+    for row in rows:
+        parcel_number = str(row.get("parcel_number") or "").strip()
+        address = str(row.get("address") or "").strip()
+        if not parcel_number or not address:
+            continue
+
+        lon = row.get("lon")
+        lat = row.get("lat")
+        centroid_geom = None
+        parcel_geom = None
+        if isinstance(lon, (float, int)) and isinstance(lat, (float, int)):
+            lon_f = float(lon)
+            lat_f = float(lat)
+            centroid_geom = from_shape(Point(lon_f, lat_f), srid=4326)
+            offset = 0.00018
+            square = Polygon(
+                [
+                    (lon_f - offset, lat_f - offset),
+                    (lon_f + offset, lat_f - offset),
+                    (lon_f + offset, lat_f + offset),
+                    (lon_f - offset, lat_f + offset),
+                    (lon_f - offset, lat_f - offset),
+                ]
+            )
+            parcel_geom = from_shape(MultiPolygon([square]), srid=4326)
+
+        external_id = f"parcel:{row.get('external_id') or parcel_number}"
+        provenance = _upsert_seed_provenance(
+            db,
+            source,
+            external_id=external_id,
+            raw_url=f"seed://parcels.json#{external_id}",
+            raw_json=row,
+        )
+
+        parcel = db.execute(
+            select(Parcel).where(Parcel.tenant_id == tenant_id, Parcel.parcel_number == parcel_number)
+        ).scalar_one_or_none()
+
+        if not parcel:
+            parcel = Parcel(
+                tenant_id=tenant_id,
+                parcel_number=parcel_number,
+                address=address,
+                city=str(row.get("city") or "Columbus"),
+                state=str(row.get("state") or "OH"),
+                zip=str(row.get("zip") or "43215"),
+                geom=parcel_geom,
+                centroid=centroid_geom,
+                attributes_json=row.get("attributes_json") or {},
+                provenance_id=provenance.id,
+                updated_at=datetime.now(tz=UTC),
+            )
+            db.add(parcel)
+            continue
+
+        parcel.address = address
+        parcel.city = str(row.get("city") or "Columbus")
+        parcel.state = str(row.get("state") or "OH")
+        parcel.zip = str(row.get("zip") or "43215")
+        parcel.geom = parcel_geom
+        parcel.centroid = centroid_geom
+        parcel.attributes_json = row.get("attributes_json") or {}
+        parcel.provenance_id = provenance.id
+        parcel.updated_at = datetime.now(tz=UTC)
+
+
+def _seed_permits(db, tenant_id, source: Source) -> None:
+    rows = load_seed_json("permits.json")
+    for row in rows:
+        external_id = str(row.get("external_id") or "").strip()
+        address = str(row.get("address") or "").strip()
+        if not external_id or not address:
+            continue
+
+        lon = row.get("lon")
+        lat = row.get("lat")
+        point = None
+        if isinstance(lon, (float, int)) and isinstance(lat, (float, int)):
+            point = from_shape(Point(float(lon), float(lat)), srid=4326)
+
+        provenance = _upsert_seed_provenance(
+            db,
+            source,
+            external_id=f"permit:{external_id}",
+            raw_url=f"seed://permits.json#{external_id}",
+            raw_json=row,
+        )
+
+        linked_parcel = db.execute(
+            select(Parcel).where(Parcel.tenant_id == tenant_id, Parcel.address.ilike(address))
+        ).scalar_one_or_none()
+
+        permit = db.execute(
+            select(Permit).where(Permit.tenant_id == tenant_id, Permit.external_id == external_id)
+        ).scalar_one_or_none()
+
+        if not permit:
+            permit = Permit(
+                tenant_id=tenant_id,
+                external_id=external_id,
+                parcel_id=linked_parcel.id if linked_parcel else None,
+                address=address,
+                permit_type=str(row.get("permit_type") or "Unknown"),
+                permit_subtype=row.get("permit_subtype"),
+                status=str(row.get("status") or "unknown"),
+                applied_date=_parse_date(row.get("applied_date")),
+                issued_date=_parse_date(row.get("issued_date")),
+                final_date=_parse_date(row.get("final_date")),
+                geom=point,
+                raw_json=row,
+                provenance_id=provenance.id,
+            )
+            db.add(permit)
+            continue
+
+        permit.parcel_id = linked_parcel.id if linked_parcel else permit.parcel_id
+        permit.address = address
+        permit.permit_type = str(row.get("permit_type") or "Unknown")
+        permit.permit_subtype = row.get("permit_subtype")
+        permit.status = str(row.get("status") or "unknown")
+        permit.applied_date = _parse_date(row.get("applied_date"))
+        permit.issued_date = _parse_date(row.get("issued_date"))
+        permit.final_date = _parse_date(row.get("final_date"))
+        permit.geom = point
+        permit.raw_json = row
+        permit.provenance_id = provenance.id
+
+
+def _seed_flood_zones(db, tenant_id, source: Source) -> None:
+    rows = load_seed_json("flood_zones.json")
+    for row in rows:
+        external_id = str(row.get("external_id") or "").strip()
+        zone_code = str(row.get("zone_code") or "UNKNOWN")
+        if not external_id:
+            continue
+
+        polygons = []
+        for ring_group in row.get("coordinates") or []:
+            if not ring_group:
+                continue
+            outer = ring_group[0]
+            if len(outer) < 4:
+                continue
+            try:
+                polygons.append(Polygon([(float(x), float(y)) for x, y in outer]))
+            except Exception:
+                continue
+        if not polygons:
+            continue
+
+        geom = from_shape(MultiPolygon(polygons), srid=4326)
+        provenance = _upsert_seed_provenance(
+            db,
+            source,
+            external_id=f"flood:{external_id}",
+            raw_url=f"seed://flood_zones.json#{external_id}",
+            raw_json=row,
+        )
+
+        flood = db.execute(
+            select(FloodZone).where(FloodZone.tenant_id == tenant_id, FloodZone.external_id == external_id)
+        ).scalar_one_or_none()
+
+        if not flood:
+            db.add(
+                FloodZone(
+                    tenant_id=tenant_id,
+                    external_id=external_id,
+                    zone_code=zone_code,
+                    geom=geom,
+                    raw_json=row,
+                    provenance_id=provenance.id,
+                )
+            )
+            continue
+
+        flood.zone_code = zone_code
+        flood.geom = geom
+        flood.raw_json = row
+        flood.provenance_id = provenance.id
+
+
+def _seed_pois(db, tenant_id, source: Source) -> None:
+    rows = load_seed_json("pois.json")
+    for row in rows:
+        external_id = str(row.get("external_id") or "").strip()
+        name = str(row.get("name") or "").strip()
+        category = str(row.get("category") or "unknown")
+        lon = row.get("lon")
+        lat = row.get("lat")
+
+        if not external_id or not name:
+            continue
+        if not isinstance(lon, (float, int)) or not isinstance(lat, (float, int)):
+            continue
+
+        point = from_shape(Point(float(lon), float(lat)), srid=4326)
+        provenance = _upsert_seed_provenance(
+            db,
+            source,
+            external_id=f"poi:{external_id}",
+            raw_url=f"seed://pois.json#{external_id}",
+            raw_json=row,
+        )
+
+        poi = db.execute(
+            select(PoiFeature).where(PoiFeature.tenant_id == tenant_id, PoiFeature.name == name)
+        ).scalar_one_or_none()
+
+        if not poi:
+            db.add(
+                PoiFeature(
+                    tenant_id=tenant_id,
+                    category=category,
+                    name=name,
+                    geom=point,
+                    raw_json=row,
+                    provenance_id=provenance.id,
+                )
+            )
+            continue
+
+        poi.category = category
+        poi.geom = point
+        poi.raw_json = row
+        poi.provenance_id = provenance.id
+
+
+def _seed_transit_stops(db, tenant_id, source: Source) -> None:
+    rows = load_seed_json("transit_stops.json")
+    for row in rows:
+        external_id = str(row.get("external_id") or "").strip()
+        name = str(row.get("name") or "").strip()
+        lon = row.get("lon")
+        lat = row.get("lat")
+
+        if not external_id or not name:
+            continue
+        if not isinstance(lon, (float, int)) or not isinstance(lat, (float, int)):
+            continue
+
+        point = from_shape(Point(float(lon), float(lat)), srid=4326)
+        provenance = _upsert_seed_provenance(
+            db,
+            source,
+            external_id=f"transit:{external_id}",
+            raw_url=f"seed://transit_stops.json#{external_id}",
+            raw_json=row,
+        )
+
+        stop = db.execute(
+            select(TransitStop).where(TransitStop.tenant_id == tenant_id, TransitStop.external_id == external_id)
+        ).scalar_one_or_none()
+
+        if not stop:
+            db.add(
+                TransitStop(
+                    tenant_id=tenant_id,
+                    external_id=external_id,
+                    name=name,
+                    geom=point,
+                    raw_json=row,
+                    provenance_id=provenance.id,
+                )
+            )
+            continue
+
+        stop.name = name
+        stop.geom = point
+        stop.raw_json = row
+        stop.provenance_id = provenance.id
+
+
+def _seed_public_demo_data(db, tenant_id) -> None:
+    seed_source = _ensure_seed_source(db)
+    _seed_parcels(db, tenant_id, seed_source)
+    _seed_permits(db, tenant_id, seed_source)
+    _seed_flood_zones(db, tenant_id, seed_source)
+    _seed_pois(db, tenant_id, seed_source)
+    _seed_transit_stops(db, tenant_id, seed_source)
+
+
 def bootstrap_seed() -> None:
+    deterministic_only = _truthy_env("SEED_DETERMINISTIC_ONLY", default=False)
+
     db = SessionLocal()
     try:
         tenant, _ = _ensure_tenant_and_user(db)
         _ensure_metric_definitions(db)
         _ensure_contacts_and_consents(db, tenant.id)
         _ensure_sequences(db, tenant.id)
+        _seed_public_demo_data(db, tenant.id)
         db.commit()
 
-        asyncio.run(run_ingestion(db, tenant.id))
+        if not deterministic_only:
+            asyncio.run(run_ingestion(db, tenant.id))
+
         _ensure_demo_drafts(db, tenant.id)
         db.commit()
     finally:
