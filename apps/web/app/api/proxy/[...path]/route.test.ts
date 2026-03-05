@@ -123,5 +123,55 @@ describe("api proxy route", function () {
  expect(fetchMock).toHaveBeenCalledTimes(1);
  expect(fetchMock.mock.calls[0][0]).toBe("http://api.internal/?x=1");
  });
+
+ it("forwards HEAD requests without a request body", async function () {
+ const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+ vi.stubGlobal("fetch", fetchMock as any);
+
+ const mod = await import("./route");
+ const req = new NextRequest("http://localhost/api/proxy/sources/status", {
+ method: "HEAD",
+ headers: {
+ authorization: "Bearer t",
+ "content-length": "99"
+ }
+ });
+
+ const res = await mod.GET(req, { params: { path: ["sources", "status"] } });
+
+ expect(fetchMock).toHaveBeenCalledTimes(1);
+ const call = fetchMock.mock.calls[0];
+ expect(call[0]).toBe("http://api.internal/sources/status");
+ const init = call[1] as RequestInit;
+ expect(init.method).toBe("HEAD");
+ expect(init.body).toBeUndefined();
+ const sent = init.headers as Headers;
+ expect(sent.get("content-length")).toBeNull();
+ expect(res.status).toBe(204);
+ });
+
+ it("forwards OPTIONS requests with body when present", async function () {
+ const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+ vi.stubGlobal("fetch", fetchMock as any);
+
+ const mod = await import("./route");
+ const req = new NextRequest("http://localhost/api/proxy/outreach/drafts", {
+ method: "OPTIONS",
+ body: "{}",
+ headers: {
+ "content-type": "application/json"
+ }
+ });
+
+ const res = await mod.OPTIONS(req, { params: { path: ["outreach", "drafts"] } });
+
+ expect(fetchMock).toHaveBeenCalledTimes(1);
+ const call = fetchMock.mock.calls[0];
+ expect(call[0]).toBe("http://api.internal/outreach/drafts");
+ const init = call[1] as RequestInit;
+ expect(init.method).toBe("OPTIONS");
+ expect(init.body).toBeTruthy();
+ expect(res.status).toBe(200);
+ });
 });
 
