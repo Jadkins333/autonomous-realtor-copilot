@@ -20,6 +20,14 @@ type OpportunityItem = {
   opportunity_flags: string[];
   status: "ok" | "insufficient_data";
   missing_inputs: string[];
+  event_signal?: {
+    count_30d?: number;
+    latest?: {
+      event_type?: string;
+      severity?: string;
+      created_at?: string;
+    } | null;
+  };
   neighborhood_heat: {
     value?: { score_0_100?: number };
   };
@@ -132,7 +140,18 @@ export default function OpportunitiesPage() {
                 ) : (
                   <Badge variant="outline">no active flags</Badge>
                 )}
+                <Badge variant="secondary">Events 30d {Number(row.event_signal?.count_30d || 0)}</Badge>
               </div>
+
+              {row.event_signal?.latest ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Latest trigger: {String(row.event_signal.latest.event_type || "unknown").replaceAll("_", " ")} (
+                  {row.event_signal.latest.severity || "n/a"}){" "}
+                  {row.event_signal.latest.created_at
+                    ? new Date(row.event_signal.latest.created_at).toLocaleString()
+                    : ""}
+                </p>
+              ) : null}
 
               {row.status === "insufficient_data" ? (
                 <p className="mt-3 text-xs text-amber-300">

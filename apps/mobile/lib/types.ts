@@ -66,6 +66,14 @@ export type OpportunityItem = {
   opportunity_flags: string[];
   status: "ok" | "insufficient_data";
   missing_inputs: string[];
+  event_signal?: {
+    count_30d?: number;
+    latest?: {
+      event_type?: string;
+      severity?: string;
+      created_at?: string;
+    } | null;
+  };
   neighborhood_heat: {
     value?: { score_0_100?: number };
   };

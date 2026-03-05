@@ -156,6 +156,31 @@ def list_opportunities(db: Session, tenant_id: UUID, limit: int = 50) -> dict:
         )
     }
 
+    thirty_days_ago = datetime.now(tz=UTC) - timedelta(days=30)
+    event_count_30d_map: dict[UUID, int] = {
+        row[0]: int(row[1])
+        for row in db.execute(
+            select(OpportunityEvent.parcel_id, func.count(OpportunityEvent.id))
+            .where(
+                OpportunityEvent.tenant_id == tenant_id,
+                OpportunityEvent.parcel_id.in_(parcel_ids),
+                OpportunityEvent.created_at >= thirty_days_ago,
+            )
+            .group_by(OpportunityEvent.parcel_id)
+        )
+    }
+    latest_event_map: dict[UUID, OpportunityEvent] = {}
+    for event in db.execute(
+        select(OpportunityEvent)
+        .where(
+            OpportunityEvent.tenant_id == tenant_id,
+            OpportunityEvent.parcel_id.in_(parcel_ids),
+        )
+        .order_by(OpportunityEvent.created_at.desc())
+    ).scalars():
+        if event.parcel_id not in latest_event_map:
+            latest_event_map[event.parcel_id] = event
+
     provenance_map: dict[UUID, ProvenanceRecord] = {}
     provenance_ids = [parcel.provenance_id for parcel in parcels if parcel.provenance_id]
     if provenance_ids:
@@ -312,6 +337,18 @@ def list_opportunities(db: Session, tenant_id: UUID, limit: int = 50) -> dict:
                 "opportunity_flags": flags,
                 "status": "insufficient_data" if missing_inputs else "ok",
                 "missing_inputs": missing_inputs,
+                "event_signal": {
+                    "count_30d": event_count_30d_map.get(parcel.id, 0),
+                    "latest": (
+                        {
+                            "event_type": latest_event_map[parcel.id].event_type,
+                            "severity": latest_event_map[parcel.id].severity,
+                            "created_at": latest_event_map[parcel.id].created_at.isoformat(),
+                        }
+                        if parcel.id in latest_event_map
+                        else None
+                    ),
+                },
                 "neighborhood_heat": {
                     "metric_key": heat_def.key,
                     "version": heat_def.version,

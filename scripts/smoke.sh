@@ -56,6 +56,10 @@ copilot_response="$(curl -fsS -X POST "${API_BASE}/copilot/chat" \
   -H "Authorization: Bearer ${token}" \
   -H 'Content-Type: application/json' \
   -d '{"message":"columbus market snapshot"}')"
+copilot_property_response="$(curl -fsS -X POST "${API_BASE}/copilot/chat" \
+  -H "Authorization: Bearer ${token}" \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"property profile for 145 N High St"}')"
 copilot_draft_response="$(curl -fsS -X POST "${API_BASE}/copilot/chat" \
   -H "Authorization: Bearer ${token}" \
   -H 'Content-Type: application/json' \
@@ -124,6 +128,20 @@ if missing:
 if "selected_agent" not in payload.get("trace", {}):
     raise SystemExit("copilot trace missing selected_agent")
 print("copilot chat shape ok")
+PY
+
+python3 - <<'PY' "${copilot_property_response}"
+import json,sys
+payload=json.loads(sys.argv[1])
+trace=payload.get("trace", {})
+if trace.get("selected_agent") != "property_intel":
+    raise SystemExit(f"unexpected selected_agent for property command: {trace.get('selected_agent')}")
+data=payload.get("data", {})
+required=["id","address","insights"]
+missing=[k for k in required if k not in data]
+if missing:
+    raise SystemExit(f"property copilot data missing keys: {missing}")
+print("copilot property routing ok")
 PY
 
 python3 - <<'PY' "${copilot_draft_response}" "${outreach_drafts_response}"

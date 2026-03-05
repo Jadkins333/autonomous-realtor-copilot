@@ -42,6 +42,13 @@ export default function OpportunitiesScreen() {
               <Text style={styles.address}>{item.address}</Text>
               <Text style={styles.meta}>Heat {Math.round(heat)} • Distress {(distress * 100).toFixed(0)}%</Text>
               <Text style={styles.meta}>{item.opportunity_flags.join(", ") || "no active flags"}</Text>
+              <Text style={styles.meta}>Events 30d: {Number(item.event_signal?.count_30d || 0)}</Text>
+              {item.event_signal?.latest ? (
+                <Text style={styles.meta}>
+                  Latest: {String(item.event_signal.latest.event_type || "unknown").replaceAll("_", " ")} (
+                  {item.event_signal.latest.severity || "n/a"})
+                </Text>
+              ) : null}
               {item.status === "insufficient_data" ? (
                 <Text style={styles.warn}>Partial signal: {item.missing_inputs.join(", ") || "missing inputs"}</Text>
               ) : null}
