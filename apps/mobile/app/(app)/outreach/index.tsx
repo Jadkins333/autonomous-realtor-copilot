@@ -150,7 +150,8 @@ export default function OutreachScreen() {
  void submitPack(selectedPack.id);
  }
  }}
- style={styles.submitButton}
+ disabled={actionBusy}
+ style={[styles.submitButton, actionBusy ? styles.disabledButton : null]}
  >
  <Text style={styles.submitButtonText}>Submit Pack</Text>
  </Pressable>
@@ -166,12 +167,12 @@ export default function OutreachScreen() {
  <View style={styles.actionRow}>
  <Pressable onPress={function () { if (!actionBusy) {
  void approveDraft(draft.id);
- } }} style={styles.actionButton}>
+ } }} disabled={actionBusy} style={[styles.actionButton, actionBusy ? styles.disabledButton : null]}>
  <Text style={styles.actionButtonText}>Approve</Text>
  </Pressable>
  <Pressable onPress={function () { if (!actionBusy) {
  void rejectDraft(draft.id);
- } }} style={styles.rejectButton}>
+ } }} disabled={actionBusy} style={[styles.rejectButton, actionBusy ? styles.disabledButton : null]}>
  <Text style={styles.rejectButtonText}>Reject</Text>
  </Pressable>
  </View>
@@ -305,9 +306,16 @@ const styles = StyleSheet.create({
  color: "#f87171",
  fontWeight: "700"
  },
+ disabledButton: {
+ opacity: 0.6
+ },
  emptyText: {
  color: "#94a3b8",
  marginTop: 10
  }
 });
+
+
+
+
 
