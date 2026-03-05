@@ -15,3 +15,6 @@ ignore = ["S101", "B008"]
 pythonpath = ["."]
 norecursedirs = ["apps"]
 asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+ "ignore:.*crypt.*deprecated.*:DeprecationWarning:passlib.utils"
+]
