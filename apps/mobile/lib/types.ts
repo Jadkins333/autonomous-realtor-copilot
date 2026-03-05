@@ -87,3 +87,12 @@ export type OpportunitiesResponse = {
   model_version?: string;
   items: OpportunityItem[];
 };
+
+export type SourceStatusItem = {
+ source_name: string;
+ mode: string;
+};
+
+export type SourceStatusResponse = {
+ items: SourceStatusItem[];
+};

@@ -4,7 +4,8 @@ import type {
   Contact,
   OpportunitiesResponse,
   OutreachDraft,
-  ParcelSummary
+  ParcelSummary,
+ SourceStatusResponse
 } from "./types";
 
 declare const process: { env: Record<string, string | undefined> };
@@ -53,6 +54,10 @@ export function login(email: string, password: string) {
 
 export function getMetrics(token: string) {
   return request<Record<string, unknown>>("/metrics", { token });
+}
+
+export function getSourcesStatus(token: string): Promise<SourceStatusResponse> {
+ return request("/sources/status", { token });
 }
 
 export function getCitySnapshot(token: string) {
@@ -152,3 +157,5 @@ export function rejectPackDraft(token: string, messageId: string) {
  token
  });
 }
+
+
