@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 
 import { useRequireAuth } from "@/components/auth-guard";
 import { ProvenanceDrawer } from "@/components/provenance-drawer";
@@ -85,6 +86,11 @@ export default function CopilotPage() {
         <CardDescription className="mt-1">
           Deterministic routing with trace metadata and provenance.
         </CardDescription>
+        <div className="mt-2">
+          <Link className="text-sm text-accent underline" href="/copilot/agents">
+            View all copilot agents
+          </Link>
+        </div>
         <div className="mt-4 flex flex-col gap-2 md:flex-row">
           <Input value={query} onChange={(event) => setQuery(event.target.value)} />
           <Button disabled={loading || isOffline} onClick={submitCommand}>

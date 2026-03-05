@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useRouter } from "expo-router";
 
 import { ProvenanceModal } from "../../../components/provenance-modal";
 import { copilotChat, getCopilotAgents } from "../../../lib/api";
@@ -21,6 +22,7 @@ type ChatMessage = {
 
 export default function CopilotScreen() {
   const { token } = useAuth();
+  const router = useRouter();
   const [input, setInput] = useState(DEMO_COMMANDS[0]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [agents, setAgents] = useState<Array<{ key: string; name: string }>>([]);
@@ -82,6 +84,9 @@ export default function CopilotScreen() {
               {agent.name}
             </Text>
           ))}
+          <Pressable onPress={() => router.push("/(app)/copilot/agents")} style={styles.agentButton}>
+            <Text style={styles.agentButtonText}>View all agents</Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -162,6 +167,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     fontSize: 11
+  },
+  agentButton: {
+    borderColor: "#334155",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4
+  },
+  agentButtonText: {
+    color: "#cbd5e1",
+    fontSize: 11,
+    fontWeight: "600"
   },
   list: {
     flex: 1
