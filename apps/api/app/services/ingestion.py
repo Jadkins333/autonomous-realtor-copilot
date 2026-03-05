@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from hashlib import sha256
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Callable
 
@@ -26,8 +27,19 @@ from app.models.entities import (
     SourceRun,
     TransitStop,
 )
-from app.models.enums import SourceRunStatus
+from app.models.enums import SourceMode, SourceRunStatus, SourceState
 from app.services.seed_loader import load_seed_json
+from app.services.source_ops import (
+    ensure_source_status_defaults,
+    get_or_create_source_status,
+    list_source_status,
+    pause_source,
+    recompute_source_dlq_count,
+    recompute_source_dlq_count_by_source_id,
+    resume_source,
+    touch_source_status_finish,
+    touch_source_status_start,
+)
 from app.utils.circuit_breaker import CircuitBreaker
 from app.utils.hash import stable_hash
 
@@ -41,6 +53,15 @@ BREAKERS = {
     "osm_overpass": CircuitBreaker(),
     "cota_gtfs": CircuitBreaker(),
 }
+
+CONNECTOR_SOURCE_NAMES = (
+    "franklin_auditor",
+    "columbus_arcgis_permits",
+    "fema_nfhl",
+    "osm_overpass",
+    "cota_gtfs",
+)
+PAYLOAD_VERSION = "v1"
 
 
 class ParcelPayload(BaseModel):
@@ -112,15 +133,40 @@ def _finish_source_run(db: Session, run: SourceRun, status: SourceRunStatus, err
     run.finished_at = datetime.now(tz=UTC)
 
 
-def _record_schema_drift(db: Session, source_id, raw_url: str, raw_json: dict, error_text: str) -> None:
+def _dlq_dedupe_key(source_name: str, external_id: str, event_type: str, payload_version: str) -> str:
+    # Dedupe policy during drift: source + external id + event type + normalized payload version.
+    packed = f"{source_name}|{external_id}|{event_type}|{payload_version}".encode("utf-8")
+    return sha256(packed).hexdigest()
+
+
+def _record_schema_drift(
+    db: Session,
+    *,
+    source: Source,
+    raw_url: str,
+    raw_json: dict,
+    error_text: str,
+    external_id: str,
+    event_type: str = "schema_validation_error",
+    payload_version: str = PAYLOAD_VERSION,
+) -> bool:
+    dedupe_key = _dlq_dedupe_key(source.name, external_id, event_type, payload_version)
+    exists = db.execute(select(SchemaDriftDLQ).where(SchemaDriftDLQ.dedupe_key == dedupe_key)).scalar_one_or_none()
+    if exists:
+        return False
     db.add(
         SchemaDriftDLQ(
-            source_id=source_id,
+            source_id=source.id,
             raw_url=raw_url,
+            external_id=external_id,
+            event_type=event_type,
+            payload_version=payload_version,
+            dedupe_key=dedupe_key,
             raw_json=raw_json,
             error_text=error_text,
         )
     )
+    return True
 
 
 def _upsert_provenance(
@@ -338,16 +384,26 @@ async def _process_rows(
     rows: list[dict[str, Any]],
     validator: Callable[[dict[str, Any]], BaseModel],
     upserter: Callable[[Session, Any, BaseModel, Any], None],
-) -> tuple[int, int]:
+) -> tuple[int, int, int]:
     ingested = 0
     skipped = 0
+    drift_count = 0
     for raw in rows:
         external_id = str(raw.get("external_id") or raw.get("id") or raw.get("parcel_number") or "unknown")
         raw_url = f"{raw_url_base}#{external_id}"
         try:
             item = validator(raw)
         except ValidationError as exc:
-            _record_schema_drift(db, source.id, raw_url, raw, str(exc))
+            if _record_schema_drift(
+                db,
+                source=source,
+                raw_url=raw_url,
+                raw_json=raw,
+                error_text=str(exc),
+                external_id=external_id,
+                event_type="schema_validation_error",
+            ):
+                drift_count += 1
             continue
 
         provenance, was_skipped = _upsert_provenance(db, source, external_id, raw_url, raw)
@@ -359,8 +415,17 @@ async def _process_rows(
             upserter(db, tenant_id, item, provenance.id)
             ingested += 1
         except Exception as exc:  # noqa: BLE001
-            _record_schema_drift(db, source.id, raw_url, raw, str(exc))
-    return ingested, skipped
+            if _record_schema_drift(
+                db,
+                source=source,
+                raw_url=raw_url,
+                raw_json=raw,
+                error_text=str(exc),
+                external_id=external_id,
+                event_type="upsert_error",
+            ):
+                drift_count += 1
+    return ingested, skipped, drift_count
 
 
 def _validate(model_cls):
@@ -394,6 +459,7 @@ async def run_ingestion(db: Session, tenant_id) -> dict:
     overpass_source = _get_or_create_source(db, "osm_overpass", settings.overpass_url, ttl_seconds=21600)
     gtfs_source = _get_or_create_source(db, "cota_gtfs", settings.gtfs_url or "seed://cota_gtfs", ttl_seconds=86400)
 
+    ensure_source_status_defaults(db, CONNECTOR_SOURCE_NAMES)
     db.flush()
 
     async def run_connector(
@@ -406,11 +472,52 @@ async def run_ingestion(db: Session, tenant_id) -> dict:
         fallback_status: SourceRunStatus = SourceRunStatus.partial,
     ):
         run = _start_source_run(db, source.id)
+        status_row = touch_source_status_start(db, source.name)
         breaker = BREAKERS[label]
         rows: list[dict[str, Any]] = []
         status = SourceRunStatus.success
         error_text = None
         used_seed = False
+        drift_detected = False
+        drift_reason = None
+
+        if status_row.state == SourceState.paused:
+            reason = status_row.paused_reason or "source paused"
+            _record_schema_drift(
+                db,
+                source=source,
+                raw_url=f"{source.base_url}#paused",
+                raw_json={"source": source.name, "reason": reason},
+                error_text=f"Source paused: {reason}",
+                external_id="source_paused",
+                event_type="paused_drift_skip" if status_row.drift_detected else "paused_manual_skip",
+            )
+            recompute_source_dlq_count_by_source_id(db, source.name, source.id)
+            status = SourceRunStatus.partial
+            error_text = f"Source paused: {reason}"
+            _finish_source_run(db, run, status, error_text)
+            touch_source_status_finish(
+                db,
+                source.name,
+                mode=SourceMode.fixture,
+                run_status=status,
+                error_text=error_text,
+                drift_detected=status_row.drift_detected,
+                drift_reason=status_row.drift_reason,
+                source_id=source.id,
+            )
+            summary["sources"][label] = {
+                "status": status.value,
+                "ingested": 0,
+                "skipped": 0,
+                "used_seed": True,
+                "seed_missing": False,
+                "error": error_text,
+                "mode": SourceMode.fixture.value,
+                "drift_detected": status_row.drift_detected,
+                "paused_reason": reason,
+            }
+            return
 
         if not breaker.allow():
             rows = load_seed_json(seed_filename)
@@ -453,7 +560,7 @@ async def run_ingestion(db: Session, tenant_id) -> dict:
             error_text = (error_text + " | seed missing") if error_text else "Seed missing"
             status = SourceRunStatus.failure
 
-        ingested, skipped = await _process_rows(
+        ingested, skipped, drift_count = await _process_rows(
             db,
             tenant_id,
             source,
@@ -462,10 +569,26 @@ async def run_ingestion(db: Session, tenant_id) -> dict:
             validator,
             upserter,
         )
+        if drift_count > 0:
+            drift_detected = True
+            drift_reason = f"schema drift detected ({drift_count} new DLQ item(s))"
+            status = SourceRunStatus.failure
+            error_text = drift_reason
 
         if status == SourceRunStatus.success and ingested == 0 and skipped > 0:
             status = SourceRunStatus.partial
         _finish_source_run(db, run, status, error_text)
+        mode = SourceMode.fixture if used_seed else SourceMode.live
+        touch_source_status_finish(
+            db,
+            source.name,
+            mode=mode,
+            run_status=status,
+            error_text=error_text,
+            drift_detected=drift_detected,
+            drift_reason=drift_reason,
+            source_id=source.id,
+        )
         summary["sources"][label] = {
             "status": status.value,
             "ingested": ingested,
@@ -473,6 +596,8 @@ async def run_ingestion(db: Session, tenant_id) -> dict:
             "used_seed": used_seed,
             "seed_missing": bool(used_seed and not rows),
             "error": error_text,
+            "mode": mode.value,
+            "drift_detected": drift_detected,
         }
 
     auditor_client = JsonRestConnector(
@@ -632,3 +757,136 @@ async def run_ingestion(db: Session, tenant_id) -> dict:
     db.commit()
     logger.info("ingestion_run_complete", extra={"summary": summary})
     return summary
+
+
+def get_sources_status(db: Session) -> list[dict[str, Any]]:
+    ensure_source_status_defaults(db, CONNECTOR_SOURCE_NAMES)
+    rows = list_source_status(db)
+    payload = []
+    for row in rows:
+        payload.append(
+            {
+                "source_name": row.source_name,
+                "mode": row.mode.value,
+                "state": row.state.value,
+                "last_run_started_at": row.last_run_started_at.isoformat() if row.last_run_started_at else None,
+                "last_run_finished_at": row.last_run_finished_at.isoformat() if row.last_run_finished_at else None,
+                "last_success_at": row.last_success_at.isoformat() if row.last_success_at else None,
+                "last_error": row.last_error,
+                "drift_detected": row.drift_detected,
+                "drift_reason": row.drift_reason,
+                "dlq_count": row.dlq_count,
+                "paused_reason": row.paused_reason,
+                "updated_at": row.updated_at.isoformat(),
+            }
+        )
+    return payload
+
+
+def set_source_pause(db: Session, source_name: str, reason: str) -> dict[str, Any]:
+    row = pause_source(db, source_name=source_name, reason=reason)
+    db.commit()
+    return {
+        "source_name": row.source_name,
+        "state": row.state.value,
+        "paused_reason": row.paused_reason,
+    }
+
+
+def set_source_resume(db: Session, source_name: str) -> dict[str, Any]:
+    row = resume_source(db, source_name=source_name)
+    recompute_source_dlq_count(db, source_name)
+    db.commit()
+    return {
+        "source_name": row.source_name,
+        "state": row.state.value,
+        "paused_reason": row.paused_reason,
+    }
+
+
+def _replay_config_for_source(source_name: str):
+    if source_name == "franklin_auditor":
+        return _validate(ParcelPayload), _upsert_parcel
+    if source_name == "columbus_arcgis_permits":
+        return _validate(PermitPayload), _upsert_permit
+    if source_name == "fema_nfhl":
+        return _validate(FloodZonePayload), _upsert_flood_zone
+    if source_name == "osm_overpass":
+        return _validate(PoiPayload), _upsert_poi
+    if source_name == "cota_gtfs":
+        return _validate(TransitPayload), _upsert_transit_stop
+    raise ValueError(f"Unsupported source '{source_name}'")
+
+
+def replay_source_dlq(db: Session, tenant_id, source_name: str) -> dict[str, Any]:
+    source = db.execute(select(Source).where(Source.name == source_name)).scalar_one_or_none()
+    if source is None:
+        raise ValueError(f"Unknown source '{source_name}'")
+
+    status_row = get_or_create_source_status(db, source_name)
+    if status_row.drift_detected:
+        return {
+            "ok": False,
+            "message": "Replay blocked: drift_detected=true. Resolve drift and resume source first.",
+            "attempted": 0,
+            "succeeded": 0,
+            "failed": 0,
+            "skipped_duplicate": 0,
+        }
+    if status_row.state == SourceState.paused:
+        return {
+            "ok": False,
+            "message": "Replay blocked: source is paused. Resume source first.",
+            "attempted": 0,
+            "succeeded": 0,
+            "failed": 0,
+            "skipped_duplicate": 0,
+        }
+
+    validator, upserter = _replay_config_for_source(source_name)
+    dlq_rows = list(
+        db.execute(select(SchemaDriftDLQ).where(SchemaDriftDLQ.source_id == source.id).order_by(SchemaDriftDLQ.occurred_at.asc())).scalars()
+    )
+
+    attempted = 0
+    succeeded = 0
+    failed = 0
+    skipped_duplicate = 0
+
+    for item in dlq_rows:
+        attempted += 1
+        if item.last_replayed_at is not None:
+            skipped_duplicate += 1
+            continue
+
+        try:
+            model = validator(item.raw_json)
+            external_id = str(model.model_dump(mode="python").get("external_id") or item.external_id or "unknown")
+            provenance, was_skipped = _upsert_provenance(
+                db=db,
+                source=source,
+                external_id=external_id,
+                raw_url=item.raw_url,
+                raw_json=item.raw_json,
+            )
+            if was_skipped:
+                skipped_duplicate += 1
+            else:
+                upserter(db, tenant_id, model, provenance.id)
+                succeeded += 1
+            item.replay_count += 1
+            item.last_replayed_at = datetime.now(tz=UTC)
+        except Exception as exc:  # noqa: BLE001
+            failed += 1
+            item.error_text = f"{item.error_text} | replay_error: {exc}"
+
+    recompute_source_dlq_count_by_source_id(db, source_name, source.id)
+    db.commit()
+    return {
+        "ok": True,
+        "message": "Replay completed",
+        "attempted": attempted,
+        "succeeded": succeeded,
+        "failed": failed,
+        "skipped_duplicate": skipped_duplicate,
+    }

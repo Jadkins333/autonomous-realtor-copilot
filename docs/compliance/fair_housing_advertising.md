@@ -1,5 +1,7 @@
 # Fair Housing Advertising Guardrails
 
+See [Compliance Notice](./NOTICE.md).
+
 The marketing package scorer applies a fair-housing risk screen and returns `flagged_terms` in scoring output.
 
 Implementation notes:

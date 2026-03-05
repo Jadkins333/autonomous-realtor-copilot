@@ -1,6 +1,7 @@
 # TCPA Policy Guardrails (SMS/Voice)
 
-This project uses conservative, configurable policy defaults for outbound SMS/voice. It is not legal advice.
+This project uses conservative, configurable policy defaults for outbound SMS/voice.
+See [Compliance Notice](./NOTICE.md).
 
 Implementation defaults:
 - Human approval before send remains the default product flow.

@@ -1,5 +1,7 @@
 # CAN-SPAM Compliance (Email)
 
+See [Compliance Notice](./NOTICE.md).
+
 This project enforces draft-first outbound email controls through suppression handling and auditable message state transitions.
 
 Implementation notes:

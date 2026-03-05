@@ -42,3 +42,9 @@ def get_optional_auth_context(
     if not payload:
         return None
     return AuthContext(user_id=UUID(payload["sub"]), tenant_id=UUID(payload["tenant_id"]), role=payload.get("role", "agent"))
+
+
+def get_admin_auth_context(auth: AuthContext = Depends(get_auth_context)) -> AuthContext:
+    if auth.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
+    return auth

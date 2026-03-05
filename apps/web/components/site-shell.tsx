@@ -6,11 +6,13 @@ import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 
 import { OfflineBanner } from "@/components/offline-banner";
+import { FixtureModeBanner } from "@/components/fixture-mode-banner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/setup", label: "Setup" },
   { href: "/opportunities", label: "Opportunities" },
   { href: "/copilot", label: "Copilot" },
   { href: "/properties", label: "Properties" },
@@ -38,6 +40,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
       </header>
       <div className="mx-auto w-full max-w-7xl px-4">
         <OfflineBanner />
+        <FixtureModeBanner />
       </div>
       <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-4 px-4 pb-8 md:grid-cols-[220px,1fr]">
         <nav className="h-fit rounded-2xl border bg-card p-3">

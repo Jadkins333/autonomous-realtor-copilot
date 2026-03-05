@@ -12,6 +12,18 @@ class SourceRunStatus(str, enum.Enum):
     failure = "failure"
 
 
+class SourceMode(str, enum.Enum):
+    live = "live"
+    fixture = "fixture"
+
+
+class SourceState(str, enum.Enum):
+    ok = "ok"
+    partial = "partial"
+    failed = "failed"
+    paused = "paused"
+
+
 class Channel(str, enum.Enum):
     email = "email"
     sms = "sms"

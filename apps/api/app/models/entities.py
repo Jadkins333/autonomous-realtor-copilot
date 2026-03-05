@@ -24,7 +24,9 @@ from app.models.enums import (
     EnrollmentState,
     MessageDirection,
     MessageStatus,
+    SourceMode,
     SourceRunStatus,
+    SourceState,
     UserRole,
 )
 
@@ -63,6 +65,24 @@ class Source(Base):
     license_notes: Mapped[str | None] = mapped_column(Text)
     default_ttl_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=86400)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class SourceStatus(Base):
+    __tablename__ = "source_status"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source_name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    mode: Mapped[SourceMode] = mapped_column(Enum(SourceMode, name="source_mode"), nullable=False)
+    state: Mapped[SourceState] = mapped_column(Enum(SourceState, name="source_state"), nullable=False)
+    last_run_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_run_finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(Text)
+    drift_detected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    drift_reason: Mapped[str | None] = mapped_column(String(512))
+    dlq_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    paused_reason: Mapped[str | None] = mapped_column(String(512))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
 
 
 class SourceRun(Base):
@@ -334,5 +354,11 @@ class SchemaDriftDLQ(Base):
     source_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("sources.id"), nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     raw_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    external_id: Mapped[str | None] = mapped_column(String(255))
+    event_type: Mapped[str] = mapped_column(String(128), nullable=False, default="schema_validation_error")
+    payload_version: Mapped[str] = mapped_column(String(64), nullable=False, default="v1")
+    dedupe_key: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     raw_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     error_text: Mapped[str] = mapped_column(Text, nullable=False)
+    replay_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_replayed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

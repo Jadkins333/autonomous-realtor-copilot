@@ -23,7 +23,7 @@ check "docker daemon" "docker info"
 
 if ! docker compose ps >/dev/null 2>&1; then
   echo "[doctor] fail: docker compose stack unavailable"
-  echo "[doctor] fix: run 'pnpm setup' or 'docker compose up -d --build db redis api worker beat web'"
+  echo "[doctor] fix: run 'pnpm run project:setup' or 'docker compose up -d --build db redis api worker beat web'"
   exit 1
 fi
 
@@ -40,7 +40,7 @@ if [ "$status" -ne 0 ]; then
   echo "[doctor] fixes:"
   echo "  1) ensure Docker Desktop is running"
   echo "  2) ensure ports 3000/8000/5432/6379 are free"
-  echo "  3) run 'pnpm setup'"
+  echo "  3) run 'pnpm run project:setup'"
   exit 1
 fi
 

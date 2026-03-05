@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_name: str = "Autonomous Realtor Intelligence Copilot API"
+    environment: str = "development"
+    debug_diag: bool = False
     log_level: str = "INFO"
     sandbox_mode: bool = True
     jwt_secret: str = "change-me"
