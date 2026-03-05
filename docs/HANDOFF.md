@@ -552,3 +552,10 @@ New regression coverage:
 - Verified with:
  - `pnpm run project:doctor` (all checks passed)
  - `pnpm smoke` (passed end-to-end).
+
+## T) CORS Policy Hardening (2026-03-05)
+- Replaced API CORS wildcard defaults with explicit configurable origins.
+- New setting: `CORS_ALLOW_ORIGINS` (comma-separated), default `http://localhost:3000,http://127.0.0.1:3000`.
+- Middleware now derives `allow_credentials` from origin mode (`false` for wildcard, `true` otherwise).
+- Files: `apps/api/app/core/config.py`, `apps/api/app/main.py`, `.env.example`.
+- Added regression coverage: `apps/api/tests/test_cors_policy.py` (config parsing, wildcard handling, preflight allow-origin behavior).
