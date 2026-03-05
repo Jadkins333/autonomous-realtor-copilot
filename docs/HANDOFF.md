@@ -536,3 +536,12 @@ New regression coverage:
  - `test_approve_and_send_email_non_sandbox_invokes_provider`
  - `test_approve_and_send_sms_non_sandbox_invokes_provider`
 - Assertions include provider invocation arguments, sent status transition, provider message id propagation, and pack status passthrough.
+
+## R) Web Fixture Banner Test Coverage (2026-03-05)
+- Added component tests for fixture banner behavior under failure and success paths.
+- File: `apps/web/app/fixture-mode-banner.test.tsx`.
+- Covers:
+ - dev-visible warning when session cache parse fails,
+ - dev-visible warning when `/sources/status` refresh fails,
+ - fixture banner visibility when a critical source reports `mode=fixture`.
+- Minor compatibility fix for Vitest JSX runtime: `apps/web/components/fixture-mode-banner.tsx` now imports `React` default.
