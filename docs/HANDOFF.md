@@ -528,3 +528,11 @@ New regression coverage:
 - Mobile API now exposes typed source-status client call: `apps/mobile/lib/api.ts`, `apps/mobile/lib/types.ts`.
 - Failure path is dev-visible (warning text + console warning) rather than silently hidden.
 - Verification: `pnpm --filter mobile exec tsc --noEmit -p tsconfig.check.json` passed.
+
+## Q) Outreach Provider Path Regression Coverage (2026-03-05)
+- Added regression tests proving non-sandbox approve/send invokes live provider path for both email and sms drafts.
+- File: `apps/api/tests/test_phase2_handoff_regressions.py`.
+- New tests:
+ - `test_approve_and_send_email_non_sandbox_invokes_provider`
+ - `test_approve_and_send_sms_non_sandbox_invokes_provider`
+- Assertions include provider invocation arguments, sent status transition, provider message id propagation, and pack status passthrough.
