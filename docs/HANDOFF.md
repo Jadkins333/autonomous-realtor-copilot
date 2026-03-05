@@ -507,3 +507,16 @@ Coverage gaps observed:
 ### MLS/RESO future status
 - Current status: disabled plugin scaffold only (`apps/api/app/integrations/reso/`).
 - To enable later: tenant credential storage + metadata sync + resource mapping + explicit legal/commercial credential workflow + guarded feature flag rollout.
+
+## O) Phase2 Redo Update (2026-03-05)
+Resolved in branch `codex/phase2-sources-ui-tests`:
+- Ingestion now uses bounded retry with backoff+jitter before fixture fallback (`apps/api/app/services/ingestion.py`).
+- Outreach approve/send bug fixed for non-sandbox email/sms sends; missing-contact failures now return safely and keep `pack_status` guarded (`apps/api/app/services/outreach.py`).
+- `/sources/status` now has an explicit response schema contract (`apps/api/app/schemas/sources.py`, `apps/api/app/api/routes_sources.py`).
+- Mobile outreach now supports draft pack list + detail + submit + approve + reject actions (`apps/mobile/app/(app)/outreach/index.tsx`, `apps/mobile/lib/api.ts`).
+- Fixture banner no longer silently swallows source-status failures; dev-visible warning path added (`apps/web/components/fixture-mode-banner.tsx`).
+- Web proxy route tests added and Vitest discovery expanded to include app route tests (`apps/web/app/api/proxy/[...path]/route.test.ts`, `apps/web/vitest.config.ts`).
+
+New regression coverage:
+- `apps/api/tests/test_phase2_handoff_regressions.py` verifies retry+jitter behavior, outreach pack-status safety in approve/send error path, and authenticated `/sources/status` response shape.
+- `apps/web/app/api/proxy/[...path]/route.test.ts` verifies proxy forwarding for GET query/header stripping and POST body forwarding.
