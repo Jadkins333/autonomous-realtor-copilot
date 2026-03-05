@@ -73,4 +73,55 @@ describe("api proxy route", function () {
  expect(init.body).toBeTruthy();
  expect(res.status).toBe(201);
  });
+
+ it("strips content-encoding and transfer-encoding response headers", async function () {
+ const fetchMock = vi.fn().mockResolvedValue(
+ new Response("ok", {
+ status: 200,
+ headers: {
+ "content-type": "text/plain",
+ "content-encoding": "gzip",
+ "transfer-encoding": "chunked",
+ "x-proxy-test": "yes"
+ }
+ })
+ );
+ vi.stubGlobal("fetch", fetchMock as any);
+
+ const mod = await import("./route");
+ const req = new NextRequest("http://localhost/api/proxy/healthz", { method: "GET" });
+
+ const res = await mod.GET(req, { params: { path: ["healthz"] } });
+
+ expect(res.headers.get("content-encoding")).toBeNull();
+ expect(res.headers.get("transfer-encoding")).toBeNull();
+ expect(res.headers.get("x-proxy-test")).toBe("yes");
+ });
+
+ it("encodes path segments before forwarding", async function () {
+ const fetchMock = vi.fn().mockResolvedValue(new Response("ok", { status: 200 }));
+ vi.stubGlobal("fetch", fetchMock as any);
+
+ const mod = await import("./route");
+ const req = new NextRequest("http://localhost/api/proxy/raw?q=a%2Fb", { method: "GET" });
+
+ await mod.GET(req, { params: { path: ["spaces and/slash", "100%"] } });
+
+ expect(fetchMock).toHaveBeenCalledTimes(1);
+ expect(fetchMock.mock.calls[0][0]).toBe("http://api.internal/spaces%20and%2Fslash/100%25?q=a%2Fb");
+ });
+
+ it("handles undefined path arrays by proxying to API root", async function () {
+ const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+ vi.stubGlobal("fetch", fetchMock as any);
+
+ const mod = await import("./route");
+ const req = new NextRequest("http://localhost/api/proxy?x=1", { method: "GET" });
+
+ await mod.GET(req, { params: { path: undefined as unknown as string[] } });
+
+ expect(fetchMock).toHaveBeenCalledTimes(1);
+ expect(fetchMock.mock.calls[0][0]).toBe("http://api.internal/?x=1");
+ });
 });
+
