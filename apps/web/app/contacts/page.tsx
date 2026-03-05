@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 
-import { useRequireAuth } from "@/components/auth-guard";
-import { SiteShell } from "@/components/site-shell";
-import { Button } from "@/components/ui/button";
-import { Card, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Table, Td, Th } from "@/components/ui/table";
-import { apiFetch } from "@/lib/api";
+import { useRequireAuth } from "../../components/auth-guard";
+import { SiteShell } from "../../components/site-shell";
+import { Button } from "../../components/ui/button";
+import { Card, CardTitle } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import { Table, Td, Th } from "../../components/ui/table";
+import { apiFetch } from "../../lib/api";
 
 export default function ContactsPage() {
   const { status } = useRequireAuth();
