@@ -122,3 +122,33 @@ export function getCopilotAgents(token: string) {
     token
   });
 }
+
+export function listDraftPacks(token: string, limit = 20) {
+ const safeLimit = encodeURIComponent(String(limit));
+ return request(`/outreach/draft-packs?limit=${safeLimit}`, { token });
+}
+
+export function getDraftPack(token: string, packId: string) {
+ return request(`/outreach/draft-pack/${packId}`, { token });
+}
+
+export function submitDraftPack(token: string, packId: string) {
+ return request(`/outreach/draft-pack/${packId}/submit`, {
+ method: "POST",
+ token
+ });
+}
+
+export function approvePackDraft(token: string, messageId: string) {
+ return request(`/outreach/drafts/${messageId}/approve`, {
+ method: "POST",
+ token
+ });
+}
+
+export function rejectPackDraft(token: string, messageId: string) {
+ return request(`/outreach/drafts/${messageId}/reject`, {
+ method: "POST",
+ token
+ });
+}
