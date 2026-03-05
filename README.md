@@ -180,6 +180,7 @@ Reference docs:
 - `GET /parcels/search?query=`
 - `GET /parcels/{parcel_id}`
 - `GET /opportunities`
+- `GET /opportunities/events`
 - `POST /ingest/run`
 - `GET /insights/city/columbus`
 - `GET /insights/parcels/{parcel_id}`

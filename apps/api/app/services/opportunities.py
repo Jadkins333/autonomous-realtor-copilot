@@ -389,3 +389,52 @@ def list_opportunities(db: Session, tenant_id: UUID, limit: int = 50) -> dict:
         "model_version": "v1",
         "items": items,
     }
+
+
+def list_opportunity_events(
+    db: Session,
+    tenant_id: UUID,
+    *,
+    parcel_id: UUID | None = None,
+    severity: str | None = None,
+    days: int = 30,
+    limit: int = 100,
+) -> dict:
+    cutoff = datetime.now(tz=UTC) - timedelta(days=days)
+    stmt = (
+        select(OpportunityEvent, Parcel)
+        .join(Parcel, Parcel.id == OpportunityEvent.parcel_id)
+        .where(
+            OpportunityEvent.tenant_id == tenant_id,
+            OpportunityEvent.created_at >= cutoff,
+        )
+        .order_by(OpportunityEvent.created_at.desc())
+        .limit(limit)
+    )
+    if parcel_id:
+        stmt = stmt.where(OpportunityEvent.parcel_id == parcel_id)
+    if severity:
+        stmt = stmt.where(OpportunityEvent.severity == severity)
+
+    rows = db.execute(stmt).all()
+    return {
+        "status": "ok",
+        "filters": {
+            "parcel_id": str(parcel_id) if parcel_id else None,
+            "severity": severity,
+            "days": days,
+            "limit": limit,
+        },
+        "items": [
+            {
+                "id": str(event.id),
+                "parcel_id": str(event.parcel_id),
+                "address": parcel.address,
+                "event_type": event.event_type,
+                "severity": event.severity,
+                "details": event.details_json,
+                "created_at": event.created_at.isoformat(),
+            }
+            for event, parcel in rows
+        ],
+    }

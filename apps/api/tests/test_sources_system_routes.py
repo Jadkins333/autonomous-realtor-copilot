@@ -38,6 +38,12 @@ def test_opportunities_requires_auth() -> None:
     assert response.status_code == 401
 
 
+def test_opportunity_events_requires_auth() -> None:
+    with TestClient(app) as client:
+        response = client.get("/opportunities/events")
+    assert response.status_code == 401
+
+
 def test_opportunities_shape_for_authenticated_user(monkeypatch) -> None:
     app.dependency_overrides[get_db] = lambda: DummyDB()
     monkeypatch.setattr(
@@ -64,6 +70,38 @@ def test_opportunities_shape_for_authenticated_user(monkeypatch) -> None:
         assert payload["status"] == "ok"
         assert isinstance(payload["items"], list)
         assert "parcel_id" in payload["items"][0]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_opportunity_events_shape_for_authenticated_user(monkeypatch) -> None:
+    app.dependency_overrides[get_db] = lambda: DummyDB()
+    monkeypatch.setattr(
+        "app.api.routes_opportunities.list_opportunity_events",
+        lambda *_args, **_kwargs: {
+            "status": "ok",
+            "filters": {"days": 30},
+            "items": [
+                {
+                    "id": str(uuid4()),
+                    "parcel_id": str(uuid4()),
+                    "address": "145 N High St",
+                    "event_type": "distress_signal_crossed",
+                    "severity": "medium",
+                    "created_at": "2026-03-05T00:00:00+00:00",
+                }
+            ],
+        },
+    )
+
+    try:
+        with TestClient(app) as client:
+            response = client.get("/opportunities/events?days=30", headers=_auth_header("agent"))
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["status"] == "ok"
+        assert isinstance(payload["items"], list)
+        assert "event_type" in payload["items"][0]
     finally:
         app.dependency_overrides.clear()
 

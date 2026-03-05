@@ -87,6 +87,11 @@ export default function OpportunitiesPage() {
         <CardDescription>
           Public-data opportunity feed using deterministic parcel heuristics with provenance-backed inputs.
         </CardDescription>
+        <div className="mt-2">
+          <Link className="text-sm text-accent underline" href="/opportunities/events">
+            View opportunity event log
+          </Link>
+        </div>
       </Card>
 
       <Card className="mb-4 p-4">

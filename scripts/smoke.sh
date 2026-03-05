@@ -52,6 +52,7 @@ PY
 
 detail_response="$(curl -fsS "${API_BASE}/parcels/${parcel_id}" -H "Authorization: Bearer ${token}")"
 opportunities_response="$(curl -fsS "${API_BASE}/opportunities" -H "Authorization: Bearer ${token}")"
+opportunity_events_response="$(curl -fsS "${API_BASE}/opportunities/events?days=30" -H "Authorization: Bearer ${token}")"
 copilot_response="$(curl -fsS -X POST "${API_BASE}/copilot/chat" \
   -H "Authorization: Bearer ${token}" \
   -H 'Content-Type: application/json' \
@@ -116,6 +117,17 @@ if payload["items"]:
     if missing:
         raise SystemExit(f"opportunities item missing keys: {missing}")
 print("opportunities shape ok")
+PY
+
+python3 - <<'PY' "${opportunity_events_response}"
+import json,sys
+payload=json.loads(sys.argv[1])
+if payload.get("status") != "ok":
+    raise SystemExit("opportunity events status not ok")
+items=payload.get("items")
+if not isinstance(items, list):
+    raise SystemExit("opportunity events missing items")
+print("opportunity events shape ok")
 PY
 
 python3 - <<'PY' "${copilot_response}"
