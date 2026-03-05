@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+import random
 from hashlib import sha256
 from datetime import UTC, date, datetime, timedelta
-from typing import Any, Callable
+from typing import Any, Awaitable, Callable
 
 from geoalchemy2.shape import from_shape
 from pydantic import BaseModel, ValidationError
@@ -62,6 +64,9 @@ CONNECTOR_SOURCE_NAMES = (
     "cota_gtfs",
 )
 PAYLOAD_VERSION = "v1"
+RETRY_MAX_ATTEMPTS = 3
+RETRY_BASE_DELAY_SECONDS = 0.2
+RETRY_JITTER_SECONDS = 0.25
 
 
 class ParcelPayload(BaseModel):
@@ -435,6 +440,36 @@ def _validate(model_cls):
     return _inner
 
 
+async def _retry_with_jitter(
+    fetch_live: Callable[[], Awaitable[list[dict[str, Any]]]],
+    *,
+    source_label: str,
+    max_attempts: int = RETRY_MAX_ATTEMPTS,
+    base_delay_seconds: float = RETRY_BASE_DELAY_SECONDS,
+    jitter_seconds: float = RETRY_JITTER_SECONDS,
+) -> list[dict[str, Any]]:
+    attempt = 1
+    while True:
+        try:
+            return await fetch_live()
+        except Exception: # noqa: BLE001
+            if attempt >= max_attempts:
+                raise
+            backoff = base_delay_seconds * (2 ** (attempt - 1))
+            jitter = random.uniform(0, jitter_seconds)
+            delay = backoff + jitter
+            logger.warning(
+                "ingest_live_fetch_retry",
+                extra={
+                 "source": source_label,
+                 "attempt": attempt,
+                 "max_attempts": max_attempts,
+                 "delay_seconds": round(delay, 3),
+                },
+            )
+            await asyncio.sleep(delay)
+            attempt += 1
+
 async def run_ingestion(db: Session, tenant_id) -> dict:
     summary: dict[str, Any] = {"sources": {}}
 
@@ -530,7 +565,7 @@ async def run_ingestion(db: Session, tenant_id) -> dict:
             )
         else:
             try:
-                rows = await fetch_live()
+                rows = await _retry_with_jitter(fetch_live, source_label=label)
                 breaker.success()
                 logger.info(
                     "ingest_live_fetch_success",
@@ -898,3 +933,10 @@ def replay_source_dlq(db: Session, tenant_id, source_name: str) -> dict[str, Any
         "failed": failed,
         "skipped_duplicate": skipped_duplicate,
     }
+
+
+
+
+
+
+

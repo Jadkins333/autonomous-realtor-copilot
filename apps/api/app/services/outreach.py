@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -22,6 +23,26 @@ from app.services.compliance import enforce_outbound_policy, stop_enrollments_on
 from app.services.providers import get_email_provider, get_sms_provider
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
+
+def _message_meta(message: Message, **updates):
+    return {**(message.meta_json or {}), **updates}
+
+
+def _safe_pack_status(db: Session, pack_id):
+    if pack_id is None:
+        return None
+    try:
+        return _refresh_pack_rollup_status(db, pack_id)
+    except Exception as exc: # noqa: BLE001
+        logger.warning(
+            "outreach_pack_status_refresh_failed",
+            extra={
+             "pack_id": str(pack_id),
+             "error": str(exc),
+            },
+        )
+        return None
 
 
 def list_drafts(db: Session, tenant_id: UUID) -> list[Message]:
@@ -291,8 +312,8 @@ async def approve_and_send(db: Session, tenant_id: UUID, message_id: UUID) -> di
     allowed, reason = enforce_outbound_policy(db, message)
     if not allowed:
         message.status = MessageStatus.blocked
-        message.meta_json = {**message.meta_json, "blocked_reason": reason, "approval_state": "approved"}
-        pack_status = _refresh_pack_rollup_status(db, message.pack_id) if message.pack_id else None
+        message.meta_json = _message_meta(message, blocked_reason=reason, approval_state="approved")
+        pack_status = _safe_pack_status(db, message.pack_id)
         db.commit()
         return {
             "status": "blocked",
@@ -307,12 +328,12 @@ async def approve_and_send(db: Session, tenant_id: UUID, message_id: UUID) -> di
 
     if settings.sandbox_mode:
         message.status = MessageStatus.blocked
-        message.meta_json = {
-            **message.meta_json,
-            "sandbox_staged": True,
-            "approval_state": "approved",
-            "blocked_reason": "Sandbox mode blocks real sends",
-        }
+        message.meta_json = _message_meta(
+            message,
+            sandbox_staged=True,
+            approval_state="approved",
+            blocked_reason="Sandbox mode blocks real sends",
+        )
         db.add(
             ComplianceEvent(
                 tenant_id=tenant_id,
@@ -323,7 +344,7 @@ async def approve_and_send(db: Session, tenant_id: UUID, message_id: UUID) -> di
                 details_json={"sandbox_mode": True, "channel": message.channel.value},
             )
         )
-        pack_status = _refresh_pack_rollup_status(db, message.pack_id) if message.pack_id else None
+        pack_status = _safe_pack_status(db, message.pack_id)
         db.commit()
         return {
             "status": "blocked_sandbox",
@@ -337,42 +358,60 @@ async def approve_and_send(db: Session, tenant_id: UUID, message_id: UUID) -> di
         provider = get_email_provider()
         if not contact.email:
             message.status = MessageStatus.failed
-            message.meta_json = {**message.meta_json, "error": "Contact has no email"}
+            message.meta_json = _message_meta(message, error="Contact has no email")
+            pack_status = _safe_pack_status(db, message.pack_id)
             db.commit()
-        return {"status": "failed", "reason": "Contact has no email"}
-        if not settings.sandbox_mode and getattr(provider, "name", "") == "console_email":
-            message.meta_json = {
-                **message.meta_json,
-                "provider_fallback_reason": "Missing Postmark credentials; using console provider",
+            return {
+                "status": "failed",
+                "reason": "Contact has no email",
+                "pack_id": message.pack_id,
+                "pack_status": pack_status,
             }
+        if not settings.sandbox_mode and getattr(provider, "name", "") == "console_email":
+            message.meta_json = _message_meta(
+                message,
+                provider_fallback_reason="Missing Postmark credentials; using console provider",
+            )
         result = await provider.send(contact.email, message.subject or "", message.body)
     elif message.channel == Channel.sms:
         provider = get_sms_provider()
         if not contact.phone:
             message.status = MessageStatus.failed
-            message.meta_json = {**message.meta_json, "error": "Contact has no phone"}
+            message.meta_json = _message_meta(message, error="Contact has no phone")
+            pack_status = _safe_pack_status(db, message.pack_id)
             db.commit()
-        return {"status": "failed", "reason": "Contact has no phone"}
-        if not settings.sandbox_mode and getattr(provider, "name", "") == "console_sms":
-            message.meta_json = {
-                **message.meta_json,
-                "provider_fallback_reason": "Missing Twilio credentials; using console provider",
+            return {
+                "status": "failed",
+                "reason": "Contact has no phone",
+                "pack_id": message.pack_id,
+                "pack_status": pack_status,
             }
+        if not settings.sandbox_mode and getattr(provider, "name", "") == "console_sms":
+            message.meta_json = _message_meta(
+                message,
+                provider_fallback_reason="Missing Twilio credentials; using console provider",
+            )
         result = await provider.send(contact.phone, message.body)
     else:
         message.status = MessageStatus.queued
-        message.meta_json = {**message.meta_json, "voice_provider": "not_implemented", "sandbox_staged": True}
+        message.meta_json = _message_meta(message, voice_provider="not_implemented", sandbox_staged=True)
+        pack_status = _safe_pack_status(db, message.pack_id)
         db.commit()
-        return {"status": "queued", "sandbox": True, "pack_id": message.pack_id}
+        return {
+            "status": "queued",
+            "sandbox": True,
+            "pack_id": message.pack_id,
+            "pack_status": pack_status,
+        }
 
     if result.ok:
         message.status = MessageStatus.sent
         message.sent_at = datetime.now(tz=UTC)
         message.provider_message_id = result.provider_message_id
-        message.meta_json = {**message.meta_json, "approval_state": "approved"}
+        message.meta_json = _message_meta(message, approval_state="approved")
     else:
         message.status = MessageStatus.failed
-        message.meta_json = {**message.meta_json, "provider_error": result.error}
+        message.meta_json = _message_meta(message, provider_error=result.error)
 
     convo = db.execute(
         select(Conversation).where(
@@ -385,7 +424,7 @@ async def approve_and_send(db: Session, tenant_id: UUID, message_id: UUID) -> di
         db.add(convo)
     convo.last_outbound_at = datetime.now(tz=UTC)
 
-    pack_status = _refresh_pack_rollup_status(db, message.pack_id) if message.pack_id else None
+    pack_status = _safe_pack_status(db, message.pack_id)
     db.commit()
     return {
         "status": message.status.value,
@@ -393,7 +432,6 @@ async def approve_and_send(db: Session, tenant_id: UUID, message_id: UUID) -> di
         "pack_id": message.pack_id,
         "pack_status": pack_status,
     }
-
 
 def reject_draft(db: Session, tenant_id: UUID, message_id: UUID, reason: str | None = None) -> dict:
     message = db.execute(
@@ -409,12 +447,12 @@ def reject_draft(db: Session, tenant_id: UUID, message_id: UUID, reason: str | N
         raise ValueError("Only draft messages can be rejected")
 
     message.status = MessageStatus.blocked
-    message.meta_json = {
-        **message.meta_json,
-        "approval_state": "rejected",
-        "rejected_reason": reason or "manual_reject",
-    }
-    pack_status = _refresh_pack_rollup_status(db, message.pack_id) if message.pack_id else None
+    message.meta_json = _message_meta(
+        message,
+        approval_state="rejected",
+        rejected_reason=reason or "manual_reject",
+    )
+    pack_status = _safe_pack_status(db, message.pack_id)
     db.commit()
     return {
         "id": message.id,
@@ -552,3 +590,5 @@ def handle_inbound_sms(
         "global_revocation_applied": bool(stop_triggered and settings.enforce_global_revocation),
         "enrollments_stopped": stopped,
     }
+
+
