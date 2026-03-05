@@ -13,4 +13,6 @@ Implementation notes:
 - This is a policy-control layer and should be reviewed by counsel for production deployments.
 
 Reference:
-- Guidance on application of the Fair Housing Act to digital advertising: https://www.equalhousing.org/resources/guidance-on-application-of-the-fair-housing-act-to-the-advertising-of-housing-credit-and-other-real-estate-related-transactions-through-digital-platforms/
+- HUD Fair Housing Act overview (primary): https://www.hud.gov/program_offices/fair_housing_equal_opp/fair_housing_act_overview
+- HUD Office of Fair Housing and Equal Opportunity (primary): https://www.hud.gov/fairhousing
+- Digital advertising guidance summary (secondary): https://www.equalhousing.org/resources/guidance-on-application-of-the-fair-housing-act-to-the-advertising-of-housing-credit-and-other-real-estate-related-transactions-through-digital-platforms/

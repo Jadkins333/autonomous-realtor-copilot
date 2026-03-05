@@ -15,6 +15,7 @@
       "baths": 2,
       "sqft": 1890,
       "lot_sqft": 5100,
+      "last_sale_date": "2018-06-15",
       "coordinates": [-82.9989, 39.9654]
     }
   },
@@ -34,6 +35,7 @@
       "baths": 2,
       "sqft": 1210,
       "lot_sqft": 0,
+      "last_sale_date": "2020-04-10",
       "coordinates": [-83.0097, 39.9752]
     }
   },
@@ -53,6 +55,7 @@
       "baths": 3,
       "sqft": 2210,
       "lot_sqft": 6600,
+      "last_sale_date": "2012-09-20",
       "coordinates": [-82.9832, 40.0393]
     }
   }

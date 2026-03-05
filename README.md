@@ -33,7 +33,7 @@ docker compose up --build
 Detailed local workflow: [DEV.md](./DEV.md)
 
 > Note: use `pnpm run project:setup` and `pnpm run project:doctor`.  
-> `pnpm run project:setup` and `pnpm run project:doctor` are pnpm builtins and do not run this project's scripts.
+> `pnpm setup` and `pnpm doctor` are pnpm builtins and do not run this project's scripts.
 
 ## Demo Credentials
 - Email: `agent@demo.local`
@@ -43,7 +43,7 @@ These are seeded automatically at first boot (`apps/api/scripts/start_api.sh` ru
 
 ## Demo Mode Behavior
 - `SANDBOX_MODE=true` by default.
-- Outreach approvals move messages to `queued` sandbox state without real sends.
+- Outreach approvals remain non-sending in sandbox mode and return `blocked_sandbox` with a compliance audit event.
 - Public-data connectors try live URLs first, then fallback to synthetic seed files.
 - Source failures are non-fatal and recorded in `source_runs`.
 - Drift policy: when schema drift is detected, the source is auto-paused and DLQ replay is blocked until drift is resolved.

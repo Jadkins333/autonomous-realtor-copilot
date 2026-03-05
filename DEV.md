@@ -1,7 +1,7 @@
 # Development Commands
 
 > Use `pnpm run project:setup` and `pnpm run project:doctor` for this repo.  
-> `pnpm run project:setup` and `pnpm run project:doctor` are pnpm builtins and are not project bootstrap/diagnostics.
+> `pnpm setup` and `pnpm doctor` are pnpm builtins and are not project bootstrap/diagnostics.
 
 ## Install
 

@@ -7,15 +7,28 @@ from uuid import UUID
 from sqlalchemy import case, func, select, text
 from sqlalchemy.orm import Session
 
-from app.models.entities import MetricDefinition, MetricValue, OpportunityEvent, Parcel, Permit, ProvenanceRecord
+from app.models.entities import (
+    MetricDefinition,
+    MetricValue,
+    OpportunityEvent,
+    OpportunityState,
+    Parcel,
+    Permit,
+    ProvenanceRecord,
+)
 from app.services.provenance import freshness
 
 
-def _ensure_metric_definition(db: Session, key: str, name: str, formula_markdown: str) -> MetricDefinition:
+def _ensure_metric_definition(
+    db: Session, key: str, name: str, formula_markdown: str, required_inputs_json: list[str]
+) -> MetricDefinition:
     existing = db.execute(
         select(MetricDefinition).where(MetricDefinition.key == key, MetricDefinition.version == "v1")
     ).scalar_one_or_none()
     if existing:
+        existing.name = name
+        existing.formula_markdown = formula_markdown
+        existing.required_inputs_json = required_inputs_json
         return existing
 
     definition = MetricDefinition(
@@ -23,6 +36,7 @@ def _ensure_metric_definition(db: Session, key: str, name: str, formula_markdown
         name=name,
         version="v1",
         formula_markdown=formula_markdown,
+        required_inputs_json=required_inputs_json,
     )
     db.add(definition)
     db.flush()
@@ -92,6 +106,39 @@ def _record_opportunity_event(
     )
 
 
+def _record_status_change_event(
+    db: Session,
+    *,
+    tenant_id: UUID,
+    parcel_id: UUID,
+    from_status: str,
+    to_status: str,
+    actor_user_id: UUID,
+    reason: str | None,
+    occurred_at: datetime,
+) -> None:
+    dedupe_key = sha256(
+        f"{tenant_id}|{parcel_id}|status_change|{from_status}|{to_status}|{occurred_at.isoformat()}".encode("utf-8")
+    ).hexdigest()
+    db.add(
+        OpportunityEvent(
+            tenant_id=tenant_id,
+            parcel_id=parcel_id,
+            event_type="status_change",
+            severity="info",
+            details_json={
+                "from_status": from_status,
+                "to_status": to_status,
+                "actor_user_id": str(actor_user_id),
+                "reason": reason,
+                "changed_at": occurred_at.isoformat(),
+            },
+            dedupe_key=dedupe_key,
+            created_at=occurred_at,
+        )
+    )
+
+
 def list_opportunities(db: Session, tenant_id: UUID, limit: int = 50) -> dict:
     parcels = list(
         db.execute(
@@ -114,12 +161,14 @@ def list_opportunities(db: Session, tenant_id: UUID, limit: int = 50) -> dict:
         "neighborhood_heat_v1",
         "Neighborhood Heat",
         "`heat = max(0, ((min(1, permits_90d/4)*0.60) + (transit_score_0_100/100*0.40) - flood_penalty) * 100)`",
+        ["permits_90d", "transit_score_0_100", "flood_intersection"],
     )
     distress_def = _ensure_metric_definition(
         db,
         "distress_likelihood_v1",
         "Distress Likelihood",
         "`distress = clamp(0,1, 0.15 + permit_signal + flood_signal + transit_signal)`",
+        ["permits_365d", "flood_intersection", "transit_score_0_100"],
     )
 
     parcel_ids = [parcel.id for parcel in parcels]
@@ -182,6 +231,10 @@ def list_opportunities(db: Session, tenant_id: UUID, limit: int = 50) -> dict:
             latest_event_map[event.parcel_id] = event
 
     provenance_map: dict[UUID, ProvenanceRecord] = {}
+    state_map: dict[UUID, str] = {
+        row.parcel_id: row.status
+        for row in db.execute(select(OpportunityState).where(OpportunityState.tenant_id == tenant_id)).scalars()
+    }
     provenance_ids = [parcel.provenance_id for parcel in parcels if parcel.provenance_id]
     if provenance_ids:
         for record in db.execute(select(ProvenanceRecord).where(ProvenanceRecord.id.in_(provenance_ids))).scalars():
@@ -336,6 +389,7 @@ def list_opportunities(db: Session, tenant_id: UUID, limit: int = 50) -> dict:
                 "zip": parcel.zip,
                 "opportunity_flags": flags,
                 "status": "insufficient_data" if missing_inputs else "ok",
+                "workflow_status": state_map.get(parcel.id, "new"),
                 "missing_inputs": missing_inputs,
                 "event_signal": {
                     "count_30d": event_count_30d_map.get(parcel.id, 0),
@@ -388,6 +442,64 @@ def list_opportunities(db: Session, tenant_id: UUID, limit: int = 50) -> dict:
         "status": "ok",
         "model_version": "v1",
         "items": items,
+    }
+
+
+def set_opportunity_status(
+    db: Session,
+    tenant_id: UUID,
+    parcel_id: UUID,
+    *,
+    status: str,
+    actor_user_id: UUID,
+    reason: str | None = None,
+) -> dict:
+    parcel = db.execute(select(Parcel).where(Parcel.id == parcel_id, Parcel.tenant_id == tenant_id)).scalar_one_or_none()
+    if parcel is None:
+        raise ValueError("Parcel not found")
+
+    existing = db.execute(
+        select(OpportunityState).where(
+            OpportunityState.tenant_id == tenant_id,
+            OpportunityState.parcel_id == parcel_id,
+        )
+    ).scalar_one_or_none()
+    now = datetime.now(tz=UTC)
+    if existing is None:
+        existing = OpportunityState(
+            tenant_id=tenant_id,
+            parcel_id=parcel_id,
+            status="new",
+            updated_by_user_id=actor_user_id,
+            updated_at=now,
+        )
+        db.add(existing)
+        db.flush()
+
+    prior_status = existing.status
+    changed = prior_status != status
+    if changed:
+        existing.status = status
+        existing.updated_by_user_id = actor_user_id
+        existing.updated_at = now
+        _record_status_change_event(
+            db,
+            tenant_id=tenant_id,
+            parcel_id=parcel_id,
+            from_status=prior_status,
+            to_status=status,
+            actor_user_id=actor_user_id,
+            reason=reason,
+            occurred_at=now,
+        )
+    db.commit()
+
+    return {
+        "parcel_id": str(parcel_id),
+        "status": existing.status,
+        "previous_status": prior_status,
+        "changed": changed,
+        "updated_at": existing.updated_at.isoformat(),
     }
 
 

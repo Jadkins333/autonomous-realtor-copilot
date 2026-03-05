@@ -8,7 +8,8 @@
     "build:local": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "vitest run"
+    "test": "node ./scripts/test.js",
+    "test:local": "vitest run"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",

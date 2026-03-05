@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 
 import { useRequireAuth } from "@/components/auth-guard";
@@ -10,19 +10,56 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, Td, Th } from "@/components/ui/table";
 import { apiFetch } from "@/lib/api";
 
+type DraftRow = {
+  id: string;
+  pack_id?: string | null;
+  contact_id: string;
+  channel: string;
+  subject?: string | null;
+  body: string;
+  status: string;
+  created_at: string;
+};
+
+type DraftPackRow = {
+  id: string;
+  created_at: string;
+  created_by_user_id: string;
+  parcel_id?: string | null;
+  contact_id?: string | null;
+  status: string;
+  sandbox: boolean;
+  objective: string;
+  drafts: DraftRow[];
+};
+
+type DraftPackList = {
+  items: DraftPackRow[];
+  next_cursor?: string | null;
+};
+
 export default function OutreachPage() {
   const { status } = useRequireAuth();
   const { data: session } = useSession();
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<DraftRow[]>([]);
+  const [packs, setPacks] = useState<DraftPackRow[]>([]);
+  const [selectedPackId, setSelectedPackId] = useState<string | null>(null);
   const [actionResult, setActionResult] = useState<string | null>(null);
 
-  async function loadDrafts() {
+  async function load() {
     if (!session) return;
-    const data = await apiFetch<any[]>("/outreach/drafts", (session as any).apiToken);
-    setRows(data);
+    const [draftRows, packRows] = await Promise.all([
+      apiFetch<DraftRow[]>("/outreach/drafts", (session as any).apiToken),
+      apiFetch<DraftPackList>("/outreach/draft-packs?limit=20", (session as any).apiToken)
+    ]);
+    setRows(draftRows);
+    setPacks(packRows.items || []);
+    if (!selectedPackId && packRows.items?.length) {
+      setSelectedPackId(packRows.items[0].id);
+    }
   }
 
-  async function approve(id: string) {
+  async function approveLegacy(id: string) {
     if (!session) return;
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       setActionResult(
@@ -34,12 +71,41 @@ export default function OutreachPage() {
       method: "POST"
     });
     setActionResult(JSON.stringify(result));
-    await loadDrafts();
+    await load();
+  }
+
+  async function submitPack(id: string) {
+    if (!session) return;
+    const result = await apiFetch<any>(`/outreach/draft-pack/${id}/submit`, (session as any).apiToken, {
+      method: "POST"
+    });
+    setActionResult(JSON.stringify(result));
+    await load();
+  }
+
+  async function approveDraft(id: string) {
+    if (!session) return;
+    const result = await apiFetch<any>(`/outreach/drafts/${id}/approve`, (session as any).apiToken, {
+      method: "POST"
+    });
+    setActionResult(JSON.stringify(result));
+    await load();
+  }
+
+  async function rejectDraft(id: string) {
+    if (!session) return;
+    const result = await apiFetch<any>(`/outreach/drafts/${id}/reject`, (session as any).apiToken, {
+      method: "POST"
+    });
+    setActionResult(JSON.stringify(result));
+    await load();
   }
 
   useEffect(() => {
-    void loadDrafts();
+    void load();
   }, [session]);
+
+  const selectedPack = useMemo(() => packs.find((pack) => pack.id === selectedPackId) || null, [packs, selectedPackId]);
 
   if (status !== "authenticated") {
     return null;
@@ -50,13 +116,77 @@ export default function OutreachPage() {
       <Card className="mb-4">
         <CardTitle>Outreach Autopilot</CardTitle>
         <CardDescription>
-          Sandbox is ON by default. Approvals queue messages without real delivery unless sandbox is disabled.
+          Sandbox is ON by default. Draft packs group SMS/email/voice drafts and require explicit submission and
+          approval.
         </CardDescription>
         {actionResult ? (
           <pre className="mt-3 overflow-auto rounded-xl bg-muted p-3 text-xs">{actionResult}</pre>
         ) : null}
       </Card>
+
+      <Card className="mb-4">
+        <CardTitle className="mb-3">Draft Packs</CardTitle>
+        <div className="space-y-2">
+          {packs.map((pack) => (
+            <div
+              key={pack.id}
+              className={`cursor-pointer rounded-xl border p-3 text-sm ${
+                selectedPackId === pack.id ? "border-accent" : "border-border"
+              }`}
+              onClick={() => setSelectedPackId(pack.id)}
+            >
+              <p className="font-medium">
+                Pack {pack.id.slice(0, 8)} • {pack.status}
+              </p>
+              <p className="text-muted-foreground">{pack.objective}</p>
+              <p className="text-xs text-muted-foreground">drafts: {pack.drafts.length}</p>
+            </div>
+          ))}
+          {packs.length === 0 ? <p className="text-sm text-muted-foreground">No draft packs yet.</p> : null}
+        </div>
+      </Card>
+
+      {selectedPack ? (
+        <Card className="mb-4">
+          <CardTitle className="mb-2">Pack Detail</CardTitle>
+          <p className="mb-3 text-sm text-muted-foreground">Status: {selectedPack.status}</p>
+          <Button className="mb-3" onClick={() => submitPack(selectedPack.id)}>
+            Submit Pack
+          </Button>
+          <Table>
+            <thead>
+              <tr>
+                <Th>Channel</Th>
+                <Th>Subject</Th>
+                <Th>Body</Th>
+                <Th>Status</Th>
+                <Th>Actions</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {selectedPack.drafts.map((draft) => (
+                <tr key={draft.id}>
+                  <Td>{draft.channel}</Td>
+                  <Td>{draft.subject ?? "-"}</Td>
+                  <Td>{draft.body}</Td>
+                  <Td>{draft.status}</Td>
+                  <Td>
+                    <div className="flex gap-2">
+                      <Button onClick={() => approveDraft(draft.id)}>Approve</Button>
+                      <Button variant="outline" onClick={() => rejectDraft(draft.id)}>
+                        Reject
+                      </Button>
+                    </div>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
+      ) : null}
+
       <Card>
+        <CardTitle className="mb-2">Legacy Draft Queue</CardTitle>
         <Table>
           <thead>
             <tr>
@@ -75,7 +205,7 @@ export default function OutreachPage() {
                 <Td>{row.body}</Td>
                 <Td>{row.status}</Td>
                 <Td>
-                  <Button onClick={() => approve(row.id)}>Approve</Button>
+                  <Button onClick={() => approveLegacy(row.id)}>Approve</Button>
                 </Td>
               </tr>
             ))}

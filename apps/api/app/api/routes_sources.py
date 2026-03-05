@@ -79,7 +79,9 @@ def source_set_debug_drift(
     db: Session = Depends(get_db),
 ) -> dict:
     _ = auth
-    if settings.environment.lower() == "production" and not settings.debug_diag:
+    if settings.environment.lower() == "production":
+        raise HTTPException(status_code=403, detail="Debug diagnostics are disabled in production")
+    if not settings.debug_diag:
         raise HTTPException(status_code=403, detail="Debug diagnostics are disabled")
 
     row = set_source_drift_debug(

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import AuthContext, get_auth_context
 from app.db.session import get_db
 from app.schemas.parcels import ParcelSearchResult
+from app.services.negotiation import compute_negotiation_insight
 from app.services.parcels import get_parcel_detail, search_parcels
 
 router = APIRouter(prefix="/parcels", tags=["parcels"])
@@ -28,5 +29,17 @@ def parcel_detail(
 ) -> dict:
     try:
         return get_parcel_detail(db, auth.tenant_id, parcel_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/{parcel_id}/negotiation")
+def parcel_negotiation(
+    parcel_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+) -> dict:
+    try:
+        return compute_negotiation_insight(db, auth.tenant_id, parcel_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

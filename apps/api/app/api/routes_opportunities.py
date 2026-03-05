@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import AuthContext, get_auth_context
 from app.db.session import get_db
-from app.services.opportunities import list_opportunities, list_opportunity_events
+from app.schemas.opportunities import OpportunityStatusUpdateRequest
+from app.services.opportunities import list_opportunities, list_opportunity_events, set_opportunity_status
 
 router = APIRouter(prefix="/opportunities", tags=["opportunities"])
 
@@ -34,4 +35,21 @@ def opportunity_events(
         severity=severity,
         days=days,
         limit=limit,
+    )
+
+
+@router.post("/{parcel_id}/status")
+def update_opportunity_status(
+    parcel_id: UUID,
+    payload: OpportunityStatusUpdateRequest,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+) -> dict:
+    return set_opportunity_status(
+        db,
+        auth.tenant_id,
+        parcel_id,
+        status=payload.status,
+        actor_user_id=auth.user_id,
+        reason=payload.reason,
     )

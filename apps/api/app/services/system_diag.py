@@ -103,6 +103,17 @@ def get_system_diagnostics(db: Session) -> dict:
                 }
             )
 
+    env_checklist = {
+        "SANDBOX_MODE": True,
+        "DATABASE_URL": bool(settings.database_url),
+        "REDIS_URL": bool(settings.redis_url),
+        "JWT_SECRET": bool(settings.jwt_secret),
+        "NEXTAUTH_URL": bool(os.getenv("NEXTAUTH_URL")),
+        "NEXT_PUBLIC_API_URL": bool(os.getenv("NEXT_PUBLIC_API_URL")),
+        "EXPO_PUBLIC_API_BASE_URL": bool(os.getenv("EXPO_PUBLIC_API_BASE_URL")),
+        "DEFAULT_LOCALE": bool(settings.default_locale),
+    }
+
     return {
         "generated_at": datetime.now(tz=UTC).isoformat(),
         "build": build,
@@ -111,4 +122,7 @@ def get_system_diagnostics(db: Session) -> dict:
         "worker_heartbeat": {"last_seen": worker_last_seen},
         "beat_heartbeat": {"last_seen": beat_last_seen},
         "sources": reachability,
+        "default_locale": settings.default_locale,
+        "locale_notice": "Locale fixtures are currently static and tuned for columbus_oh demo data.",
+        "env_checklist": env_checklist,
     }

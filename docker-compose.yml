@@ -45,6 +45,8 @@ services:
         condition: service_healthy
     ports:
       - "8000:8000"
+    volumes:
+      - ./docs:/workspace-docs:ro
 
   worker:
     build:
@@ -62,6 +64,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - ./docs:/workspace-docs:ro
 
   beat:
     build:
@@ -79,6 +83,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - ./docs:/workspace-docs:ro
 
   web:
     build:

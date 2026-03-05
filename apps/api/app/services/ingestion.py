@@ -764,11 +764,19 @@ def get_sources_status(db: Session) -> list[dict[str, Any]]:
     rows = list_source_status(db)
     payload = []
     for row in rows:
+        is_stale = row.mode == SourceMode.fixture or row.state in {
+            SourceState.partial,
+            SourceState.failed,
+            SourceState.paused,
+        }
+        reachable = None if row.mode == SourceMode.fixture else row.state == SourceState.ok
         payload.append(
             {
                 "source_name": row.source_name,
                 "mode": row.mode.value,
                 "state": row.state.value,
+                "reachable": reachable,
+                "is_stale": is_stale,
                 "last_run_started_at": row.last_run_started_at.isoformat() if row.last_run_started_at else None,
                 "last_run_finished_at": row.last_run_finished_at.isoformat() if row.last_run_finished_at else None,
                 "last_success_at": row.last_success_at.isoformat() if row.last_success_at else None,

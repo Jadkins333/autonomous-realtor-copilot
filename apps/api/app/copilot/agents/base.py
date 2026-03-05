@@ -13,6 +13,7 @@ class AgentContext:
     db: Session
     tenant_id: UUID
     message: str
+    user_id: UUID | None = None
 
 
 class AgentTraceRefs(BaseModel):

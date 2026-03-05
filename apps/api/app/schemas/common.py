@@ -15,3 +15,10 @@ class ProvenanceEnvelope(BaseModel):
     raw_url: str | None = None
     external_id: str | None = None
     freshness: Freshness | None = None
+
+
+class CoverageSummary(BaseModel):
+    coverage_pct: float
+    required_total: int
+    required_present: int
+    missing_required: list[str]

@@ -17,6 +17,7 @@ Policy notes:
 - FCC materials use "as soon as practicable" framing for honoring revocations, with specific implementation timelines depending on rule context.
 
 References:
-- FDIC TCPA manual overview: https://www.fdic.gov/consumer-compliance-examination-manual/viii-5-telephone-consumer-protection-act
-- FCC 2024 AI/robocall rules announcement: https://www.fcc.gov/document/fcc-adopts-rules-protect-consumers-ai-generated-robocalls
-- FCC limited-delay announcement (2025): https://www.fcc.gov/document/fcc-delays-part-robocall-rule-may-impact-bank-text-messages-0
+- FCC consumer guide (primary): https://www.fcc.gov/consumers/guides/stop-unwanted-robocalls-and-texts
+- FCC TCPA rule text (47 CFR 64.1200): https://www.ecfr.gov/current/title-47/chapter-I/subchapter-A/part-64/subpart-L/section-64.1200
+- FCC 2024 AI/robocall rules update: https://www.fcc.gov/document/fcc-adopts-rules-protect-consumers-ai-generated-robocalls
+- FDIC TCPA manual overview (secondary): https://www.fdic.gov/consumer-compliance-examination-manual/viii-5-telephone-consumer-protection-act

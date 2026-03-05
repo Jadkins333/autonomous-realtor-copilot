@@ -30,4 +30,4 @@ def copilot_chat(
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ) -> CopilotChatResponse:
-    return run_copilot_command(db, auth.tenant_id, payload.message)
+    return run_copilot_command(db, auth.tenant_id, auth.user_id, payload.message)

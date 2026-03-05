@@ -120,6 +120,7 @@ class MetricDefinition(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     version: Mapped[str] = mapped_column(String(64), nullable=False)
     formula_markdown: Mapped[str] = mapped_column(Text, nullable=False)
+    required_inputs_json: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
@@ -270,11 +271,26 @@ class Conversation(Base):
     last_outbound_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class OutreachDraftPack(Base):
+    __tablename__ = "outreach_draft_packs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    parcel_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("parcels.id"), nullable=True)
+    contact_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("contacts.id"), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="draft")
+    sandbox: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    objective: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+
 class Message(Base):
     __tablename__ = "messages"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    pack_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("outreach_draft_packs.id"))
     contact_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("contacts.id"), nullable=False)
     channel: Mapped[Channel] = mapped_column(Enum(Channel, name="message_channel"), nullable=False)
     direction: Mapped[MessageDirection] = mapped_column(
@@ -359,6 +375,18 @@ class OpportunityEvent(Base):
     details_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     dedupe_key: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class OpportunityState(Base):
+    __tablename__ = "opportunity_states"
+    __table_args__ = (UniqueConstraint("tenant_id", "parcel_id", name="uq_opportunity_states_tenant_parcel"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    parcel_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("parcels.id"), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="new")
+    updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
 
 
 class SchemaDriftDLQ(Base):

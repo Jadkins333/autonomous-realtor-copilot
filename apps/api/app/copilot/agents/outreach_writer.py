@@ -3,8 +3,8 @@ from __future__ import annotations
 from sqlalchemy import select
 
 from app.copilot.agents.base import AgentContext, AgentMatch, AgentResult, CopilotAgent
-from app.models.entities import Contact, Message
-from app.models.enums import Channel, MessageDirection, MessageStatus
+from app.models.entities import Contact
+from app.services.outreach import create_draft_pack
 
 
 class OutreachWriterAgent(CopilotAgent):
@@ -45,44 +45,36 @@ class OutreachWriterAgent(CopilotAgent):
                 tools_used=["contacts.search"],
             )
 
-        draft = {
-            "contact_id": str(contact.id),
-            "channel": "email",
-            "subject": f"Quick Columbus opportunity snapshot for {contact.name}",
-            "body": (
-                f"Hi {contact.name},\n\n"
-                "I prepared a Columbus public-data snapshot with permit momentum, transit proximity, and amenity coverage "
-                "around your target areas. If you want, I can send a property-specific profile next.\n\n"
-                "Reply STOP to opt out of SMS updates."
-            ),
-            "sandbox_default": True,
-            "compliance_notes": [
-                "SMS/voice sends require explicit opt-in.",
-                "Quiet hours and frequency caps are enforced server-side.",
-            ],
-        }
-
-        message = Message(
-            tenant_id=context.tenant_id,
-            contact_id=contact.id,
-            channel=Channel.email,
-            direction=MessageDirection.outbound,
-            status=MessageStatus.draft,
-            subject=draft["subject"],
-            body=draft["body"],
-            meta_json={
-                "created_by": "copilot",
-                "source_agent": self.key,
-                "sandbox_default": True,
-            },
+        objective = (
+            "I prepared a Columbus public-data snapshot with permit momentum, transit proximity, and amenity coverage "
+            "for your target areas. I can send the property-specific profile next."
         )
-        context.db.add(message)
-        context.db.flush()
-        context.db.commit()
-        draft["message_id"] = str(message.id)
+        pack = create_draft_pack(
+            context.db,
+            tenant_id=context.tenant_id,
+            user_id=context.user_id or context.tenant_id,
+            contact_id=contact.id,
+            parcel_id=None,
+            objective=objective,
+            channels=["sms", "email", "voice"],
+            sandbox=True,
+        )
 
         return AgentResult(
-            text="Draft created in sandbox mode, saved to outreach drafts, and ready for approval.",
-            data=draft,
-            tools_used=["contacts.search", "messages.create_draft", "compliance.policy"],
+            text="Draft pack created in sandbox mode with SMS, email, and voice drafts. Submit and approve each draft before send.",
+            data={
+                "pack_id": str(pack["id"]),
+                "contact_id": str(contact.id),
+                "channels": [
+                    draft.channel.value if hasattr(draft.channel, "value") else str(draft.channel)
+                    for draft in pack["drafts"]
+                ],
+                "draft_ids": [str(draft.id) for draft in pack["drafts"]],
+                "sandbox_default": True,
+                "compliance_notes": [
+                    "SMS/voice sends require explicit opt-in.",
+                    "Quiet hours and frequency caps are enforced server-side.",
+                ],
+            },
+            tools_used=["contacts.search", "outreach.create_draft_pack", "compliance.policy"],
         )

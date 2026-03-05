@@ -23,7 +23,17 @@ type SourceStatusResponse = {
   items: SourceStatusItem[];
 };
 
-const COMMANDS = ["pnpm run project:setup", "pnpm smoke"];
+const COMMANDS = ["pnpm run project:setup", "pnpm run project:doctor", "pnpm smoke"];
+const REQUIRED_ENV_KEYS = [
+  "SANDBOX_MODE",
+  "DATABASE_URL",
+  "REDIS_URL",
+  "JWT_SECRET",
+  "NEXTAUTH_URL",
+  "NEXT_PUBLIC_API_URL",
+  "EXPO_PUBLIC_API_BASE_URL",
+  "DEFAULT_LOCALE"
+];
 
 export default function SetupPage() {
   const { status } = useRequireAuth();
@@ -86,6 +96,40 @@ export default function SetupPage() {
             </div>
           ))}
         </div>
+      </Card>
+
+      <Card className="mb-4">
+        <CardTitle>Required Env Checklist</CardTitle>
+        <CardDescription className="mt-1">
+          Checklist is derived from backend diagnostics and reports configured/missing values only.
+        </CardDescription>
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+          {REQUIRED_ENV_KEYS.map((key) => {
+            const envChecklist = (diagnostics?.env_checklist as Record<string, boolean> | undefined) || {};
+            const configured = !!envChecklist[key];
+            return (
+              <div key={key} className="rounded-xl border bg-card px-3 py-2 text-sm">
+                <p className="font-medium">{key}</p>
+                <p className={configured ? "text-emerald-400" : "text-amber-300"}>
+                  {configured ? "configured" : "missing"}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      <Card className="mb-4">
+        <CardTitle>Locale</CardTitle>
+        <CardDescription className="mt-1">
+          Default locale:{" "}
+          <span className="font-mono">{String(diagnostics?.default_locale || "columbus_oh")}</span>
+        </CardDescription>
+        <p className="mt-2 text-sm text-amber-200">
+          {String(
+            diagnostics?.locale_notice || "Locale fixtures are currently static and tuned for columbus_oh demo data."
+          )}
+        </p>
       </Card>
 
       {error ? (

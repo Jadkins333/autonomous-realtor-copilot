@@ -19,40 +19,39 @@ class _ScalarResult:
 class FakeDB:
     def __init__(self, contact) -> None:
         self._contact = contact
-        self.added = []
-        self.flush_called = 0
-        self.commit_called = 0
 
     def execute(self, _stmt):
         return _ScalarResult(self._contact)
 
-    def add(self, obj) -> None:
-        if getattr(obj, "id", None) is None:
-            obj.id = uuid4()
-        self.added.append(obj)
 
-    def flush(self) -> None:
-        self.flush_called += 1
-
-    def commit(self) -> None:
-        self.commit_called += 1
-
-
-def test_outreach_writer_persists_draft_message() -> None:
+def test_outreach_writer_creates_draft_pack_and_excludes_insurance_terms(monkeypatch) -> None:
     contact = SimpleNamespace(id=uuid4(), name="Ava Thompson", email="ava@example.com")
     db = FakeDB(contact)
     agent = OutreachWriterAgent()
+
+    monkeypatch.setattr(
+        "app.copilot.agents.outreach_writer.create_draft_pack",
+        lambda *_args, **_kwargs: {
+            "id": uuid4(),
+            "drafts": [
+                SimpleNamespace(id=uuid4(), channel=SimpleNamespace(value="sms")),
+                SimpleNamespace(id=uuid4(), channel=SimpleNamespace(value="email")),
+                SimpleNamespace(id=uuid4(), channel=SimpleNamespace(value="voice")),
+            ],
+        },
+    )
 
     result = agent.run(
         AgentContext(
             db=db,
             tenant_id=uuid4(),
+            user_id=uuid4(),
             message="draft outreach to Ava",
         )
     )
 
     assert result.status == "ok"
-    assert "message_id" in result.data
-    assert db.flush_called == 1
-    assert db.commit_called == 1
-    assert any(getattr(item, "subject", "").startswith("Quick Columbus opportunity snapshot") for item in db.added)
+    assert len(result.data.get("draft_ids", [])) == 3
+    assert sorted(result.data.get("channels", [])) == ["email", "sms", "voice"]
+    assert "insurance_pressure" not in str(result.data).lower()
+    assert "verify with insurer" not in str(result.data).lower()

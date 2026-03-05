@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import uuid
 from datetime import UTC, date, datetime
 
 from geoalchemy2.shape import from_shape
@@ -81,16 +82,28 @@ def _ensure_metric_definitions(db):
             "key": "micro_market_nowcast_v1",
             "name": "Micro Market Nowcast",
             "version": "v1",
+            "required_inputs_json": [
+                "permits_per_100_parcels_90d",
+                "poi_density_per_km2",
+                "rate_series_delta_bps_90d",
+            ],
             "formula_markdown": (
-                "`score = 0.45*permit_component + 0.25*poi_component + 0.30*rate_component`\n"
-                "where `permit_component=min(100, permit_activity_rate*5)`, `poi_component=min(100, poi_density_proxy*8)`, "
-                "and `rate_component=clamp(0,100,50-(rate_delta*180))`."
+                "`permits_score = clamp(permits_per_100_parcels_90d * 10, 0, 100)`\n"
+                "`poi_score = clamp(poi_density_per_km2 * 5, 0, 100)`\n"
+                "`rates_score = clamp(50 - (rate_series_delta_bps_90d / 10), 0, 100)`\n"
+                "`score = round(clamp(permits_score*0.5 + poi_score*0.3 + rates_score*0.2, 0, 100), 1)`"
             ),
         },
         {
             "key": "marketing_package_health_v1",
             "name": "Marketing Package Health",
             "version": "v1",
+            "required_inputs_json": [
+                "photo_count",
+                "min_resolution_short_side",
+                "rooms_covered",
+                "description_text",
+            ],
             "formula_markdown": (
                 "`score = completeness(40) + copy_richness(30) - compliance_penalty(up to 30)`\n"
                 "completeness uses photo count, min short-side resolution, and rooms covered."
@@ -100,6 +113,7 @@ def _ensure_metric_definitions(db):
             "key": "renovation_roi_v1",
             "name": "Renovation ROI Band",
             "version": "v1",
+            "required_inputs_json": ["property_type", "last_sale_date", "neighborhood_permit_mix"],
             "formula_markdown": (
                 "Rule-based banding using property type + neighborhood permit mix. "
                 "Outputs qualitative ranges only (no dollar claims)."
@@ -109,8 +123,29 @@ def _ensure_metric_definitions(db):
             "key": "insurance_pressure_v1",
             "name": "Insurance Pressure",
             "version": "v1",
+            "required_inputs_json": ["parcel_geom", "flood_polygons"],
             "formula_markdown": (
                 "Flood intersection + nearest flood polygon distance -> pressure level with uncertainty note."
+            ),
+        },
+        {
+            "key": "negotiation_motivation_v1",
+            "name": "Negotiation Motivation",
+            "version": "v1",
+            "required_inputs_json": [
+                "days_since_last_sale",
+                "open_violations_count",
+                "permit_activity_last_90d_count",
+            ],
+            "formula_markdown": (
+                "`score = 0`\n"
+                "`+25 if open_violations_count >= 3`\n"
+                "`+15 if open_violations_count in [1,2]`\n"
+                "`+20 if permit_activity_last_90d_count >= 2`\n"
+                "`+10 if permit_activity_last_90d_count == 1`\n"
+                "`+25 if days_since_last_sale >= 3650`\n"
+                "`+15 if days_since_last_sale in [1825..3649]`\n"
+                "then clamp score to 0..100."
             ),
         },
     ]
@@ -123,6 +158,10 @@ def _ensure_metric_definitions(db):
         ).scalar_one_or_none()
         if not exists:
             db.add(MetricDefinition(**item))
+            continue
+        exists.name = item["name"]
+        exists.formula_markdown = item["formula_markdown"]
+        exists.required_inputs_json = item["required_inputs_json"]
 
 
 def _ensure_contacts_and_consents(db, tenant_id):
@@ -601,10 +640,77 @@ def _seed_transit_stops(db, tenant_id, source: Source) -> None:
 def _seed_public_demo_data(db, tenant_id) -> None:
     seed_source = _ensure_seed_source(db)
     _seed_parcels(db, tenant_id, seed_source)
+    _ensure_missing_signals_parcel(db, tenant_id, seed_source)
     _seed_permits(db, tenant_id, seed_source)
     _seed_flood_zones(db, tenant_id, seed_source)
     _seed_pois(db, tenant_id, seed_source)
     _seed_transit_stops(db, tenant_id, seed_source)
+
+
+def _ensure_missing_signals_parcel(db, tenant_id, source: Source) -> None:
+    parcel_id = uuid.UUID(settings.test_parcel_missing_signals_id)
+    raw = {
+        "external_id": "parcel-missing-signals",
+        "parcel_number": "010-000111",
+        "address": "999 Missing Signal Ln",
+        "city": "Columbus",
+        "state": "OH",
+        "zip": "43215",
+        "attributes_json": {
+            "coordinates": [-82.99, 39.96],
+            # Intentionally no last_sale_date/open_violations_count to force insufficient_data checks.
+        },
+    }
+    provenance = _upsert_seed_provenance(
+        db,
+        source,
+        external_id="parcel:missing_signals",
+        raw_url="seed://parcels.json#missing_signals",
+        raw_json=raw,
+    )
+    point = from_shape(Point(-82.99, 39.96), srid=4326)
+    square = Polygon(
+        [
+            (-82.9902, 39.9598),
+            (-82.9898, 39.9598),
+            (-82.9898, 39.9602),
+            (-82.9902, 39.9602),
+            (-82.9902, 39.9598),
+        ]
+    )
+    geom = from_shape(MultiPolygon([square]), srid=4326)
+
+    parcel = db.execute(
+        select(Parcel).where(Parcel.id == parcel_id, Parcel.tenant_id == tenant_id)
+    ).scalar_one_or_none()
+    if not parcel:
+        parcel = Parcel(
+            id=parcel_id,
+            tenant_id=tenant_id,
+            parcel_number=raw["parcel_number"],
+            address=raw["address"],
+            city=raw["city"],
+            state=raw["state"],
+            zip=raw["zip"],
+            geom=geom,
+            centroid=point,
+            attributes_json=raw["attributes_json"],
+            provenance_id=provenance.id,
+            updated_at=datetime.now(tz=UTC),
+        )
+        db.add(parcel)
+        return
+
+    parcel.parcel_number = raw["parcel_number"]
+    parcel.address = raw["address"]
+    parcel.city = raw["city"]
+    parcel.state = raw["state"]
+    parcel.zip = raw["zip"]
+    parcel.geom = geom
+    parcel.centroid = point
+    parcel.attributes_json = raw["attributes_json"]
+    parcel.provenance_id = provenance.id
+    parcel.updated_at = datetime.now(tz=UTC)
 
 
 def bootstrap_seed() -> None:

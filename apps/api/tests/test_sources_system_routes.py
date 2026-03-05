@@ -223,3 +223,21 @@ def test_debug_drift_disabled_in_production(monkeypatch) -> None:
         assert response.status_code == 403
     finally:
         app.dependency_overrides.clear()
+
+
+def test_debug_drift_disabled_in_production_even_when_debug_enabled(monkeypatch) -> None:
+    app.dependency_overrides[get_db] = lambda: DummyDB()
+    app.dependency_overrides[get_admin_auth_context] = lambda: AuthContext(user_id=uuid4(), tenant_id=uuid4(), role="admin")
+
+    monkeypatch.setattr("app.api.routes_sources.settings.environment", "production", raising=False)
+    monkeypatch.setattr("app.api.routes_sources.settings.debug_diag", True, raising=False)
+
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/sources/franklin_auditor/debug/drift",
+                json={"drift_detected": True, "reason": "test"},
+            )
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
