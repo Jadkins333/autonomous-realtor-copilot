@@ -52,8 +52,25 @@ class Settings(BaseSettings):
     quiet_hours_end: int = Field(default=21, ge=0, le=23)
     frequency_cap_per_day: int = 3
     enforce_global_revocation: bool = False
+    cors_allow_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+
+    @property
+    def cors_allow_origins_list(self):
+        raw = (self.cors_allow_origins or "").strip()
+        if not raw:
+            return ["http://localhost:3000", "http://127.0.0.1:3000"]
+        if raw == "*":
+            return ["*"]
+
+        origins = []
+        for origin in raw.split(","):
+            item = origin.strip()
+            if item and item not in origins:
+                origins.append(item)
+        return origins
 
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
+
