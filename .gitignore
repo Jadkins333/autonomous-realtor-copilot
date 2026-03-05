@@ -1,0 +1,36 @@
+# macOS
+.DS_Store
+
+# Xcode
+DerivedData/
+*.xcresult
+*.xcuserstate
+*.xccheckout
+*.moved-aside
+*.playgroundbook
+*.playground
+xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+
+# Swift Package Manager
+.build/
+Packages/*/.build/
+Package.resolved
+
+# Temporary / logs
+build/
+*.log
+*.tmp
+*.swp
+
+# JavaScript / pnpm
+node_modules/
+apps/web/node_modules/
+.next/
+pnpm-lock.yaml
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
