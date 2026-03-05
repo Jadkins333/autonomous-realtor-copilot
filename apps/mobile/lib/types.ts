@@ -55,3 +55,27 @@ export type CitySnapshot = {
   inputs: Record<string, unknown>;
   provenance: Record<string, unknown>;
 };
+
+export type OpportunityItem = {
+  parcel_id: string;
+  address: string;
+  parcel_number: string;
+  city: string;
+  state: string;
+  zip: string;
+  opportunity_flags: string[];
+  status: "ok" | "insufficient_data";
+  missing_inputs: string[];
+  neighborhood_heat: {
+    value?: { score_0_100?: number };
+  };
+  distress_likelihood: {
+    value?: { score_0_1?: number };
+  };
+};
+
+export type OpportunitiesResponse = {
+  status: "ok" | "insufficient_data";
+  model_version?: string;
+  items: OpportunityItem[];
+};

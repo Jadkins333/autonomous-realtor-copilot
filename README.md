@@ -179,6 +179,7 @@ Reference docs:
 - `POST /auth/login`
 - `GET /parcels/search?query=`
 - `GET /parcels/{parcel_id}`
+- `GET /opportunities`
 - `POST /ingest/run`
 - `GET /insights/city/columbus`
 - `GET /insights/parcels/{parcel_id}`
@@ -190,6 +191,7 @@ Reference docs:
 - `POST /outreach/{message_id}/approve_and_send`
 - `POST /webhooks/twilio/inbound`
 - `POST /copilot/chat`
+- `GET /copilot/agents`
 
 ## Notes
 - MLS/RESO module exists at `apps/api/app/integrations/reso/` and is disabled by default with explicit `NotImplementedError` unless enabled via env and paid credentials.

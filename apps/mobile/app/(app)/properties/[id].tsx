@@ -91,6 +91,17 @@ export default function PropertyDetailScreen() {
         </Pressable>
       </View>
 
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Timeline</Text>
+        {(data?.timeline || []).slice(0, 8).map((event: any) => (
+          <View key={`${event.event_type}-${event.occurred_at}-${event.title}`} style={styles.timelineRow}>
+            <Text style={styles.timelineTitle}>{event.title}</Text>
+            <Text style={styles.timelineMeta}>{new Date(event.occurred_at).toLocaleString()}</Text>
+          </View>
+        ))}
+        {!(data?.timeline || []).length ? <Text style={styles.insight}>No timeline events yet.</Text> : null}
+      </View>
+
       <ProvenanceModal
         visible={provenanceOpen}
         title="Property Insight Provenance"
@@ -174,5 +185,20 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: "#fb923c",
     fontWeight: "700"
+  },
+  timelineRow: {
+    borderTopWidth: 1,
+    borderTopColor: "#1f2937",
+    paddingTop: 8,
+    marginTop: 8
+  },
+  timelineTitle: {
+    color: "#f8fafc",
+    fontWeight: "600"
+  },
+  timelineMeta: {
+    color: "#94a3b8",
+    fontSize: 12,
+    marginTop: 2
   }
 });

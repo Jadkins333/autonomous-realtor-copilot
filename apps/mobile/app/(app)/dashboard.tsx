@@ -60,6 +60,9 @@ export default function DashboardScreen() {
 
       <Text style={styles.section}>Quick Links</Text>
       <View style={styles.quickLinks}>
+        <Pressable onPress={() => router.push("/(app)/opportunities")} style={styles.linkCard}>
+          <Text style={styles.linkLabel}>Opportunities</Text>
+        </Pressable>
         <Pressable onPress={() => router.push("/(app)/properties")} style={styles.linkCard}>
           <Text style={styles.linkLabel}>Properties</Text>
         </Pressable>

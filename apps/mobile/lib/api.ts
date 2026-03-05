@@ -1,4 +1,11 @@
-import type { AuthResponse, CitySnapshot, Contact, OutreachDraft, ParcelSummary } from "./types";
+import type {
+  AuthResponse,
+  CitySnapshot,
+  Contact,
+  OpportunitiesResponse,
+  OutreachDraft,
+  ParcelSummary
+} from "./types";
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -50,6 +57,10 @@ export function getMetrics(token: string) {
 
 export function getCitySnapshot(token: string) {
   return request<CitySnapshot>("/insights/city/columbus", { token });
+}
+
+export function listOpportunities(token: string) {
+  return request<OpportunitiesResponse>("/opportunities", { token });
 }
 
 export function searchParcels(token: string, query: string) {

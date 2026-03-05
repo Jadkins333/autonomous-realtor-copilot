@@ -51,6 +51,11 @@ PY
 )"
 
 detail_response="$(curl -fsS "${API_BASE}/parcels/${parcel_id}" -H "Authorization: Bearer ${token}")"
+opportunities_response="$(curl -fsS "${API_BASE}/opportunities" -H "Authorization: Bearer ${token}")"
+copilot_response="$(curl -fsS -X POST "${API_BASE}/copilot/chat" \
+  -H "Authorization: Bearer ${token}" \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"columbus market snapshot"}')"
 copilot_agents_status="$(curl -sS -o /dev/null -w '%{http_code}' "${API_BASE}/copilot/agents" -H "Authorization: Bearer ${token}")"
 if [ "${copilot_agents_status}" != "200" ]; then
   echo "copilot agents endpoint failed: ${copilot_agents_status}"
@@ -82,6 +87,31 @@ for key in required:
     if key not in payload:
         raise SystemExit(f"missing key: {key}")
 print("parcel detail shape ok")
+PY
+
+python3 - <<'PY' "${opportunities_response}"
+import json,sys
+payload=json.loads(sys.argv[1])
+if "items" not in payload or not isinstance(payload["items"], list):
+    raise SystemExit("opportunities response missing items")
+if payload["items"]:
+    required=["parcel_id","neighborhood_heat","distress_likelihood"]
+    missing=[k for k in required if k not in payload["items"][0]]
+    if missing:
+        raise SystemExit(f"opportunities item missing keys: {missing}")
+print("opportunities shape ok")
+PY
+
+python3 - <<'PY' "${copilot_response}"
+import json,sys
+payload=json.loads(sys.argv[1])
+required=["text","status","trace"]
+missing=[k for k in required if k not in payload]
+if missing:
+    raise SystemExit(f"copilot response missing keys: {missing}")
+if "selected_agent" not in payload.get("trace", {}):
+    raise SystemExit("copilot trace missing selected_agent")
+print("copilot chat shape ok")
 PY
 
 python3 - <<'PY' "${sources_status_response}"

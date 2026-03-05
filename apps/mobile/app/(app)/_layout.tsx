@@ -33,6 +33,13 @@ export default function AppTabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="opportunities"
+        options={{
+          title: "Opportunities",
+          tabBarIcon: ({ color, size }) => <Ionicons color={color} name="flash-outline" size={size} />
+        }}
+      />
+      <Tabs.Screen
         name="properties"
         options={{
           title: "Properties",

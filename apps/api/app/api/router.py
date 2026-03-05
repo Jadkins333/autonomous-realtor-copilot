@@ -8,6 +8,7 @@ from app.api import (
     routes_ingest,
     routes_insights,
     routes_outreach,
+    routes_opportunities,
     routes_parcels,
     routes_sources,
     routes_sequences,
@@ -19,6 +20,7 @@ api_router = APIRouter()
 api_router.include_router(routes_health.router)
 api_router.include_router(routes_auth.router)
 api_router.include_router(routes_parcels.router)
+api_router.include_router(routes_opportunities.router)
 api_router.include_router(routes_ingest.router)
 api_router.include_router(routes_insights.router)
 api_router.include_router(routes_contacts.router)

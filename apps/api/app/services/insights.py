@@ -566,6 +566,20 @@ def parcel_detail_metrics(db: Session, tenant_id: UUID, parcel_id: UUID) -> dict
         ).scalars()
     )
 
+    parcel_metric_history = list(
+        db.execute(
+            select(MetricValue, MetricDefinition)
+            .join(MetricDefinition, MetricDefinition.id == MetricValue.metric_definition_id)
+            .where(
+                MetricValue.tenant_id == tenant_id,
+                MetricValue.subject_type == "parcel",
+                MetricValue.subject_id == str(parcel.id),
+            )
+            .order_by(MetricValue.computed_at.desc())
+            .limit(12)
+        ).all()
+    )
+
     top_types: dict[str, int] = {}
     for permit in permits:
         top_types[permit.permit_type] = top_types.get(permit.permit_type, 0) + 1
@@ -611,6 +625,48 @@ def parcel_detail_metrics(db: Session, tenant_id: UUID, parcel_id: UUID) -> dict
     )
     flood_zone = db.execute(flood_zone_stmt, {"tenant_id": str(tenant_id), "parcel_id": str(parcel.id)}).scalar()
 
+    timeline_rows: list[tuple[datetime, dict]] = []
+    for permit in permits:
+        event_date = permit.issued_date or permit.applied_date or permit.final_date
+        if not event_date:
+            continue
+        occurred = datetime.combine(event_date, datetime.min.time(), tzinfo=UTC)
+        timeline_rows.append(
+            (
+                occurred,
+                {
+                    "event_type": "permit",
+                    "occurred_at": occurred.isoformat(),
+                    "title": f"{permit.permit_type} permit",
+                    "details": {
+                        "status": permit.status,
+                        "permit_subtype": permit.permit_subtype,
+                        "external_id": permit.external_id,
+                    },
+                },
+            )
+        )
+
+    for metric_value, definition in parcel_metric_history:
+        timeline_rows.append(
+            (
+                metric_value.computed_at,
+                {
+                    "event_type": "insight",
+                    "occurred_at": metric_value.computed_at.isoformat(),
+                    "title": definition.name,
+                    "details": {
+                        "metric_key": definition.key,
+                        "version": definition.version,
+                        "value": metric_value.value_json,
+                    },
+                },
+            )
+        )
+
+    timeline_rows.sort(key=lambda item: item[0], reverse=True)
+    timeline = [item[1] for item in timeline_rows[:20]]
+
     return {
         "permits_summary": {
             "last_12_months_count": len(permits),
@@ -628,4 +684,5 @@ def parcel_detail_metrics(db: Session, tenant_id: UUID, parcel_id: UUID) -> dict
             "distance_meters": round(float(nearest_stop[1]), 2) if nearest_stop else None,
             "score_0_100": max(0, round(100 - ((float(nearest_stop[1]) if nearest_stop else 99999) / 40), 2)),
         },
+        "timeline": timeline,
     }
