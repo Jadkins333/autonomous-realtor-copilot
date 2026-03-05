@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 
 import { useRequireAuth } from "@/components/auth-guard";
 import { SiteShell } from "@/components/site-shell";
+import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { apiFetch } from "@/lib/api";
 
@@ -12,6 +13,7 @@ export default function DashboardPage() {
   const { status } = useRequireAuth();
   const { data: session } = useSession();
   const [metrics, setMetrics] = useState<Record<string, unknown> | null>(null);
+  const [tourDismissed, setTourDismissed] = useState(false);
 
   useEffect(() => {
     if (!session) return;
@@ -20,12 +22,38 @@ export default function DashboardPage() {
       .catch(() => setMetrics(null));
   }, [session]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const dismissed = window.localStorage.getItem("tour_mode_dismissed");
+    setTourDismissed(dismissed === "true");
+  }, []);
+
+  const dismissTour = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("tour_mode_dismissed", "true");
+    }
+    setTourDismissed(true);
+  };
+
   if (status !== "authenticated") {
     return null;
   }
 
   return (
     <SiteShell>
+      {!tourDismissed ? (
+        <Card className="mb-4">
+          <CardTitle>Tour Mode</CardTitle>
+          <CardDescription>
+            1. Search a property. 2. Open insight + provenance. 3. Draft outreach in sandbox. 4. Run a copilot command.
+          </CardDescription>
+          <div className="mt-3">
+            <Button onClick={dismissTour} size="sm" variant="outline">
+              Dismiss tour
+            </Button>
+          </div>
+        </Card>
+      ) : null}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Card>
           <CardTitle>Demo Mode</CardTitle>

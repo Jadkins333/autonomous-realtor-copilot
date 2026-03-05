@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 
 import { ProvenanceModal } from "../../components/provenance-modal";
 import { getCitySnapshot, getMetrics } from "../../lib/api";
@@ -13,6 +14,12 @@ export default function DashboardScreen() {
   const [snapshot, setSnapshot] = useState<any>(null);
   const [metrics, setMetrics] = useState<Record<string, unknown> | null>(null);
   const [provenanceOpen, setProvenanceOpen] = useState(false);
+  const [tourDismissed, setTourDismissed] = useState(false);
+
+  const dismissTour = async () => {
+    await SecureStore.setItemAsync("tour_mode_dismissed", "true");
+    setTourDismissed(true);
+  };
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -33,6 +40,24 @@ export default function DashboardScreen() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    let mounted = true;
+    SecureStore.getItemAsync("tour_mode_dismissed")
+      .then((value) => {
+        if (mounted) {
+          setTourDismissed(value === "true");
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setTourDismissed(false);
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const score = useMemo(() => Number(snapshot?.value?.score_0_100 || 0), [snapshot]);
 
   return (
@@ -43,6 +68,19 @@ export default function DashboardScreen() {
     >
       <Text style={styles.title}>Welcome, {user?.name || "Agent"}</Text>
       <Text style={styles.subtitle}>Columbus market nowcast from public data</Text>
+
+      {!tourDismissed ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Tour Mode</Text>
+          <Text style={styles.detail}>
+            1. Search a property. 2. Open insight + provenance. 3. Draft outreach in sandbox. 4. Run a copilot
+            command.
+          </Text>
+          <Pressable onPress={() => void dismissTour()} style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>Dismiss tour</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Micro Market Nowcast</Text>
