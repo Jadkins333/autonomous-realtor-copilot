@@ -3,10 +3,12 @@ import { Alert, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Tex
 
 import { approvePackDraft, listDraftPacks, rejectPackDraft, submitDraftPack } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth-context";
+import type { DraftPack, DraftPacksResponse } from "../../../lib/types";
 
 export default function OutreachScreen() {
  const { token } = useAuth();
- const [packs, setPacks] = useState([] as any[]);
+ const [packs, setPacks] = useState([] as DraftPack[]);
+ const [actionBusy, setActionBusy] = useState(false);
  const [selectedPackId, setSelectedPackId] = useState("");
  const [refreshing, setRefreshing] = useState(false);
  const [actionResult, setActionResult] = useState("");
@@ -18,7 +20,7 @@ export default function OutreachScreen() {
 
  setRefreshing(true);
  try {
- const response = (await listDraftPacks(token, 20)) as any;
+ const response = (await listDraftPacks(token, 20)) as DraftPacksResponse;
  const next = Array.isArray(response.items) ? response.items : [];
  setPacks(next);
 
@@ -27,7 +29,7 @@ export default function OutreachScreen() {
  setSelectedPackId(next[0].id);
  }
  } else {
- const stillExists = next.some(function (pack: any) {
+ const stillExists = next.some(function (pack) {
  return pack.id === selectedPackId;
  });
  if (!stillExists) {
@@ -46,7 +48,7 @@ export default function OutreachScreen() {
  }, [load]);
 
  const selectedPack = useMemo(function () {
- const found = packs.find(function (pack: any) {
+ const found = packs.find(function (pack) {
  return pack.id === selectedPackId;
  });
  if (found) {
@@ -59,27 +61,48 @@ export default function OutreachScreen() {
  if (!token) {
  return;
  }
- const result = (await submitDraftPack(token, packId)) as any;
+ try {
+ setActionBusy(true);
+ const result = await submitDraftPack(token, packId);
  setActionResult(JSON.stringify(result));
  await load();
+ } catch (error) {
+ Alert.alert("Submit Failed", String(error));
+ } finally {
+ setActionBusy(false);
+ }
  };
 
  const approveDraft = async function (draftId: string) {
  if (!token) {
  return;
  }
- const result = (await approvePackDraft(token, draftId)) as any;
+ try {
+ setActionBusy(true);
+ const result = await approvePackDraft(token, draftId);
  setActionResult(JSON.stringify(result));
  await load();
+ } catch (error) {
+ Alert.alert("Approve Failed", String(error));
+ } finally {
+ setActionBusy(false);
+ }
  };
 
  const rejectDraft = async function (draftId: string) {
  if (!token) {
  return;
  }
- const result = (await rejectPackDraft(token, draftId)) as any;
+ try {
+ setActionBusy(true);
+ const result = await rejectPackDraft(token, draftId);
  setActionResult(JSON.stringify(result));
  await load();
+ } catch (error) {
+ Alert.alert("Reject Failed", String(error));
+ } finally {
+ setActionBusy(false);
+ }
  };
 
  const draftRows = selectedPack ? (Array.isArray(selectedPack.drafts) ? selectedPack.drafts : []) : [];
@@ -123,14 +146,16 @@ export default function OutreachScreen() {
 
  <Pressable
  onPress={function () {
+ if (!actionBusy) {
  void submitPack(selectedPack.id);
+ }
  }}
  style={styles.submitButton}
  >
  <Text style={styles.submitButtonText}>Submit Pack</Text>
  </Pressable>
 
- {draftRows.map(function (draft: any) {
+ {draftRows.map(function (draft) {
  return (
  <View key={draft.id} style={styles.draftRow}>
  <Text style={styles.draftChannel}>{String(draft.channel).toUpperCase()}</Text>
@@ -139,10 +164,14 @@ export default function OutreachScreen() {
  <Text style={styles.draftStatus}>Status: {draft.status}</Text>
 
  <View style={styles.actionRow}>
- <Pressable onPress={function () { void approveDraft(draft.id); }} style={styles.actionButton}>
+ <Pressable onPress={function () { if (!actionBusy) {
+ void approveDraft(draft.id);
+ } }} style={styles.actionButton}>
  <Text style={styles.actionButtonText}>Approve</Text>
  </Pressable>
- <Pressable onPress={function () { void rejectDraft(draft.id); }} style={styles.rejectButton}>
+ <Pressable onPress={function () { if (!actionBusy) {
+ void rejectDraft(draft.id);
+ } }} style={styles.rejectButton}>
  <Text style={styles.rejectButtonText}>Reject</Text>
  </Pressable>
  </View>

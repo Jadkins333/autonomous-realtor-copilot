@@ -96,3 +96,47 @@ export type SourceStatusItem = {
 export type SourceStatusResponse = {
  items: SourceStatusItem[];
 };
+
+export type DraftPackDraft = {
+ id: string;
+ pack_id?: string;
+ contact_id: string;
+ channel: string;
+ subject?: string;
+ body: string;
+ status: string;
+ created_at: string;
+};
+
+export type DraftPack = {
+ id: string;
+ created_at: string;
+ created_by_user_id: string;
+ parcel_id?: string;
+ contact_id?: string;
+ status: string;
+ sandbox: boolean;
+ objective: string;
+ drafts: DraftPackDraft[];
+};
+
+export type DraftPacksResponse = {
+ items: DraftPack[];
+ next_cursor?: string;
+};
+
+export type DraftPackSubmitResponse = {
+ id: string;
+ status: string;
+ submitted_at: string;
+};
+
+export type DraftActionResponse = {
+ id: string;
+ pack_id?: string;
+ status: string;
+ approval_state: string;
+ pack_status?: string;
+ reason?: string;
+};
+
