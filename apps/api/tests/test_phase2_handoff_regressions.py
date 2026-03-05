@@ -146,3 +146,103 @@ def test_sources_status_shape_for_authenticated_user(monkeypatch):
         app.dependency_overrides.clear()
 
 
+
+
+class _FakeProvider:
+    def __init__(self, result, name="provider"):
+        self.result = result
+        self.name = name
+        self.calls = []
+
+    async def send(self, *args):
+        self.calls.append(args)
+        return self.result
+
+
+def test_approve_and_send_email_non_sandbox_invokes_provider(monkeypatch):
+    tenant_id = uuid4()
+    message_id = uuid4()
+    pack_id = uuid4()
+
+    message = SimpleNamespace(
+        id=message_id,
+        tenant_id=tenant_id,
+        contact_id=uuid4(),
+        status=MessageStatus.draft,
+        channel=Channel.email,
+        subject="Subject",
+        body="Body",
+        meta_json={},
+        pack_id=pack_id,
+        sent_at=None,
+        provider_message_id=None,
+    )
+    contact = SimpleNamespace(id=message.contact_id, tenant_id=tenant_id, email="lead@example.com", phone=None)
+    db = _FakeDB([message, contact, None])
+
+    provider = _FakeProvider(
+        result=SimpleNamespace(ok=True, provider_message_id="pm-123", error=None),
+        name="postmark",
+    )
+
+    monkeypatch.setattr(outreach, "enforce_outbound_policy", lambda *_args, **_kwargs: (True, None))
+    monkeypatch.setattr(outreach.settings, "sandbox_mode", False, raising=False)
+    monkeypatch.setattr(outreach, "get_email_provider", lambda: provider)
+    monkeypatch.setattr(outreach, "_safe_pack_status", lambda *_args, **_kwargs: "submitted")
+
+    result = asyncio.run(outreach.approve_and_send(db, tenant_id, message_id))
+
+    assert provider.calls == [("lead@example.com", "Subject", "Body")]
+    assert message.status == MessageStatus.sent
+    assert message.provider_message_id == "pm-123"
+    assert message.meta_json["approval_state"] == "approved"
+    assert result["status"] == "sent"
+    assert result["provider_message_id"] == "pm-123"
+    assert result["pack_id"] == pack_id
+    assert result["pack_status"] == "submitted"
+    assert db.commits == 1
+
+
+def test_approve_and_send_sms_non_sandbox_invokes_provider(monkeypatch):
+    tenant_id = uuid4()
+    message_id = uuid4()
+    pack_id = uuid4()
+
+    message = SimpleNamespace(
+        id=message_id,
+        tenant_id=tenant_id,
+        contact_id=uuid4(),
+        status=MessageStatus.draft,
+        channel=Channel.sms,
+        subject=None,
+        body="Hello from test",
+        meta_json={},
+        pack_id=pack_id,
+        sent_at=None,
+        provider_message_id=None,
+    )
+    contact = SimpleNamespace(id=message.contact_id, tenant_id=tenant_id, email=None, phone="+15555550123")
+    db = _FakeDB([message, contact, None])
+
+    provider = _FakeProvider(
+        result=SimpleNamespace(ok=True, provider_message_id="sms-321", error=None),
+        name="console_sms",
+    )
+
+    monkeypatch.setattr(outreach, "enforce_outbound_policy", lambda *_args, **_kwargs: (True, None))
+    monkeypatch.setattr(outreach.settings, "sandbox_mode", False, raising=False)
+    monkeypatch.setattr(outreach, "get_sms_provider", lambda: provider)
+    monkeypatch.setattr(outreach, "_safe_pack_status", lambda *_args, **_kwargs: "approved")
+
+    result = asyncio.run(outreach.approve_and_send(db, tenant_id, message_id))
+
+    assert provider.calls == [("+15555550123", "Hello from test")]
+    assert message.status == MessageStatus.sent
+    assert message.provider_message_id == "sms-321"
+    assert message.meta_json["provider_fallback_reason"] == "Missing Twilio credentials; using console provider"
+    assert message.meta_json["approval_state"] == "approved"
+    assert result["status"] == "sent"
+    assert result["provider_message_id"] == "sms-321"
+    assert result["pack_id"] == pack_id
+    assert result["pack_status"] == "approved"
+    assert db.commits == 1
