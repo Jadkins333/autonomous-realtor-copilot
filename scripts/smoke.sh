@@ -86,6 +86,13 @@ required=["id","address","insights"]
 for key in required:
     if key not in payload:
         raise SystemExit(f"missing key: {key}")
+timeline=payload.get("timeline")
+if not isinstance(timeline,list):
+    raise SystemExit("parcel detail missing timeline")
+if timeline:
+    first=timeline[0]
+    if "event_type" not in first or "occurred_at" not in first:
+        raise SystemExit("timeline event missing required fields")
 print("parcel detail shape ok")
 PY
 

@@ -7,7 +7,18 @@ from uuid import UUID
 from sqlalchemy import case, desc, func, select, text
 from sqlalchemy.orm import Session
 
-from app.models.entities import FloodZone, MetricDefinition, MetricValue, Parcel, Permit, PoiFeature, ProvenanceRecord, Source, TransitStop
+from app.models.entities import (
+    FloodZone,
+    MetricDefinition,
+    MetricValue,
+    OpportunityEvent,
+    Parcel,
+    Permit,
+    PoiFeature,
+    ProvenanceRecord,
+    Source,
+    TransitStop,
+)
 from app.services.compliance import evaluate_fair_housing_text
 from app.services.provenance import freshness
 from app.services.seed_loader import load_seed_json
@@ -579,6 +590,17 @@ def parcel_detail_metrics(db: Session, tenant_id: UUID, parcel_id: UUID) -> dict
             .limit(12)
         ).all()
     )
+    parcel_opportunity_events = list(
+        db.execute(
+            select(OpportunityEvent)
+            .where(
+                OpportunityEvent.tenant_id == tenant_id,
+                OpportunityEvent.parcel_id == parcel.id,
+            )
+            .order_by(OpportunityEvent.created_at.desc())
+            .limit(12)
+        ).scalars()
+    )
 
     top_types: dict[str, int] = {}
     for permit in permits:
@@ -659,6 +681,22 @@ def parcel_detail_metrics(db: Session, tenant_id: UUID, parcel_id: UUID) -> dict
                         "metric_key": definition.key,
                         "version": definition.version,
                         "value": metric_value.value_json,
+                    },
+                },
+            )
+        )
+
+    for event in parcel_opportunity_events:
+        timeline_rows.append(
+            (
+                event.created_at,
+                {
+                    "event_type": "opportunity_event",
+                    "occurred_at": event.created_at.isoformat(),
+                    "title": event.event_type.replace("_", " "),
+                    "details": {
+                        "severity": event.severity,
+                        "payload": event.details_json,
                     },
                 },
             )

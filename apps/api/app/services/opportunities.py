@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from hashlib import sha256
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import case, func, select, text
 from sqlalchemy.orm import Session
 
-from app.models.entities import MetricDefinition, MetricValue, Parcel, Permit, ProvenanceRecord
+from app.models.entities import MetricDefinition, MetricValue, OpportunityEvent, Parcel, Permit, ProvenanceRecord
 from app.services.provenance import freshness
 
 
@@ -50,6 +51,45 @@ def _store_metric_value(
     db.add(metric_value)
     db.flush()
     return metric_value
+
+
+def _event_dedupe_key(*, tenant_id: UUID, parcel_id: UUID, event_type: str, day: str) -> str:
+    packed = f"{tenant_id}|{parcel_id}|{event_type}|{day}".encode("utf-8")
+    return sha256(packed).hexdigest()
+
+
+def _record_opportunity_event(
+    db: Session,
+    *,
+    tenant_id: UUID,
+    parcel_id: UUID,
+    event_type: str,
+    severity: str,
+    details_json: dict,
+    occurred_at: datetime,
+) -> None:
+    day = occurred_at.date().isoformat()
+    dedupe_key = _event_dedupe_key(
+        tenant_id=tenant_id,
+        parcel_id=parcel_id,
+        event_type=event_type,
+        day=day,
+    )
+    existing = db.execute(select(OpportunityEvent).where(OpportunityEvent.dedupe_key == dedupe_key)).scalar_one_or_none()
+    if existing:
+        return
+
+    db.add(
+        OpportunityEvent(
+            tenant_id=tenant_id,
+            parcel_id=parcel_id,
+            event_type=event_type,
+            severity=severity,
+            details_json=details_json,
+            dedupe_key=dedupe_key,
+            created_at=occurred_at,
+        )
+    )
 
 
 def list_opportunities(db: Session, tenant_id: UUID, limit: int = 50) -> dict:
@@ -221,10 +261,45 @@ def list_opportunities(db: Session, tenant_id: UUID, limit: int = 50) -> dict:
         flags: list[str] = []
         if neighborhood_heat_score >= 65:
             flags.append("permit_momentum")
+            _record_opportunity_event(
+                db,
+                tenant_id=tenant_id,
+                parcel_id=parcel.id,
+                event_type="neighborhood_heat_crossed",
+                severity="high" if neighborhood_heat_score >= 80 else "medium",
+                details_json={
+                    "threshold": 65,
+                    "score_0_100": neighborhood_heat_score,
+                    "distress_score_0_1": distress_score,
+                },
+                occurred_at=datetime.now(tz=UTC),
+            )
         if distress_score >= 0.55:
             flags.append("distress_signal")
+            _record_opportunity_event(
+                db,
+                tenant_id=tenant_id,
+                parcel_id=parcel.id,
+                event_type="distress_signal_crossed",
+                severity="high" if distress_score >= 0.7 else "medium",
+                details_json={
+                    "threshold": 0.55,
+                    "score_0_1": distress_score,
+                    "annual_permits": annual_permits,
+                },
+                occurred_at=datetime.now(tz=UTC),
+            )
         if flood_zone:
             flags.append("flood_exposure")
+            _record_opportunity_event(
+                db,
+                tenant_id=tenant_id,
+                parcel_id=parcel.id,
+                event_type="flood_exposure_detected",
+                severity="medium",
+                details_json={"zone_code": flood_zone},
+                occurred_at=datetime.now(tz=UTC),
+            )
 
         items.append(
             {

@@ -347,6 +347,20 @@ class ComplianceEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
 
 
+class OpportunityEvent(Base):
+    __tablename__ = "opportunity_events"
+    __table_args__ = (UniqueConstraint("dedupe_key", name="uq_opportunity_events_dedupe_key"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    parcel_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("parcels.id"), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(128), nullable=False)
+    severity: Mapped[str] = mapped_column(String(32), nullable=False)
+    details_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    dedupe_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+
 class SchemaDriftDLQ(Base):
     __tablename__ = "schema_drift_dlq"
 
