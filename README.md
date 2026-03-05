@@ -32,6 +32,9 @@ docker compose up --build
 
 Detailed local workflow: [DEV.md](./DEV.md)
 
+> Note: use `pnpm run project:setup` and `pnpm run project:doctor`.  
+> `pnpm run project:setup` and `pnpm run project:doctor` are pnpm builtins and do not run this project's scripts.
+
 ## Demo Credentials
 - Email: `agent@demo.local`
 - Password: `demo123`
@@ -43,6 +46,8 @@ These are seeded automatically at first boot (`apps/api/scripts/start_api.sh` ru
 - Outreach approvals move messages to `queued` sandbox state without real sends.
 - Public-data connectors try live URLs first, then fallback to synthetic seed files.
 - Source failures are non-fatal and recorded in `source_runs`.
+- Drift policy: when schema drift is detected, the source is auto-paused and DLQ replay is blocked until drift is resolved.
+- DLQ entries use stable dedupe keys so repeated drift failures do not create duplicate queue rows.
 - On macOS, API/worker/beat use container-local seed copies (`/tmp/app_seed`) to avoid bind-mount file lock issues.
 
 ## PWA (apps/web)
@@ -95,6 +100,8 @@ pnpm dev:mobile
 Then choose iOS/Android from Expo CLI.
 
 ## Root Scripts
+- `pnpm run project:setup` — bootstrap local environment, migrations, deterministic seed, smoke checks
+- `pnpm run project:doctor` — diagnostics for docker/api/db/redis/worker/web reachability
 - `pnpm dev:web` — run Next.js web app
 - `pnpm dev:api` — run API stack via docker compose (db/redis/api/worker/beat)
 - `pnpm dev:mobile` — run Expo mobile app
@@ -158,6 +165,7 @@ Code-enforced controls include:
 - Optional global revocation policy toggle (`ENFORCE_GLOBAL_REVOCATION=false` by default)
 
 Compliance behavior is implemented as configurable product policy defaults and audit controls, not legal advice.
+See [Compliance Notice](./docs/compliance/NOTICE.md).
 
 Reference docs:
 - [CAN-SPAM](./docs/compliance/can_spam.md)

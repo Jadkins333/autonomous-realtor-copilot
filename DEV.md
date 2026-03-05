@@ -1,5 +1,8 @@
 # Development Commands
 
+> Use `pnpm run project:setup` and `pnpm run project:doctor` for this repo.  
+> `pnpm run project:setup` and `pnpm run project:doctor` are pnpm builtins and are not project bootstrap/diagnostics.
+
 ## Install
 
 ```bash
@@ -41,6 +44,13 @@ EXPO_PUBLIC_API_BASE_URL=http://<your-lan-ip>:8000 pnpm dev:mobile
 
 ```bash
 bash scripts/smoke.sh
+```
+
+## Bootstrap + Doctor
+
+```bash
+pnpm run project:setup
+pnpm run project:doctor
 ```
 
 ## Reset Local Dev
