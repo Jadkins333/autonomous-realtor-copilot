@@ -545,3 +545,10 @@ New regression coverage:
  - dev-visible warning when `/sources/status` refresh fails,
  - fixture banner visibility when a critical source reports `mode=fixture`.
 - Minor compatibility fix for Vitest JSX runtime: `apps/web/components/fixture-mode-banner.tsx` now imports `React` default.
+
+## S) Script Line Ending Hardening (2026-03-05)
+- Added repo `.gitattributes` rule: `*.sh text eol=lf`.
+- Prevents Windows checkout CRLF from breaking bash scripts (`set -euo pipefail` / `pipefail\r` errors).
+- Verified with:
+ - `pnpm run project:doctor` (all checks passed)
+ - `pnpm smoke` (passed end-to-end).
