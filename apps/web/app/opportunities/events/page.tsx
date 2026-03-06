@@ -44,7 +44,7 @@ export default function OpportunityEventsPage() {
 
   useEffect(() => {
     if (!session) return;
-    apiFetch<EventsResponse>(`/opportunities/events?${query}`, (session as any).apiToken)
+    apiFetch<EventsResponse>(`/opportunities/events?${query}`, session?.apiToken)
       .then((payload) => setEvents(payload.items || []))
       .catch(() => setEvents([]));
   }, [session, query]);

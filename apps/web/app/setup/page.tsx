@@ -45,20 +45,20 @@ export default function SetupPage() {
 
   useEffect(() => {
     if (!session) return;
-    let mounted = true;
+    const active = true;
 
     const load = async () => {
       try {
         setError(null);
         const [diag, sourcePayload] = await Promise.all([
-          apiFetch<Record<string, unknown>>("/system/diagnostics", (session as any).apiToken),
-          apiFetch<SourceStatusResponse>("/sources/status", (session as any).apiToken),
+          apiFetch<Record<string, unknown>>("/system/diagnostics", session?.apiToken),
+          apiFetch<SourceStatusResponse>("/sources/status", session?.apiToken),
         ]);
-        if (!mounted) return;
+        if (!active) return;
         setDiagnostics(diag);
         setSources(sourcePayload.items || []);
       } catch (err) {
-        if (!mounted) return;
+        if (!active) return;
         const message = err instanceof Error ? err.message : "Failed to load setup diagnostics";
         setError(message);
       }

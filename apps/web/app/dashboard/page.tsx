@@ -17,7 +17,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!session) return;
-    apiFetch<Record<string, unknown>>("/metrics", (session as any).apiToken)
+    apiFetch<Record<string, unknown>>("/metrics", session?.apiToken)
       .then(setMetrics)
       .catch(() => setMetrics(null));
   }, [session]);
@@ -48,7 +48,7 @@ export default function DashboardPage() {
             1. Search a property. 2. Open insight + provenance. 3. Draft outreach in sandbox. 4. Run a copilot command.
           </CardDescription>
           <div className="mt-3">
-            <Button onClick={dismissTour} size="sm" variant="outline">
+            <Button onClick={dismissTour} variant="outline">
               Dismiss tour
             </Button>
           </div>

@@ -56,7 +56,7 @@ export function FixtureModeBanner() {
 
  const load = async function () {
  try {
- const response = await apiFetch<SourceStatusResponse>("/sources/status", (session as any).apiToken);
+ const response = await apiFetch<SourceStatusResponse>("/sources/status", session?.apiToken);
  if (!active) {
  return;
  }

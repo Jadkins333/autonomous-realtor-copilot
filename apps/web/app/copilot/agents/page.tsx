@@ -24,7 +24,7 @@ export default function CopilotAgentsPage() {
 
   useEffect(() => {
     if (!session) return;
-    apiFetch<AgentRow[]>("/copilot/agents", (session as any).apiToken)
+    apiFetch<AgentRow[]>("/copilot/agents", session?.apiToken)
       .then(setAgents)
       .catch(() => setAgents([]));
   }, [session]);

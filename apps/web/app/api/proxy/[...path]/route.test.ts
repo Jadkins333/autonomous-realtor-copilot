@@ -18,7 +18,7 @@ describe("api proxy route", function () {
  }
  })
  );
- vi.stubGlobal("fetch", fetchMock as any);
+ vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
  const mod = await import("./route");
  const req = new NextRequest("http://localhost/api/proxy/sources/status?x=1", {
@@ -53,7 +53,7 @@ describe("api proxy route", function () {
  headers: { "content-type": "application/json" }
  })
  );
- vi.stubGlobal("fetch", fetchMock as any);
+ vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
  const mod = await import("./route");
  const req = new NextRequest("http://localhost/api/proxy/outreach/drafts", {
@@ -86,7 +86,7 @@ describe("api proxy route", function () {
  }
  })
  );
- vi.stubGlobal("fetch", fetchMock as any);
+ vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
  const mod = await import("./route");
  const req = new NextRequest("http://localhost/api/proxy/healthz", { method: "GET" });
@@ -100,7 +100,7 @@ describe("api proxy route", function () {
 
  it("encodes path segments before forwarding", async function () {
  const fetchMock = vi.fn().mockResolvedValue(new Response("ok", { status: 200 }));
- vi.stubGlobal("fetch", fetchMock as any);
+ vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
  const mod = await import("./route");
  const req = new NextRequest("http://localhost/api/proxy/raw?q=a%2Fb", { method: "GET" });
@@ -113,7 +113,7 @@ describe("api proxy route", function () {
 
  it("handles undefined path arrays by proxying to API root", async function () {
  const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
- vi.stubGlobal("fetch", fetchMock as any);
+ vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
  const mod = await import("./route");
  const req = new NextRequest("http://localhost/api/proxy?x=1", { method: "GET" });
@@ -126,7 +126,7 @@ describe("api proxy route", function () {
 
  it("forwards HEAD requests without a request body", async function () {
  const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
- vi.stubGlobal("fetch", fetchMock as any);
+ vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
  const mod = await import("./route");
  const req = new NextRequest("http://localhost/api/proxy/sources/status", {
@@ -152,7 +152,7 @@ describe("api proxy route", function () {
 
  it("forwards OPTIONS requests with body when present", async function () {
  const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
- vi.stubGlobal("fetch", fetchMock as any);
+ vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
  const mod = await import("./route");
  const req = new NextRequest("http://localhost/api/proxy/outreach/drafts", {

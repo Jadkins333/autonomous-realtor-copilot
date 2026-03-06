@@ -1,87 +1,94 @@
-import React from "react";
+import React from 'react'
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
-import type { Session } from "next-auth";
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
+import type { Session } from 'next-auth'
+import type { SessionContextValue } from 'next-auth/react'
 
-import { FixtureModeBanner } from "@/components/fixture-mode-banner";
-import { useSession } from "next-auth/react";
-import { apiFetch } from "@/lib/api";
+import { FixtureModeBanner } from '@/components/fixture-mode-banner'
+import { useSession } from 'next-auth/react'
+import { apiFetch } from '@/lib/api'
 
-vi.mock("next-auth/react", function () {
+vi.mock('next-auth/react', function () {
  return {
- useSession: vi.fn(),
- };
-});
+ useSession: vi.fn()
+ }
+})
 
-vi.mock("@/lib/api", function () {
+vi.mock('@/lib/api', function () {
  return {
- apiFetch: vi.fn(),
- };
-});
+ apiFetch: vi.fn()
+ }
+})
 
 function sessionWithToken(token: string): Session {
  return {
- expires: "2099-01-01T00:00:00.000Z",
+ expires: '2099-01-01T00:00:00.000Z',
  user: {
- id: "user-1",
- email: "agent@example.com",
- name: "Agent",
- role: "agent",
- tenantId: "tenant-1",
- apiToken: token,
- },
- } as Session;
+ id: 'user-1',
+ email: 'agent@example.com',
+ name: 'Agent',
+ role: 'agent',
+ tenantId: 'tenant-1',
+ apiToken: token
+ }
+ } as Session
 }
 
-describe("FixtureModeBanner", function () {
+function makeSessionContext(data: Session | null): SessionContextValue {
+ return {
+ data,
+ status: data ? 'authenticated' : 'unauthenticated',
+ update: vi.fn(async () => null)
+ }
+}
+
+describe('FixtureModeBanner', function () {
  beforeEach(function () {
- vi.clearAllMocks();
- window.sessionStorage.clear();
- });
+ vi.clearAllMocks()
+ window.sessionStorage.clear()
+ })
 
- it("shows a dev-visible warning when cache parsing fails", async function () {
- window.sessionStorage.setItem("fixture-mode-status-cache", "{invalid json");
- vi.mocked(useSession).mockReturnValue({ data: null } as any);
+ it('shows a dev-visible warning when cache parsing fails', async function () {
+ window.sessionStorage.setItem('fixture-mode-status-cache', '{invalid json')
+ vi.mocked(useSession).mockReturnValue(makeSessionContext(null))
 
- const warnSpy = vi.spyOn(console, "warn").mockImplementation(function () {
- return;
- });
+ const warnSpy = vi.spyOn(console, 'warn').mockImplementation(function () {
+ return
+ })
 
- render(<FixtureModeBanner />);
+ render(<FixtureModeBanner />)
 
- expect(await screen.findByText("Fixture status cache parse failed.")).toBeTruthy();
- expect(warnSpy).toHaveBeenCalledWith("fixture mode cache parse failed", expect.any(SyntaxError));
- expect(apiFetch).not.toHaveBeenCalled();
- });
+ expect(await screen.findByText('Fixture status cache parse failed.')).toBeTruthy()
+ expect(warnSpy).toHaveBeenCalledWith('fixture mode cache parse failed', expect.any(SyntaxError))
+ expect(apiFetch).not.toHaveBeenCalled()
+ })
 
- it("shows a dev-visible warning when status refresh fails", async function () {
- vi.mocked(useSession).mockReturnValue({ data: sessionWithToken("token-1") } as any);
- vi.mocked(apiFetch).mockRejectedValue(new Error("network down"));
+ it('shows a dev-visible warning when status refresh fails', async function () {
+ vi.mocked(useSession).mockReturnValue(makeSessionContext(sessionWithToken('token-1')))
+ vi.mocked(apiFetch).mockRejectedValue(new Error('network down'))
 
- const warnSpy = vi.spyOn(console, "warn").mockImplementation(function () {
- return;
- });
+ const warnSpy = vi.spyOn(console, 'warn').mockImplementation(function () {
+ return
+ })
 
- render(<FixtureModeBanner />);
+ render(<FixtureModeBanner />)
 
- expect(await screen.findByText("Fixture status refresh failed.")).toBeTruthy();
+ expect(await screen.findByText('Fixture status refresh failed.')).toBeTruthy()
  await waitFor(function () {
- expect(apiFetch).toHaveBeenCalled();
- });
- expect(warnSpy).toHaveBeenCalledWith("fixture mode status fetch failed", expect.any(Error));
- });
+ expect(apiFetch).toHaveBeenCalled()
+ })
+ expect(warnSpy).toHaveBeenCalledWith('fixture mode status fetch failed', expect.any(Error))
+ })
 
- it("shows fixture banner when a critical source is in fixture mode", async function () {
- vi.mocked(useSession).mockReturnValue({ data: sessionWithToken("token-1") } as any);
+ it('shows fixture banner when a critical source is in fixture mode', async function () {
+ vi.mocked(useSession).mockReturnValue(makeSessionContext(sessionWithToken('token-1')))
  vi.mocked(apiFetch).mockResolvedValue({
- items: [{ source_name: "franklin_auditor", mode: "fixture" }],
- } as any);
+ items: [{ source_name: 'franklin_auditor', mode: 'fixture' }]
+ } as unknown)
 
- render(<FixtureModeBanner />);
+ render(<FixtureModeBanner />)
 
- expect(await screen.findByText("Fixture mode: demo data in use. Live sources not connected.")).toBeTruthy();
- });
-});
-
-
+ expect(await screen.findByText('Fixture mode: demo data in use. Live sources not connected.')).toBeTruthy()
+ })
+})

@@ -55,7 +55,7 @@ export default function OpportunitiesPage() {
     let mounted = true;
     (async () => {
       try {
-        const data = await apiFetch<OpportunitiesResponse>("/opportunities", (session as any).apiToken);
+        const data = await apiFetch<OpportunitiesResponse>("/opportunities", session?.apiToken);
         if (mounted) {
           setPayload(data);
         }
