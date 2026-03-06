@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 
 import { useRequireAuth } from "@/components/auth-guard";
@@ -90,7 +90,11 @@ export default function SetupPage() {
           {COMMANDS.map((command) => (
             <div key={command} className="flex items-center justify-between rounded-xl border bg-card px-3 py-2">
               <code className="text-xs">{command}</code>
-              <Button variant="outline" onClick={() => copyCommand(command)}>
+              <Button
+                variant="outline"
+                onClick={() => copyCommand(command)}
+                data-testid={`copy-cmd-${command.split(" ").at(-1)}`}
+              >
                 Copy
               </Button>
             </div>
@@ -108,7 +112,7 @@ export default function SetupPage() {
             const envChecklist = (diagnostics?.env_checklist as Record<string, boolean> | undefined) || {};
             const configured = !!envChecklist[key];
             return (
-              <div key={key} className="rounded-xl border bg-card px-3 py-2 text-sm">
+              <div key={key} className="rounded-xl border bg-card px-3 py-2 text-sm" data-testid={`env-key-${key}`}>
                 <p className="font-medium">{key}</p>
                 <p className={configured ? "text-emerald-400" : "text-amber-300"}>
                   {configured ? "configured" : "missing"}
@@ -133,7 +137,7 @@ export default function SetupPage() {
       </Card>
 
       {error ? (
-        <Card className="mb-4">
+        <Card className="mb-4" data-testid="setup-error">
           <CardTitle>Status Error</CardTitle>
           <CardDescription className="mt-1 text-red-500">{error}</CardDescription>
         </Card>
@@ -141,7 +145,7 @@ export default function SetupPage() {
 
       <Card className="mb-4">
         <CardTitle className="mb-3">System Diagnostics</CardTitle>
-        <pre className="overflow-auto rounded-xl bg-muted p-3 text-xs">
+        <pre className="overflow-auto rounded-xl bg-muted p-3 text-xs" data-testid="diagnostics-pre">
           {JSON.stringify(diagnostics, null, 2)}
         </pre>
       </Card>
@@ -150,7 +154,7 @@ export default function SetupPage() {
         <CardTitle className="mb-3">Sources Status</CardTitle>
         <div className="space-y-2">
           {sources.map((source) => (
-            <div key={source.source_name} className="rounded-xl border bg-card p-3 text-sm">
+            <div key={source.source_name} className="rounded-xl border bg-card p-3 text-sm" data-testid={`source-row-${source.source_name}`}>
               <p className="font-semibold">{source.source_name}</p>
               <p className="text-muted-foreground">
                 mode={source.mode} state={source.state} drift={String(source.drift_detected)} dlq={source.dlq_count}
