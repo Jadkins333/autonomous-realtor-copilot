@@ -452,7 +452,7 @@ async def _retry_with_jitter(
     while True:
         try:
             return await fetch_live()
-        except Exception: # noqa: BLE001
+        except Exception as exc: # noqa: BLE001
             if attempt >= max_attempts:
                 raise
             backoff = base_delay_seconds * (2 ** (attempt - 1))
@@ -461,10 +461,11 @@ async def _retry_with_jitter(
             logger.warning(
                 "ingest_live_fetch_retry",
                 extra={
-                 "source": source_label,
-                 "attempt": attempt,
-                 "max_attempts": max_attempts,
-                 "delay_seconds": round(delay, 3),
+                    "source": source_label,
+                    "attempt": attempt,
+                    "max_attempts": max_attempts,
+                    "delay_seconds": round(delay, 3),
+                    "error": str(exc),
                 },
             )
             await asyncio.sleep(delay)
