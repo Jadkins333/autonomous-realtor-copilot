@@ -13,7 +13,7 @@ const nextConfig = {
     ignoreDuringBuilds: true
   },
   typescript: {
-    ignoreBuildErrors: true
+    ignoreBuildErrors: false
   },
   webpack: (config) => {
     config.resolve.alias = {

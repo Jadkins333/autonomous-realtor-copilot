@@ -128,8 +128,8 @@ export default function OpportunitiesPage() {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <Badge variant="secondary" data-testid={`heat-badge-${row.parcel_id}`}>Heat {Math.round(heat)}</Badge>
-                  <Badge variant={distress >= 0.55 ? "destructive" : "outline"} data-testid={`distress-badge-${row.parcel_id}`}>
+                  <Badge data-testid={`heat-badge-${row.parcel_id}`}>Heat {Math.round(heat)}</Badge>
+                  <Badge className={distress >= 0.55 ? "bg-red-500/20 text-red-200" : ""} data-testid={`distress-badge-${row.parcel_id}`}>
                     Distress {(distress * 100).toFixed(0)}%
                   </Badge>
                 </div>
@@ -138,14 +138,14 @@ export default function OpportunitiesPage() {
               <div className="mt-3 flex flex-wrap gap-2">
                 {(row.opportunity_flags || []).length ? (
                   row.opportunity_flags.map((flag) => (
-                    <Badge key={flag} variant="outline">
+                    <Badge key={flag}>
                       {flag.replaceAll("_", " ")}
                     </Badge>
                   ))
                 ) : (
-                  <Badge variant="outline">no active flags</Badge>
+                  <Badge>no active flags</Badge>
                 )}
-                <Badge variant="secondary">Events 30d {Number(row.event_signal?.count_30d || 0)}</Badge>
+                <Badge>Events 30d {Number(row.event_signal?.count_30d || 0)}</Badge>
               </div>
 
               {row.event_signal?.latest ? (
