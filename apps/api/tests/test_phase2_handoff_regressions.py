@@ -12,6 +12,7 @@ from app.db.session import get_db
 from app.main import app
 from app.models.enums import Channel, MessageStatus
 from app.services import ingestion, outreach
+import app.seed as app_seed
 
 
 class _ScalarResult:
@@ -288,3 +289,26 @@ def test_retry_with_jitter_logs_error_context(monkeypatch):
 	assert extra['max_attempts'] == 2
 	assert extra['delay_seconds'] == pytest.approx(0.1)
 	assert extra['error'] == 'boom'
+
+def test_seed_flood_zone_bad_ring_logs_warning(monkeypatch):
+	warnings = []
+
+	def fake_warning(message, *args, **kwargs):
+		warnings.append((message, args, kwargs))
+
+	bad_row = {
+		'external_id': 'flood-1',
+		'zone_code': 'AE',
+		'coordinates': [[[['x', 'y'], ['x', 'y'], ['x', 'y'], ['x', 'y']]]],
+	}
+
+	monkeypatch.setattr(app_seed, 'load_seed_json', lambda _name: [bad_row])
+	monkeypatch.setattr(app_seed.logger, 'warning', fake_warning)
+
+	app_seed._seed_flood_zones(SimpleNamespace(), uuid4(), SimpleNamespace())
+
+	assert len(warnings) == 1
+	message, args, _kwargs = warnings[0]
+	assert message == 'seed flood zone ring parse failed for %s: %s'
+	assert args[0] == 'flood-1'
+	assert isinstance(args[1], Exception)
