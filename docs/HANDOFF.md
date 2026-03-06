@@ -292,7 +292,7 @@ Stored in `source_status.mode`.
 - Breaker instances per source in `BREAKERS` map in `ingestion.py`.
 - On live failure/open breaker: fallback to seed, status partial/failure.
 - Idempotent provenance skip: `_upsert_provenance` compares `raw_hash` and TTL.
-- Explicit jittered retry loop: UNKNOWN (no general retry-with-jitter implementation found in current connectors).
+- Explicit jittered retry loop: implemented via bounded backoff plus jitter retry helper before fixture fallback (apps/api/app/services/ingestion.py).
 
 ### Source status persistence and pause/resume behavior
 - Persisted in `source_status` table (`apps/api/app/models/entities.py`, `SourceStatus`).
@@ -445,14 +445,14 @@ Asserts include:
 - `pnpm smoke` -> passed.
 - `pnpm --filter web build` -> passed (Docker Node20 wrapper path).
 - `pnpm --filter web test` -> passed (vitest via Docker wrapper).
-- `docker compose exec -T api pytest -q` -> `34 passed`.
+- `docker compose exec -T api pytest -q` -> `46 passed`.
 
-Coverage gaps observed:
+Coverage gaps observed (historical snapshot before sections O through U):
 - No dedicated web integration test for API proxy route behavior under header/body edge cases.
 - No mobile automated test suite (UI/API interactions are runtime-only).
 - Mobile `tsc --noEmit` command did not complete within 45s in this environment (see Known Issues).
 
-## M) Known Issues / Footguns
+## M) Known Issues / Footguns (Historical Snapshot Before Phase2 Redo)
 1. Mobile TS typecheck hangs in this environment:
 - Command `pnpm --filter mobile exec tsc --noEmit` timed out at 45s during this handoff.
 - `tsc --showConfig` works; full noEmit run appears to stall.
@@ -472,7 +472,7 @@ Coverage gaps observed:
 6. Debug drift endpoint exposure risk if misconfigured:
 - `/sources/{source_name}/debug/drift` is blocked in production and when `DEBUG_DIAG=false`, but should remain carefully controlled in non-prod.
 
-## N) Roadmap (Strictly Derived From Missing Pieces)
+## N) Roadmap (Historical Snapshot Before Phase2 Redo)
 ### Baseline comparison source
 - Full original MVP spec document was **not found as a file inside this repo**.
 - Comparison baseline used: `README.md`, `docs/architecture.md`, API routes/services/models/tests currently present.
@@ -569,3 +569,9 @@ New regression coverage:
 - Web Vitest config migrated to ESM (`apps/web/vitest.config.mts`) to remove the Vite CJS Node API deprecation warning during local test runs.
 - Repository line-ending policy expanded beyond shell scripts: `.gitattributes` now enforces LF for `*.ts`, `*.tsx`, `*.js`, `*.mjs`, `*.cjs`, and `*.json` to prevent recurring CRLF churn on Windows checkouts.
 - Repeated verification after each chunk: `docker compose exec -T api pytest -q` (`46 passed`), `pnpm --filter web test:local` (`13 passed`), `pnpm --filter mobile exec tsc --noEmit -p tsconfig.check.json` (pass).
+
+## V) Audit Reconciliation (2026-03-06)
+- Sections M and N are retained as pre-redo historical snapshots and are superseded by sections O through U for current state.
+- Resolved in current branch: ingestion retry-with-jitter, outreach non-sandbox provider path and pack-status safety, typed /sources/status contract, mobile draft-pack parity flow, mobile fixture banner via /sources/status, fixture banner failure visibility, proxy route tests and vitest discovery, CORS origin hardening.
+- Latest gates on this branch: docker compose exec -T api pytest -q => 46 passed; pnpm --filter web test:local => 13 passed; pnpm --filter mobile exec tsc --noEmit -p tsconfig.check.json => pass.
+- Web build gate policy decision: keep next.config.mjs lint/type bypass flags enabled for now (ignoreDuringBuilds=true, ignoreBuildErrors=true). Attempting strict build currently fails on broad pre-existing lint debt; this remains a dedicated hardening follow-up.
