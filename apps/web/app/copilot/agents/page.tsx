@@ -1,7 +1,7 @@
 "use client";
 
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 
 import { useRequireAuth } from "@/components/auth-guard";
@@ -45,9 +45,9 @@ export default function CopilotAgentsPage() {
         </div>
       </Card>
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2" data-testid="agents-grid">
         {agents.map((agent) => (
-          <Card key={agent.key} className="p-4">
+          <Card key={agent.key} className="p-4" data-testid={`agent-card-${agent.key}`}>
             <CardTitle className="text-base">{agent.name}</CardTitle>
             <CardDescription className="mt-1">{agent.description}</CardDescription>
             <p className="mt-2 text-sm text-muted-foreground">{agent.mission}</p>
