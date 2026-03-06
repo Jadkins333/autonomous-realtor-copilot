@@ -560,3 +560,12 @@ New regression coverage:
 - Files: `apps/api/app/core/config.py`, `apps/api/app/main.py`, `.env.example`.
 - Added regression coverage: `apps/api/tests/test_cors_policy.py` (config parsing, wildcard handling, preflight allow-origin behavior).
 
+
+## U) Stability Hardening Follow-up (2026-03-06)
+- Added explicit `HEAD` handler in web proxy route and expanded route tests to cover `HEAD` and `OPTIONS` forwarding semantics (`apps/web/app/api/proxy/[...path]/route.ts`, `apps/web/app/api/proxy/[...path]/route.test.ts`).
+- Proxy context typing is now optional-safe for path params (`path?: string[]`), matching undefined-path fallback behavior used in tests.
+- API pytest warning noise reduced with explicit async fixture loop scope and known passlib crypt deprecation filter in `apps/api/pyproject.toml`; current gate output is clean (`44 passed`).
+- Mobile outreach draft-pack surface now uses typed pack models and guarded async actions with user-visible failure alerts; action buttons are disabled while a request is in-flight to prevent duplicate submissions (`apps/mobile/app/(app)/outreach/index.tsx`, `apps/mobile/lib/api.ts`, `apps/mobile/lib/types.ts`).
+- Web Vitest config migrated to ESM (`apps/web/vitest.config.mts`) to remove the Vite CJS Node API deprecation warning during local test runs.
+- Repository line-ending policy expanded beyond shell scripts: `.gitattributes` now enforces LF for `*.ts`, `*.tsx`, `*.js`, `*.mjs`, `*.cjs`, and `*.json` to prevent recurring CRLF churn on Windows checkouts.
+- Repeated verification after each chunk: `docker compose exec -T api pytest -q` (`44 passed`), `pnpm --filter web test:local` (`13 passed`), `pnpm --filter mobile exec tsc --noEmit -p tsconfig.check.json` (pass).
