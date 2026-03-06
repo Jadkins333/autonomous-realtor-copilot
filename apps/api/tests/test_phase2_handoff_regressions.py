@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -364,3 +365,150 @@ def test_approve_and_send_non_draft_returns_idempotent_payload(monkeypatch):
     assert result["idempotent"] is True
     assert provider.calls == []
     assert db.commits == 0
+
+
+def test_trim_error_text_returns_tail():
+    value = "x" * (ingestion.MAX_ERROR_TEXT_CHARS + 25)
+    trimmed = ingestion._trim_error_text(value)
+    assert len(trimmed) == ingestion.MAX_ERROR_TEXT_CHARS
+    assert trimmed == value[-ingestion.MAX_ERROR_TEXT_CHARS :]
+
+
+class _NestedTxn:
+    def __init__(self, db):
+        self.db = db
+
+    def __enter__(self):
+        self.db.begin_nested_calls += 1
+        return self
+
+    def __exit__(self, exc_type, _exc, _tb):
+        if exc_type:
+            self.db.nested_errors += 1
+        return False
+
+
+class _NestedDB:
+    def __init__(self):
+        self.begin_nested_calls = 0
+        self.nested_errors = 0
+
+    def begin_nested(self):
+        return _NestedTxn(self)
+
+
+def test_process_rows_continues_after_row_upsert_failure(monkeypatch):
+    db = _NestedDB()
+    source = SimpleNamespace(id=uuid4(), name="franklin_auditor", base_url="seed://auditor")
+    rows = [{"external_id": "row-1"}, {"external_id": "row-2"}]
+    drift_events = []
+    upsert_calls = {"count": 0}
+
+    monkeypatch.setattr(
+        ingestion,
+        "_upsert_provenance",
+        lambda *_args, **_kwargs: (SimpleNamespace(id=uuid4()), False),
+    )
+    monkeypatch.setattr(
+        ingestion,
+        "_record_schema_drift",
+        lambda *_args, **kwargs: drift_events.append(kwargs["event_type"]) or True,
+    )
+
+    def upserter(_db, _tenant_id, _item, _provenance_id):
+        upsert_calls["count"] += 1
+        if upsert_calls["count"] == 1:
+            raise RuntimeError("boom")
+
+    ingested, skipped, drift_count = asyncio.run(
+        ingestion._process_rows(
+            db,
+            uuid4(),
+            source,
+            source.base_url,
+            rows,
+            lambda raw: raw,
+            upserter,
+        )
+    )
+
+    assert ingested == 1
+    assert skipped == 0
+    assert drift_count == 1
+    assert drift_events == ["upsert_error"]
+    assert db.begin_nested_calls == 3
+    assert db.nested_errors == 1
+
+
+class _ReplayResult:
+    def __init__(self, scalar=None, scalars=None):
+        self._scalar = scalar
+        self._scalars = scalars or []
+
+    def scalar_one_or_none(self):
+        return self._scalar
+
+    def scalars(self):
+        return iter(self._scalars)
+
+
+class _ReplayDB:
+    def __init__(self, results):
+        self.results = list(results)
+        self.commits = 0
+
+    def execute(self, *_args, **_kwargs):
+        return self.results.pop(0)
+
+    def commit(self):
+        self.commits += 1
+
+
+def test_replay_source_dlq_enforces_retry_cap_and_trims_error(monkeypatch):
+    source = SimpleNamespace(id=uuid4(), name="franklin_auditor")
+    status_row = SimpleNamespace(drift_detected=False, state=ingestion.SourceState.ok)
+    dlq_item = SimpleNamespace(
+        id=uuid4(),
+        source_id=source.id,
+        occurred_at=datetime.now(tz=UTC),
+        raw_json={"external_id": "row-1"},
+        raw_url="seed://auditor#row-1",
+        external_id="row-1",
+        error_text="e" * (ingestion.MAX_ERROR_TEXT_CHARS + 10),
+        replay_count=ingestion.MAX_REPLAY_RETRIES - 1,
+        last_replayed_at=None,
+    )
+
+    db = _ReplayDB(
+        [
+            _ReplayResult(scalar=source),
+            _ReplayResult(scalars=[dlq_item]),
+            _ReplayResult(scalars=[]),
+            _ReplayResult(scalar=source),
+            _ReplayResult(scalars=[]),
+        ]
+    )
+
+    class _Validated:
+        def model_dump(self, mode="python"):
+            return {"external_id": "row-1"}
+
+    monkeypatch.setattr(ingestion, "get_or_create_source_status", lambda *_args, **_kwargs: status_row)
+    monkeypatch.setattr(ingestion, "recompute_source_dlq_count_by_source_id", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(ingestion, "_replay_config_for_source", lambda *_args, **_kwargs: (lambda _raw: _Validated(), lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("x" * 4000))))
+    monkeypatch.setattr(
+        ingestion,
+        "_upsert_provenance",
+        lambda *_args, **_kwargs: (SimpleNamespace(id=uuid4()), False),
+    )
+
+    first = ingestion.replay_source_dlq(db, uuid4(), "franklin_auditor")
+    second = ingestion.replay_source_dlq(db, uuid4(), "franklin_auditor")
+
+    assert first["attempted"] == 1
+    assert first["failed"] == 1
+    assert dlq_item.replay_count == ingestion.MAX_REPLAY_RETRIES
+    assert len(dlq_item.error_text) == ingestion.MAX_ERROR_TEXT_CHARS
+    assert dlq_item.error_text == ("x" * ingestion.MAX_ERROR_TEXT_CHARS)
+    assert second["attempted"] == 0
+    assert db.commits == 2

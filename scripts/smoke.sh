@@ -45,6 +45,20 @@ print(token)
 PY
 )"
 
+echo "Waiting for ${API_BASE}/sources/status ..."
+sources_status_code=""
+for _ in {1..30}; do
+  sources_status_code="$(curl -sS -o /tmp/sources_status_ready.json -w '%{http_code}' "${API_BASE}/sources/status" -H "Authorization: Bearer ${token}" || true)"
+  if [ "${sources_status_code}" = "200" ]; then
+    break
+  fi
+  sleep 1
+done
+if [ "${sources_status_code}" != "200" ]; then
+  echo "sources status check failed: ${API_BASE}/sources/status returned ${sources_status_code}"
+  exit 1
+fi
+
 contacts_response="$(curl -fsS "${API_BASE}/contacts" -H "Authorization: Bearer ${token}")"
 sandbox_contact_id="$(python3 - <<'PY' "${contacts_response}"
 import json,sys

@@ -10,7 +10,9 @@ from typing import Any, Awaitable, Callable
 from geoalchemy2.shape import from_shape
 from pydantic import BaseModel, ValidationError
 from shapely.geometry import MultiPolygon, Point, Polygon
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -67,6 +69,9 @@ PAYLOAD_VERSION = "v1"
 RETRY_MAX_ATTEMPTS = 3
 RETRY_BASE_DELAY_SECONDS = 0.2
 RETRY_JITTER_SECONDS = 0.25
+DLQ_REPLAY_BATCH_SIZE = 500
+MAX_REPLAY_RETRIES = 5
+MAX_ERROR_TEXT_CHARS = 2000
 
 
 class ParcelPayload(BaseModel):
@@ -144,6 +149,10 @@ def _dlq_dedupe_key(source_name: str, external_id: str, event_type: str, payload
     return sha256(packed).hexdigest()
 
 
+def _trim_error_text(value: str) -> str:
+    return value[-MAX_ERROR_TEXT_CHARS:]
+
+
 def _record_schema_drift(
     db: Session,
     *,
@@ -156,21 +165,37 @@ def _record_schema_drift(
     payload_version: str = PAYLOAD_VERSION,
 ) -> bool:
     dedupe_key = _dlq_dedupe_key(source.name, external_id, event_type, payload_version)
+    payload = {
+        "source_id": source.id,
+        "raw_url": raw_url,
+        "external_id": external_id,
+        "event_type": event_type,
+        "payload_version": payload_version,
+        "dedupe_key": dedupe_key,
+        "raw_json": raw_json,
+        "error_text": error_text,
+    }
+    bind = getattr(db, "bind", None)
+    dialect_name = bind.dialect.name if bind is not None else ""
+    if dialect_name == "postgresql":
+        result = db.execute(
+            pg_insert(SchemaDriftDLQ)
+            .values(**payload)
+            .on_conflict_do_nothing(index_elements=[SchemaDriftDLQ.dedupe_key])
+        )
+        return bool(result.rowcount and result.rowcount > 0)
+    if dialect_name == "sqlite":
+        result = db.execute(
+            sqlite_insert(SchemaDriftDLQ)
+            .values(**payload)
+            .on_conflict_do_nothing(index_elements=[SchemaDriftDLQ.dedupe_key])
+        )
+        return bool(result.rowcount and result.rowcount > 0)
+
     exists = db.execute(select(SchemaDriftDLQ).where(SchemaDriftDLQ.dedupe_key == dedupe_key)).scalar_one_or_none()
     if exists:
         return False
-    db.add(
-        SchemaDriftDLQ(
-            source_id=source.id,
-            raw_url=raw_url,
-            external_id=external_id,
-            event_type=event_type,
-            payload_version=payload_version,
-            dedupe_key=dedupe_key,
-            raw_json=raw_json,
-            error_text=error_text,
-        )
-    )
+    db.add(SchemaDriftDLQ(**payload))
     return True
 
 
@@ -399,37 +424,39 @@ async def _process_rows(
         try:
             item = validator(raw)
         except ValidationError as exc:
-            if _record_schema_drift(
-                db,
-                source=source,
-                raw_url=raw_url,
-                raw_json=raw,
-                error_text=str(exc),
-                external_id=external_id,
-                event_type="schema_validation_error",
-            ):
-                drift_count += 1
-            continue
-
-        provenance, was_skipped = _upsert_provenance(db, source, external_id, raw_url, raw)
-        if was_skipped:
-            skipped += 1
+            with db.begin_nested():
+                if _record_schema_drift(
+                    db,
+                    source=source,
+                    raw_url=raw_url,
+                    raw_json=raw,
+                    error_text=str(exc),
+                    external_id=external_id,
+                    event_type="schema_validation_error",
+                ):
+                    drift_count += 1
             continue
 
         try:
-            upserter(db, tenant_id, item, provenance.id)
-            ingested += 1
+            with db.begin_nested():
+                provenance, was_skipped = _upsert_provenance(db, source, external_id, raw_url, raw)
+                if was_skipped:
+                    skipped += 1
+                    continue
+                upserter(db, tenant_id, item, provenance.id)
+                ingested += 1
         except Exception as exc:  # noqa: BLE001
-            if _record_schema_drift(
-                db,
-                source=source,
-                raw_url=raw_url,
-                raw_json=raw,
-                error_text=str(exc),
-                external_id=external_id,
-                event_type="upsert_error",
-            ):
-                drift_count += 1
+            with db.begin_nested():
+                if _record_schema_drift(
+                    db,
+                    source=source,
+                    raw_url=raw_url,
+                    raw_json=raw,
+                    error_text=str(exc),
+                    external_id=external_id,
+                    event_type="upsert_error",
+                ):
+                    drift_count += 1
     return ingested, skipped, drift_count
 
 
@@ -509,6 +536,7 @@ async def run_ingestion(db: Session, tenant_id) -> dict:
     ):
         run = _start_source_run(db, source.id)
         status_row = touch_source_status_start(db, source.name)
+        db.commit()
         breaker = BREAKERS[label]
         rows: list[dict[str, Any]] = []
         status = SourceRunStatus.success
@@ -888,41 +916,68 @@ def replay_source_dlq(db: Session, tenant_id, source_name: str) -> dict[str, Any
         }
 
     validator, upserter = _replay_config_for_source(source_name)
-    dlq_rows = list(
-        db.execute(select(SchemaDriftDLQ).where(SchemaDriftDLQ.source_id == source.id).order_by(SchemaDriftDLQ.occurred_at.asc())).scalars()
-    )
 
     attempted = 0
     succeeded = 0
     failed = 0
     skipped_duplicate = 0
 
-    for item in dlq_rows:
-        attempted += 1
-        if item.last_replayed_at is not None:
-            skipped_duplicate += 1
-            continue
-
-        try:
-            model = validator(item.raw_json)
-            external_id = str(model.model_dump(mode="python").get("external_id") or item.external_id or "unknown")
-            provenance, was_skipped = _upsert_provenance(
-                db=db,
-                source=source,
-                external_id=external_id,
-                raw_url=item.raw_url,
-                raw_json=item.raw_json,
+    last_occurred_at = None
+    last_row_id = None
+    while True:
+        stmt = (
+            select(SchemaDriftDLQ)
+            .where(SchemaDriftDLQ.source_id == source.id)
+            .order_by(SchemaDriftDLQ.occurred_at.asc(), SchemaDriftDLQ.id.asc())
+            .limit(DLQ_REPLAY_BATCH_SIZE)
+        )
+        if last_occurred_at is not None and last_row_id is not None:
+            stmt = stmt.where(
+                or_(
+                    SchemaDriftDLQ.occurred_at > last_occurred_at,
+                    and_(
+                        SchemaDriftDLQ.occurred_at == last_occurred_at,
+                        SchemaDriftDLQ.id > last_row_id,
+                    ),
+                )
             )
-            if was_skipped:
+        batch = list(db.execute(stmt).scalars())
+        if not batch:
+            break
+
+        for item in batch:
+            if item.last_replayed_at is not None:
                 skipped_duplicate += 1
-            else:
-                upserter(db, tenant_id, model, provenance.id)
-                succeeded += 1
-            item.replay_count += 1
-            item.last_replayed_at = datetime.now(tz=UTC)
-        except Exception as exc:  # noqa: BLE001
-            failed += 1
-            item.error_text = f"{item.error_text} | replay_error: {exc}"
+                continue
+            if item.replay_count >= MAX_REPLAY_RETRIES:
+                skipped_duplicate += 1
+                continue
+
+            attempted += 1
+            try:
+                model = validator(item.raw_json)
+                external_id = str(model.model_dump(mode="python").get("external_id") or item.external_id or "unknown")
+                provenance, was_skipped = _upsert_provenance(
+                    db=db,
+                    source=source,
+                    external_id=external_id,
+                    raw_url=item.raw_url,
+                    raw_json=item.raw_json,
+                )
+                if was_skipped:
+                    skipped_duplicate += 1
+                else:
+                    upserter(db, tenant_id, model, provenance.id)
+                    succeeded += 1
+                item.replay_count += 1
+                item.last_replayed_at = datetime.now(tz=UTC)
+            except Exception as exc:  # noqa: BLE001
+                failed += 1
+                item.replay_count += 1
+                item.error_text = _trim_error_text(f"{item.error_text} | replay_error: {exc}")
+
+        last_occurred_at = batch[-1].occurred_at
+        last_row_id = batch[-1].id
 
     recompute_source_dlq_count_by_source_id(db, source_name, source.id)
     db.commit()
@@ -934,7 +989,6 @@ def replay_source_dlq(db: Session, tenant_id, source_name: str) -> dict[str, Any
         "failed": failed,
         "skipped_duplicate": skipped_duplicate,
     }
-
 
 
 
