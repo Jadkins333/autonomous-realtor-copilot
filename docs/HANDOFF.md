@@ -739,3 +739,145 @@ CI uses `next start` (pre-built production bundle, zero on-demand compilation) �
 ### Known local dev note
 
 On a fresh `.next/` cache (after deleting it), the globalSetup warm-up adds ~30s before tests start (proxy route compilation). Subsequent runs reuse the compiled cache and start in seconds. CI is unaffected (uses `next start` against pre-built bundle).
+
+---
+
+## Z) Phase 3 — Sources UI Polish + Compliance Fix (2026-03-08, commit f923258)
+
+### Summary
+
+Two deliverables in this session:
+1. **Compliance bug fix** (`f41eb65`) — `pnpm smoke` failed at night due to quiet-hours check shadowing the sandbox guard
+2. **Sources UI polish** (`f923258`) — full admin surface upgrade for the Sources page + dashboard health card + expanded test coverage
+
+---
+
+### Compliance fix — quiet-hours + sandbox
+
+**Root cause:** `enforce_outbound_policy` in `apps/api/app/services/compliance.py` ran the quiet-hours check unconditionally. In production config (`sandbox_mode=True`, `quiet_hours_start=8`, `quiet_hours_end=21`), any `approve_and_send` call made outside 08:00–21:00 Eastern returned `"blocked"` (quiet hours) before the sandbox guard could return `"blocked_sandbox"`. This caused `pnpm smoke` to fail 100% of the time after 9pm.
+
+**Fix (2 lines):**
+```python
+# Before:
+if not is_within_allowed_hours():
+# After:
+if not settings.sandbox_mode and not is_within_allowed_hours():
+```
+
+**Why this is correct:** Quiet-hours enforcement is a live-send consumer-protection rule. In sandbox mode no real sends occur, so quiet-hours adds zero value and breaks off-hours testing. Contact suppression and consent checks still run in sandbox (they write compliance events needed for test assertions).
+
+**Test update:** `test_quiet_hours_blocks_outbound` now monkeypatches `compliance.settings.sandbox_mode = False` to be self-contained.
+
+---
+
+### Sources page (`apps/web/app/sources/page.tsx`)
+
+**Changes:**
+- **TypeScript type fix:** Added `is_stale: boolean` and `reachable: boolean | null` (were missing from the original type, silently dropped by the API)
+- **Inline pause form:** Replaced `window.prompt()` (broken in headless/E2E environments) with an inline form — clicking Pause shows an auto-focused text input pre-filled with "Manual pause from web admin", plus Confirm/Cancel buttons. Enter key submits; Escape cancels.
+- **Two-step Replay DLQ confirm:** Clicking "Replay DLQ" first shows "Confirm Replay" + "Cancel". Prevents accidental triggers.
+- **Per-card drift alert banner:** Amber strip with `drift_reason` text appears inside each card when `drift_detected=true`.
+- **Global drift summary banner:** Amber banner at page top counts how many sources have drift and urges resolving before replay.
+- **Stale badge (orange):** Appears next to state badge when `is_stale=true`.
+- **DLQ count badge (amber):** `DLQ: N` appears when `dlq_count > 0`.
+- **Relative timestamps:** `4h ago`, `2d ago` instead of raw ISO strings (no external dep).
+- **`data-testid` throughout:** All interactive elements and status badges have testids for precise test targeting.
+- **`import React`:** Added explicit import (required by vitest jsdom environment which doesn't run Next.js's automatic JSX transform).
+
+---
+
+### Dashboard (`apps/web/app/dashboard/page.tsx`)
+
+**Added: Source Health card**
+- Fetches `/sources/status` in parallel with `/metrics` on mount
+- Displays colored badge counts: `N ok` (green), `N partial` (amber), `N failed` (red), `N stale` (orange)
+- Inline drift alert if any source has `drift_detected=true` (lists source names)
+- "Manage →" link to `/sources`
+- Shows "Loading…" while fetch is pending; renders nothing on error (non-blocking)
+
+---
+
+### API tests (`apps/api/tests/test_sources_system_routes.py`) — 4 new
+
+| Test | What it covers |
+|---|---|
+| `test_resume_requires_admin` | Agent role → 403 on POST /sources/{name}/resume |
+| `test_resume_allows_admin` | Admin role → 200 + state=ok on resume |
+| `test_replay_allows_admin_success` | Admin role → 200 + ok=True + attempted count on replay |
+| `test_sources_status_shape_authenticated` | Agent role → 200, items array, is_stale field present |
+
+---
+
+### Vitest (`apps/web/app/sources/page.test.tsx`) — 13 new tests
+
+| Test | What it covers |
+|---|---|
+| renders source cards | Items appear with correct source_name |
+| stale badge | `is_stale=true` → stale badge visible |
+| DLQ badge | `dlq_count=5` → DLQ badge shows count |
+| per-card drift banner | `drift_detected=true` → amber banner in card |
+| global drift banner | Any drifted source → global summary banner |
+| read-only badge | Agent role → "read-only" badge |
+| admin badge | Admin role → "admin controls enabled" badge |
+| pause disabled for non-admin | Pause button has `disabled` attribute for agents |
+| Pause shows inline form | Admin clicks Pause → form with input + Confirm/Cancel |
+| Cancel hides form | Cancel on pause form → form disappears |
+| Replay shows confirm | Admin clicks Replay DLQ → Confirm/Cancel appear |
+| empty state | Empty items array → "No sources found." |
+| error state | `apiFetch` rejects → error message rendered |
+
+---
+
+### E2E (`apps/web/e2e/golden-workflow.spec.ts`) — test 8
+
+```
+test("sources page loads with at least one source card")
+  goto /sources
+  → locator("[data-testid^='source-card-']").first() visible (timeout 10s)
+  → getByRole("button", { name: "Refresh" }) visible
+```
+
+Seeded data has 5 sources; at least one card must appear.
+
+---
+
+### Verified gates (2026-03-08, commit f923258)
+
+| Gate | Result |
+|---|---|
+| `docker compose exec -T api pytest -q` | **64 passed** |
+| `docker compose exec -T api alembic current` | **0005_add_tenant_slug (head)** |
+| `pnpm --filter web test:local` | **29 passed** (vitest) |
+| `pnpm --filter web test:e2e` | **8/8 passed** |
+| `pnpm --filter mobile exec tsc --noEmit` | **pass** |
+| `pnpm --filter web build` | **clean** |
+| `pnpm smoke` | **passed** (time-independent) |
+
+---
+
+### .next/ cache and E2E local dev note
+
+When `sources/page.tsx` or `dashboard/page.tsx` change, the running `next dev` server hot-reloads but can corrupt `.next/server/` chunk manifests on Windows (backslash path issue in webpack SSR bundles). If E2E tests fail with "Cannot find module './NNN.js'":
+
+```powershell
+# Kill server
+Stop-Process -Id (Get-NetTCPConnection -LocalPort 3001 -State Listen).OwningProcess -Force
+# Clear cache
+rm -rf apps/web/.next
+# Re-run (playwright restarts the server automatically)
+pnpm --filter web test:e2e
+```
+
+---
+
+### Next recommended milestone
+
+**Phase 4 — Outreach UI hardening.** The outreach page still uses raw JSON result display and a legacy draft queue path. Key improvements:
+- Remove dead `approveLegacy` / legacy draft queue code
+- `DraftStatusBadge` with semantic colors (pending / approved / rejected / blocked / blocked_sandbox)
+- `resultMessage()` helper converting raw API JSON into human-readable strings
+- Truncate draft body preview to 120 chars
+- Two-step confirm for approve / reject / submit pack actions
+- Sandbox badge on pack cards
+- Vitest coverage (currently zero for outreach page)
+- E2E test: outreach page loads with at least one draft card
