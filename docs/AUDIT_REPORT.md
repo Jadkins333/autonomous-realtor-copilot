@@ -32,3 +32,11 @@ This report covers the phase2 redo objectives: ingestion retry-with-jitter, outr
 ## Residual Risks
 - Mobile still lacks automated UI-level test coverage; validation is currently typecheck plus runtime/manual verification.
 - next.config.mjs currently keeps ignoreDuringBuilds=true and ignoreBuildErrors=true due pre-existing broad lint/type debt under strict next build; tracked as follow-up hardening work.
+
+## Overnight Checkpoint (2026-03-06)
+- Commit: b34ddc94ff4013704977cd52a0e3bdcb1d016e1c
+- Change: approve/send now treats repeat non-draft requests as idempotent and returns existing status instead of failing; outbound-only lookup is enforced in approve flow.
+- Files: apps/api/app/services/outreach.py, apps/api/tests/test_phase2_handoff_regressions.py
+- New regression: test_approve_and_send_non_draft_returns_idempotent_payload
+- Verification: docker compose up -d --build api, docker compose exec -T api pytest -q tests/test_phase2_handoff_regressions.py::test_approve_and_send_non_draft_returns_idempotent_payload (pass).
+

@@ -575,3 +575,11 @@ New regression coverage:
 - Resolved in current branch: ingestion retry-with-jitter, outreach non-sandbox provider path and pack-status safety, typed /sources/status contract, mobile draft-pack parity flow, mobile fixture banner via /sources/status, fixture banner failure visibility, proxy route tests and vitest discovery, CORS origin hardening.
 - Latest gates on this branch: docker compose exec -T api pytest -q => 46 passed; pnpm --filter web test:local => 13 passed; pnpm --filter mobile exec tsc --noEmit -p tsconfig.check.json => pass.
 - Web build gate policy decision: keep next.config.mjs lint/type bypass flags enabled for now (ignoreDuringBuilds=true, ignoreBuildErrors=true). Attempting strict build currently fails on broad pre-existing lint debt; this remains a dedicated hardening follow-up.
+
+## W) Overnight Idempotency Hardening (2026-03-06)
+- Added idempotent handling for repeated approve/send requests on non-draft messages: the service now returns the existing message state and pack status without re-sending.
+- Approve/send message lookup is now constrained to outbound messages for safer state transitions.
+- Files: apps/api/app/services/outreach.py, apps/api/tests/test_phase2_handoff_regressions.py
+- Added regression: test_approve_and_send_non_draft_returns_idempotent_payload.
+- Verified in rebuilt API container: pytest target passed.
+
