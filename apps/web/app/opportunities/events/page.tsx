@@ -1,7 +1,7 @@
 "use client";
 
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 
 import { useRequireAuth } from "@/components/auth-guard";
@@ -69,17 +69,17 @@ export default function OpportunityEventsPage() {
         </div>
       </Card>
 
-      <div className="space-y-3">
+      <div className="space-y-3" data-testid="events-list">
         {events.map((event) => (
-          <Card key={event.id} className="p-4">
+          <Card key={event.id} className="p-4" data-testid={`event-card-${event.id}`}>
             <p className="font-semibold">{event.address}</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground" data-testid={`event-type-${event.id}`}>
               {event.event_type.replaceAll("_", " ")} ({event.severity})
             </p>
             <p className="text-xs text-muted-foreground">{new Date(event.created_at).toLocaleString()}</p>
           </Card>
         ))}
-        {!events.length ? <Card className="p-4">No events found for the selected filters.</Card> : null}
+        {!events.length ? <Card className="p-4" data-testid="no-events">No events found for the selected filters.</Card> : null}
       </div>
     </SiteShell>
   );

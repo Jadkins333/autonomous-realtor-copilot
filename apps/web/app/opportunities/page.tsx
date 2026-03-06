@@ -1,7 +1,7 @@
 "use client";
 
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 
 import { useRequireAuth } from "@/components/auth-guard";
@@ -109,17 +109,17 @@ export default function OpportunitiesPage() {
       </Card>
 
       <div className="space-y-3">
-        {loading ? <Card className="p-4">Loading opportunities...</Card> : null}
+        {loading ? <Card className="p-4" data-testid="opportunities-loading">Loading opportunities...</Card> : null}
 
         {!loading && rows.length === 0 ? (
-          <Card className="p-4">No opportunities available for the selected filter.</Card>
+          <Card className="p-4" data-testid="no-opportunities">No opportunities available for the selected filter.</Card>
         ) : null}
 
         {rows.map((row) => {
           const heat = Number(row.neighborhood_heat?.value?.score_0_100 || 0);
           const distress = Number(row.distress_likelihood?.value?.score_0_1 || 0);
           return (
-            <Card key={row.parcel_id} className="p-4">
+            <Card key={row.parcel_id} className="p-4" data-testid={`opportunity-card-${row.parcel_id}`}>
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="font-semibold">{row.address}</p>
@@ -128,8 +128,8 @@ export default function OpportunitiesPage() {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <Badge variant="secondary">Heat {Math.round(heat)}</Badge>
-                  <Badge variant={distress >= 0.55 ? "destructive" : "outline"}>
+                  <Badge variant="secondary" data-testid={`heat-badge-${row.parcel_id}`}>Heat {Math.round(heat)}</Badge>
+                  <Badge variant={distress >= 0.55 ? "destructive" : "outline"} data-testid={`distress-badge-${row.parcel_id}`}>
                     Distress {(distress * 100).toFixed(0)}%
                   </Badge>
                 </div>
