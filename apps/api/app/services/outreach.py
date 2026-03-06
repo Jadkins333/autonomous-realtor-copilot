@@ -25,6 +25,7 @@ from app.services.providers import get_email_provider, get_sms_provider
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
+
 def _message_meta(message: Message, **updates):
     return {**(message.meta_json or {}), **updates}
 
@@ -34,12 +35,12 @@ def _safe_pack_status(db: Session, pack_id):
         return None
     try:
         return _refresh_pack_rollup_status(db, pack_id)
-    except Exception as exc: # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
         logger.warning(
             "outreach_pack_status_refresh_failed",
             extra={
-             "pack_id": str(pack_id),
-             "error": str(exc),
+                "pack_id": str(pack_id),
+                "error": str(exc),
             },
         )
         return None
@@ -117,11 +118,15 @@ def _pack_status_from_drafts(pack: OutreachDraftPack, drafts: list[Message]) -> 
 
 
 def _refresh_pack_rollup_status(db: Session, pack_id: UUID) -> str:
-    pack = db.execute(select(OutreachDraftPack).where(OutreachDraftPack.id == pack_id)).scalar_one_or_none()
+    pack = db.execute(
+        select(OutreachDraftPack).where(OutreachDraftPack.id == pack_id)
+    ).scalar_one_or_none()
     if pack is None:
         return "draft"
     drafts = list(
-        db.execute(select(Message).where(Message.pack_id == pack.id).order_by(Message.created_at.asc())).scalars()
+        db.execute(
+            select(Message).where(Message.pack_id == pack.id).order_by(Message.created_at.asc())
+        ).scalars()
     )
     pack.status = _pack_status_from_drafts(pack, drafts)
     return pack.status
@@ -303,21 +308,21 @@ def list_draft_packs(
 async def approve_and_send(db: Session, tenant_id: UUID, message_id: UUID) -> dict:
     message = db.execute(
         select(Message).where(
- Message.id == message_id,
- Message.tenant_id == tenant_id,
- Message.direction == MessageDirection.outbound,
- )
+            Message.id == message_id,
+            Message.tenant_id == tenant_id,
+            Message.direction == MessageDirection.outbound,
+        )
     ).scalar_one_or_none()
     if not message:
         raise ValueError("Message not found")
     if message.status != MessageStatus.draft:
         return {
- "status": message.status.value,
- "provider_message_id": message.provider_message_id,
- "pack_id": message.pack_id,
- "pack_status": _safe_pack_status(db, message.pack_id),
- "idempotent": True,
- }
+            "status": message.status.value,
+            "provider_message_id": message.provider_message_id,
+            "pack_id": message.pack_id,
+            "pack_status": _safe_pack_status(db, message.pack_id),
+            "idempotent": True,
+        }
 
     allowed, reason = enforce_outbound_policy(db, message)
     if not allowed:
@@ -404,7 +409,9 @@ async def approve_and_send(db: Session, tenant_id: UUID, message_id: UUID) -> di
         result = await provider.send(contact.phone, message.body)
     else:
         message.status = MessageStatus.queued
-        message.meta_json = _message_meta(message, voice_provider="not_implemented", sandbox_staged=True)
+        message.meta_json = _message_meta(
+            message, voice_provider="not_implemented", sandbox_staged=True
+        )
         pack_status = _safe_pack_status(db, message.pack_id)
         db.commit()
         return {
@@ -442,6 +449,7 @@ async def approve_and_send(db: Session, tenant_id: UUID, message_id: UUID) -> di
         "pack_id": message.pack_id,
         "pack_status": pack_status,
     }
+
 
 def reject_draft(db: Session, tenant_id: UUID, message_id: UUID, reason: str | None = None) -> dict:
     message = db.execute(
@@ -486,7 +494,9 @@ def handle_inbound_sms(
         select(Contact).where(Contact.tenant_id == tenant_id, Contact.phone == from_phone)
     ).scalar_one_or_none()
     if not contact:
-        contact = Contact(tenant_id=tenant_id, name=from_phone, phone=from_phone, tags_json=["inbound_unknown"])
+        contact = Contact(
+            tenant_id=tenant_id, name=from_phone, phone=from_phone, tags_json=["inbound_unknown"]
+        )
         db.add(contact)
         db.flush()
 
@@ -600,4 +610,3 @@ def handle_inbound_sms(
         "global_revocation_applied": bool(stop_triggered and settings.enforce_global_revocation),
         "enrollments_stopped": stopped,
     }
-

@@ -114,25 +114,31 @@ def test_approve_and_send_missing_email_returns_safe_pack_status(monkeypatch):
 
 def test_sources_status_shape_for_authenticated_user(monkeypatch):
     app.dependency_overrides[get_db] = lambda: SimpleNamespace()
-    app.dependency_overrides[get_auth_context] = lambda: AuthContext(user_id=uuid4(), tenant_id=uuid4(), role="agent")
+    app.dependency_overrides[get_auth_context] = lambda: AuthContext(
+        user_id=uuid4(), tenant_id=uuid4(), role="agent"
+    )
 
-    payload = [{
-        "source_name": "franklin_auditor",
-        "mode": "fixture",
-        "state": "partial",
-        "reachable": None,
-        "is_stale": True,
-        "last_run_started_at": None,
-        "last_run_finished_at": None,
-        "last_success_at": None,
-        "last_error": "seed fallback",
-        "drift_detected": False,
-        "drift_reason": None,
-        "dlq_count": 0,
-        "paused_reason": None,
-        "updated_at": "2026-03-05T00:00:00+00:00",
-    }]
-    monkeypatch.setattr("app.api.routes_sources.get_sources_status", lambda *_args, **_kwargs: payload)
+    payload = [
+        {
+            "source_name": "franklin_auditor",
+            "mode": "fixture",
+            "state": "partial",
+            "reachable": None,
+            "is_stale": True,
+            "last_run_started_at": None,
+            "last_run_finished_at": None,
+            "last_success_at": None,
+            "last_error": "seed fallback",
+            "drift_detected": False,
+            "drift_reason": None,
+            "dlq_count": 0,
+            "paused_reason": None,
+            "updated_at": "2026-03-05T00:00:00+00:00",
+        }
+    ]
+    monkeypatch.setattr(
+        "app.api.routes_sources.get_sources_status", lambda *_args, **_kwargs: payload
+    )
 
     try:
         with TestClient(app) as client:
@@ -145,8 +151,6 @@ def test_sources_status_shape_for_authenticated_user(monkeypatch):
         assert "updated_at" in body["items"][0]
     finally:
         app.dependency_overrides.clear()
-
-
 
 
 class _FakeProvider:
@@ -178,7 +182,9 @@ def test_approve_and_send_email_non_sandbox_invokes_provider(monkeypatch):
         sent_at=None,
         provider_message_id=None,
     )
-    contact = SimpleNamespace(id=message.contact_id, tenant_id=tenant_id, email="lead@example.com", phone=None)
+    contact = SimpleNamespace(
+        id=message.contact_id, tenant_id=tenant_id, email="lead@example.com", phone=None
+    )
     db = _FakeDB([message, contact, None])
 
     provider = _FakeProvider(
@@ -222,7 +228,9 @@ def test_approve_and_send_sms_non_sandbox_invokes_provider(monkeypatch):
         sent_at=None,
         provider_message_id=None,
     )
-    contact = SimpleNamespace(id=message.contact_id, tenant_id=tenant_id, email=None, phone="+15555550123")
+    contact = SimpleNamespace(
+        id=message.contact_id, tenant_id=tenant_id, email=None, phone="+15555550123"
+    )
     db = _FakeDB([message, contact, None])
 
     provider = _FakeProvider(
@@ -240,7 +248,10 @@ def test_approve_and_send_sms_non_sandbox_invokes_provider(monkeypatch):
     assert provider.calls == [("+15555550123", "Hello from test")]
     assert message.status == MessageStatus.sent
     assert message.provider_message_id == "sms-321"
-    assert message.meta_json["provider_fallback_reason"] == "Missing Twilio credentials; using console provider"
+    assert (
+        message.meta_json["provider_fallback_reason"]
+        == "Missing Twilio credentials; using console provider"
+    )
     assert message.meta_json["approval_state"] == "approved"
     assert result["status"] == "sent"
     assert result["provider_message_id"] == "sms-321"
@@ -248,107 +259,108 @@ def test_approve_and_send_sms_non_sandbox_invokes_provider(monkeypatch):
     assert result["pack_status"] == "approved"
     assert db.commits == 1
 
+
 def test_retry_with_jitter_logs_error_context(monkeypatch):
-	attempts = {'count': 0}
-	warning_calls = []
+    attempts = {"count": 0}
+    warning_calls = []
 
-	async def flaky_fetch():
-		attempts['count'] += 1
-		if attempts['count'] == 1:
-			raise RuntimeError('boom')
-		return [{'ok': True}]
+    async def flaky_fetch():
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise RuntimeError("boom")
+        return [{"ok": True}]
 
-	async def fake_sleep(_delay):
-		return None
+    async def fake_sleep(_delay):
+        return None
 
-	def fake_warning(message, *args, **kwargs):
-		warning_calls.append((message, kwargs.get('extra', {})))
+    def fake_warning(message, *args, **kwargs):
+        warning_calls.append((message, kwargs.get("extra", {})))
 
-	monkeypatch.setattr(ingestion.random, 'uniform', lambda *_args, **_kwargs: 0.0)
-	monkeypatch.setattr(ingestion.asyncio, 'sleep', fake_sleep)
-	monkeypatch.setattr(ingestion.logger, 'warning', fake_warning)
+    monkeypatch.setattr(ingestion.random, "uniform", lambda *_args, **_kwargs: 0.0)
+    monkeypatch.setattr(ingestion.asyncio, "sleep", fake_sleep)
+    monkeypatch.setattr(ingestion.logger, "warning", fake_warning)
 
-	result = asyncio.run(
-		ingestion._retry_with_jitter(
-			flaky_fetch,
-			source_label='test_source',
-			max_attempts=2,
-			base_delay_seconds=0.1,
-			jitter_seconds=0.0,
-		)
-	)
+    result = asyncio.run(
+        ingestion._retry_with_jitter(
+            flaky_fetch,
+            source_label="test_source",
+            max_attempts=2,
+            base_delay_seconds=0.1,
+            jitter_seconds=0.0,
+        )
+    )
 
-	assert result == [{'ok': True}]
-	assert attempts['count'] == 2
-	assert len(warning_calls) == 1
+    assert result == [{"ok": True}]
+    assert attempts["count"] == 2
+    assert len(warning_calls) == 1
 
-	message, extra = warning_calls[0]
-	assert message == 'ingest_live_fetch_retry'
-	assert extra['source'] == 'test_source'
-	assert extra['attempt'] == 1
-	assert extra['max_attempts'] == 2
-	assert extra['delay_seconds'] == pytest.approx(0.1)
-	assert extra['error'] == 'boom'
+    message, extra = warning_calls[0]
+    assert message == "ingest_live_fetch_retry"
+    assert extra["source"] == "test_source"
+    assert extra["attempt"] == 1
+    assert extra["max_attempts"] == 2
+    assert extra["delay_seconds"] == pytest.approx(0.1)
+    assert extra["error"] == "boom"
+
 
 def test_seed_flood_zone_bad_ring_logs_warning(monkeypatch):
-	warnings = []
+    warnings = []
 
-	def fake_warning(message, *args, **kwargs):
-		warnings.append((message, args, kwargs))
+    def fake_warning(message, *args, **kwargs):
+        warnings.append((message, args, kwargs))
 
-	bad_row = {
-		'external_id': 'flood-1',
-		'zone_code': 'AE',
-		'coordinates': [[[['x', 'y'], ['x', 'y'], ['x', 'y'], ['x', 'y']]]],
-	}
+    bad_row = {
+        "external_id": "flood-1",
+        "zone_code": "AE",
+        "coordinates": [[[["x", "y"], ["x", "y"], ["x", "y"], ["x", "y"]]]],
+    }
 
-	monkeypatch.setattr(app_seed, 'load_seed_json', lambda _name: [bad_row])
-	monkeypatch.setattr(app_seed.logger, 'warning', fake_warning)
+    monkeypatch.setattr(app_seed, "load_seed_json", lambda _name: [bad_row])
+    monkeypatch.setattr(app_seed.logger, "warning", fake_warning)
 
-	app_seed._seed_flood_zones(SimpleNamespace(), uuid4(), SimpleNamespace())
+    app_seed._seed_flood_zones(SimpleNamespace(), uuid4(), SimpleNamespace())
 
-	assert len(warnings) == 1
-	message, args, _kwargs = warnings[0]
-	assert message == 'seed flood zone ring parse failed for %s: %s'
-	assert args[0] == 'flood-1'
-	assert isinstance(args[1], Exception)
+    assert len(warnings) == 1
+    message, args, _kwargs = warnings[0]
+    assert message == "seed flood zone ring parse failed for %s: %s"
+    assert args[0] == "flood-1"
+    assert isinstance(args[1], Exception)
 
 
 def test_approve_and_send_non_draft_returns_idempotent_payload(monkeypatch):
- tenant_id = uuid4()
- message_id = uuid4()
- pack_id = uuid4()
+    tenant_id = uuid4()
+    message_id = uuid4()
+    pack_id = uuid4()
 
- message = SimpleNamespace(
- id=message_id,
- tenant_id=tenant_id,
- contact_id=uuid4(),
- status=MessageStatus.sent,
- channel=Channel.email,
- subject='Subject',
- body='Body',
- meta_json={},
- pack_id=pack_id,
- sent_at=None,
- provider_message_id='pm-existing',
- )
- db = _FakeDB([message])
+    message = SimpleNamespace(
+        id=message_id,
+        tenant_id=tenant_id,
+        contact_id=uuid4(),
+        status=MessageStatus.sent,
+        channel=Channel.email,
+        subject="Subject",
+        body="Body",
+        meta_json={},
+        pack_id=pack_id,
+        sent_at=None,
+        provider_message_id="pm-existing",
+    )
+    db = _FakeDB([message])
 
- provider = _FakeProvider(
- result=SimpleNamespace(ok=True, provider_message_id='pm-new', error=None),
- name='postmark',
- )
+    provider = _FakeProvider(
+        result=SimpleNamespace(ok=True, provider_message_id="pm-new", error=None),
+        name="postmark",
+    )
 
- monkeypatch.setattr(outreach, 'get_email_provider', lambda: provider)
- monkeypatch.setattr(outreach, '_safe_pack_status', lambda *_args, **_kwargs: 'approved')
+    monkeypatch.setattr(outreach, "get_email_provider", lambda: provider)
+    monkeypatch.setattr(outreach, "_safe_pack_status", lambda *_args, **_kwargs: "approved")
 
- result = asyncio.run(outreach.approve_and_send(db, tenant_id, message_id))
+    result = asyncio.run(outreach.approve_and_send(db, tenant_id, message_id))
 
- assert result['status'] == 'sent'
- assert result['provider_message_id'] == 'pm-existing'
- assert result['pack_id'] == pack_id
- assert result['pack_status'] == 'approved'
- assert result['idempotent'] is True
- assert provider.calls == []
- assert db.commits == 0
-
+    assert result["status"] == "sent"
+    assert result["provider_message_id"] == "pm-existing"
+    assert result["pack_id"] == pack_id
+    assert result["pack_status"] == "approved"
+    assert result["idempotent"] is True
+    assert provider.calls == []
+    assert db.commits == 0
