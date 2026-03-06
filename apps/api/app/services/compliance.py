@@ -69,6 +69,15 @@ def is_within_quiet_hours(now: datetime | None = None) -> bool:
     return settings.quiet_hours_start <= current.hour < settings.quiet_hours_end
 
 
+def is_within_allowed_hours(now: datetime | None = None) -> bool:
+    return is_within_quiet_hours(now)
+
+def fair_housing_risk_score(text: str) -> float:
+    words = text.split()
+    if not words:
+        return 0.0
+    return float(len(evaluate_fair_housing_text(text)) / len(words))
+
 def outbound_count_today(db: Session, tenant_id, contact_id, channel: Channel) -> int:
     current = datetime.now(tz=UTC).astimezone(EASTERN).date()
     stmt = select(func.count(Message.id)).where(
@@ -111,7 +120,7 @@ def enforce_outbound_policy(db: Session, message: Message) -> tuple[bool, str | 
         )
         return False, "Contact is suppressed"
 
-    if not is_within_quiet_hours():
+    if not is_within_allowed_hours():
         _write_compliance_event(
             db,
             message.tenant_id,

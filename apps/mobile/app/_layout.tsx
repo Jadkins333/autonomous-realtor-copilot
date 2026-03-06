@@ -14,13 +14,14 @@ function RootNavigator() {
     if (loading) return;
 
     const inAuthGroup = segments[0] === "(auth)";
+    const atRootEntry = segments[0] == null;
 
     if (!token && !inAuthGroup) {
       router.replace("/(auth)/login");
       return;
     }
 
-    if (token && inAuthGroup) {
+    if (token && (inAuthGroup || atRootEntry)) {
       router.replace("/(app)/dashboard");
     }
   }, [loading, router, segments, token]);
@@ -35,7 +36,7 @@ function RootNavigator() {
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: "#0b1220" }
+          contentStyle: { backgroundColor: "#0b1220" },
         }}
       />
     </>

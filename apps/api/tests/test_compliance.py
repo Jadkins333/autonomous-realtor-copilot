@@ -34,7 +34,7 @@ def test_sms_requires_explicit_consent(monkeypatch) -> None:
 
     monkeypatch.setattr(compliance, "has_explicit_channel_consent", lambda *args, **kwargs: False)
     monkeypatch.setattr(compliance, "is_suppressed", lambda *args, **kwargs: False)
-    monkeypatch.setattr(compliance, "is_within_quiet_hours", lambda *args, **kwargs: True)
+    monkeypatch.setattr(compliance, "is_within_allowed_hours", lambda *args, **kwargs: True)
     monkeypatch.setattr(compliance, "outbound_count_today", lambda *args, **kwargs: 0)
 
     allowed, reason = compliance.enforce_outbound_policy(db, message)
@@ -49,7 +49,7 @@ def test_quiet_hours_blocks_outbound(monkeypatch) -> None:
 
     monkeypatch.setattr(compliance, "has_explicit_channel_consent", lambda *args, **kwargs: True)
     monkeypatch.setattr(compliance, "is_suppressed", lambda *args, **kwargs: False)
-    monkeypatch.setattr(compliance, "is_within_quiet_hours", lambda *args, **kwargs: False)
+    monkeypatch.setattr(compliance, "is_within_allowed_hours", lambda *args, **kwargs: False)
     monkeypatch.setattr(compliance, "outbound_count_today", lambda *args, **kwargs: 0)
 
     allowed, reason = compliance.enforce_outbound_policy(db, message)
@@ -63,7 +63,7 @@ def test_frequency_cap_blocks_outbound(monkeypatch) -> None:
 
     monkeypatch.setattr(compliance, "has_explicit_channel_consent", lambda *args, **kwargs: True)
     monkeypatch.setattr(compliance, "is_suppressed", lambda *args, **kwargs: False)
-    monkeypatch.setattr(compliance, "is_within_quiet_hours", lambda *args, **kwargs: True)
+    monkeypatch.setattr(compliance, "is_within_allowed_hours", lambda *args, **kwargs: True)
     monkeypatch.setattr(
         compliance,
         "outbound_count_today",
@@ -78,3 +78,9 @@ def test_frequency_cap_blocks_outbound(monkeypatch) -> None:
 def test_quiet_hours_window_helper() -> None:
     assert compliance.is_within_quiet_hours(datetime(2026, 1, 1, 14, 0, tzinfo=UTC)) is True
     assert compliance.is_within_quiet_hours(datetime(2026, 1, 1, 3, 0, tzinfo=UTC)) is False
+
+
+def test_fair_housing_risk_score_exposes_numeric_value() -> None:
+    score = compliance.fair_housing_risk_score("Ideal for families near church district")
+    assert isinstance(score, float)
+    assert score > 0
