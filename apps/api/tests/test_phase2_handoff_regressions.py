@@ -246,3 +246,45 @@ def test_approve_and_send_sms_non_sandbox_invokes_provider(monkeypatch):
     assert result["pack_id"] == pack_id
     assert result["pack_status"] == "approved"
     assert db.commits == 1
+
+def test_retry_with_jitter_logs_error_context(monkeypatch):
+	attempts = {'count': 0}
+	warning_calls = []
+
+	async def flaky_fetch():
+		attempts['count'] += 1
+		if attempts['count'] == 1:
+			raise RuntimeError('boom')
+		return [{'ok': True}]
+
+	async def fake_sleep(_delay):
+		return None
+
+	def fake_warning(message, *args, **kwargs):
+		warning_calls.append((message, kwargs.get('extra', {})))
+
+	monkeypatch.setattr(ingestion.random, 'uniform', lambda *_args, **_kwargs: 0.0)
+	monkeypatch.setattr(ingestion.asyncio, 'sleep', fake_sleep)
+	monkeypatch.setattr(ingestion.logger, 'warning', fake_warning)
+
+	result = asyncio.run(
+		ingestion._retry_with_jitter(
+			flaky_fetch,
+			source_label='test_source',
+			max_attempts=2,
+			base_delay_seconds=0.1,
+			jitter_seconds=0.0,
+		)
+	)
+
+	assert result == [{'ok': True}]
+	assert attempts['count'] == 2
+	assert len(warning_calls) == 1
+
+	message, extra = warning_calls[0]
+	assert message == 'ingest_live_fetch_retry'
+	assert extra['source'] == 'test_source'
+	assert extra['attempt'] == 1
+	assert extra['max_attempts'] == 2
+	assert extra['delay_seconds'] == pytest.approx(0.1)
+	assert extra['error'] == 'boom'
