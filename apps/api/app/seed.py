@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import uuid
 from datetime import UTC, date, datetime
@@ -35,6 +36,7 @@ from app.utils.hash import stable_hash
 from app.utils.security import get_password_hash
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 def _truthy_env(name: str, default: bool = False) -> bool:
@@ -509,8 +511,10 @@ def _seed_flood_zones(db, tenant_id, source: Source) -> None:
                 continue
             try:
                 polygons.append(Polygon([(float(x), float(y)) for x, y in outer]))
-            except Exception:
+            except Exception as exc: # noqa: BLE001
+                logger.warning("seed flood zone ring parse failed for %s: %s", external_id, exc)
                 continue
+
         if not polygons:
             continue
 
@@ -736,3 +740,7 @@ def bootstrap_seed() -> None:
 
 if __name__ == "__main__":
     bootstrap_seed()
+
+
+
+
