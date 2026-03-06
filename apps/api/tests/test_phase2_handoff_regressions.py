@@ -312,3 +312,43 @@ def test_seed_flood_zone_bad_ring_logs_warning(monkeypatch):
 	assert message == 'seed flood zone ring parse failed for %s: %s'
 	assert args[0] == 'flood-1'
 	assert isinstance(args[1], Exception)
+
+
+def test_approve_and_send_non_draft_returns_idempotent_payload(monkeypatch):
+ tenant_id = uuid4()
+ message_id = uuid4()
+ pack_id = uuid4()
+
+ message = SimpleNamespace(
+ id=message_id,
+ tenant_id=tenant_id,
+ contact_id=uuid4(),
+ status=MessageStatus.sent,
+ channel=Channel.email,
+ subject='Subject',
+ body='Body',
+ meta_json={},
+ pack_id=pack_id,
+ sent_at=None,
+ provider_message_id='pm-existing',
+ )
+ db = _FakeDB([message])
+
+ provider = _FakeProvider(
+ result=SimpleNamespace(ok=True, provider_message_id='pm-new', error=None),
+ name='postmark',
+ )
+
+ monkeypatch.setattr(outreach, 'get_email_provider', lambda: provider)
+ monkeypatch.setattr(outreach, '_safe_pack_status', lambda *_args, **_kwargs: 'approved')
+
+ result = asyncio.run(outreach.approve_and_send(db, tenant_id, message_id))
+
+ assert result['status'] == 'sent'
+ assert result['provider_message_id'] == 'pm-existing'
+ assert result['pack_id'] == pack_id
+ assert result['pack_status'] == 'approved'
+ assert result['idempotent'] is True
+ assert provider.calls == []
+ assert db.commits == 0
+

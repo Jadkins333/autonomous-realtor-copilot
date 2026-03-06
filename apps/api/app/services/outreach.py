@@ -302,12 +302,22 @@ def list_draft_packs(
 
 async def approve_and_send(db: Session, tenant_id: UUID, message_id: UUID) -> dict:
     message = db.execute(
-        select(Message).where(Message.id == message_id, Message.tenant_id == tenant_id)
+        select(Message).where(
+ Message.id == message_id,
+ Message.tenant_id == tenant_id,
+ Message.direction == MessageDirection.outbound,
+ )
     ).scalar_one_or_none()
     if not message:
         raise ValueError("Message not found")
     if message.status != MessageStatus.draft:
-        raise ValueError("Message is not draft")
+        return {
+ "status": message.status.value,
+ "provider_message_id": message.provider_message_id,
+ "pack_id": message.pack_id,
+ "pack_status": _safe_pack_status(db, message.pack_id),
+ "idempotent": True,
+ }
 
     allowed, reason = enforce_outbound_policy(db, message)
     if not allowed:
@@ -590,5 +600,4 @@ def handle_inbound_sms(
         "global_revocation_applied": bool(stop_triggered and settings.enforce_global_revocation),
         "enrollments_stopped": stopped,
     }
-
 
