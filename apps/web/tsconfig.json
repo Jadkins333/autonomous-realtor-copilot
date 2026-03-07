@@ -17,6 +17,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
+      // next-auth entries prevent baseUrl: "." from resolving "next-auth" imports
+      // to the local next-auth.d.ts file (which would shadow the real package).
+      // Augmentation lives in types/next-auth.d.ts (subdirectory avoids collision).
       "next-auth": ["./node_modules/next-auth"],
       "next-auth/*": ["./node_modules/next-auth/*"]
     }
