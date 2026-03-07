@@ -54,10 +54,10 @@ export function getApiBaseUrl() {
   return BASE_URL;
 }
 
-export function login(email: string, password: string) {
+export function login(tenantSlug: string, email: string, password: string) {
   return request<AuthResponse>("/auth/login", {
     method: "POST",
-    body: { email, password },
+    body: { tenant_slug: tenantSlug, email, password },
   });
 }
 

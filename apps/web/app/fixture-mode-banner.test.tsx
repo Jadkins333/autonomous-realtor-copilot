@@ -40,7 +40,7 @@ function makeSessionContext(data: Session | null): SessionContextValue {
  data,
  status: data ? 'authenticated' : 'unauthenticated',
  update: vi.fn(async () => null)
- }
+ } as SessionContextValue
 }
 
 describe('FixtureModeBanner', function () {

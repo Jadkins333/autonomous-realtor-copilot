@@ -36,6 +36,7 @@ Detailed local workflow: [DEV.md](./DEV.md)
 > `pnpm setup` and `pnpm doctor` are pnpm builtins and do not run this project's scripts.
 
 ## Demo Credentials
+- Tenant slug: `demo-realty`
 - Email: `agent@demo.local`
 - Password: `demo123`
 

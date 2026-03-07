@@ -11,7 +11,7 @@ type AuthContextValue = {
   token: string | null;
   user: DemoUser | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (tenantSlug: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -29,10 +29,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const [storedToken, storedUser] = await Promise.all([
           SecureStore.getItemAsync(TOKEN_KEY),
-          SecureStore.getItemAsync(USER_KEY)
+          SecureStore.getItemAsync(USER_KEY),
         ]);
-        if (cancelled) return;
+
+        if (cancelled) {
+          return;
+        }
+
         setToken(storedToken || null);
+
         if (storedUser) {
           try {
             setUser(JSON.parse(storedUser) as DemoUser);
@@ -62,22 +67,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       token,
       user,
       loading,
-      signIn: async (email: string, password: string) => {
-        const payload = await login(email.trim(), password);
+      signIn: async (tenantSlug: string, email: string, password: string) => {
+        const payload = await login(tenantSlug.trim(), email.trim(), password);
+
         await Promise.all([
           SecureStore.setItemAsync(TOKEN_KEY, payload.access_token),
-          SecureStore.setItemAsync(USER_KEY, JSON.stringify(payload.user))
+          SecureStore.setItemAsync(USER_KEY, JSON.stringify(payload.user)),
         ]);
+
         setToken(payload.access_token);
         setUser(payload.user);
       },
       signOut: async () => {
-        await Promise.all([SecureStore.deleteItemAsync(TOKEN_KEY), SecureStore.deleteItemAsync(USER_KEY)]);
+        await Promise.all([
+          SecureStore.deleteItemAsync(TOKEN_KEY),
+          SecureStore.deleteItemAsync(USER_KEY),
+        ]);
         setToken(null);
         setUser(null);
-      }
+      },
     }),
-    [loading, token, user]
+    [loading, token, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
