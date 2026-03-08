@@ -4,7 +4,7 @@ File: HANDOFF.md
 ## A) Executive Summary
 - Product: multi-surface real-estate copilot focused on Columbus public-data workflows (web PWA + Expo mobile + FastAPI backend) with ingestion, insights, outreach approval, and copilot routing.
 - What it does today:
-  - Auth: demo credentials -> JWT (`/auth/login`) and NextAuth session bridge (`apps/web/lib/auth.ts`).
+  - Auth: demo credentials + tenant slug -> JWT (`/auth/login`) and NextAuth session bridge (`apps/web/lib/auth.ts`).
   - Property flow: parcel search/detail + map + permits/flood/transit/POI + timeline (`apps/api/app/services/parcels.py`, `apps/web/app/properties/`, `apps/mobile/app/(app)/properties/`).
   - Opportunities: deterministic heat/distress event-driven list and event log (`apps/api/app/services/opportunities.py`, web/mobile opportunities screens).
   - Truth Layer: metric definitions/values/provenance persisted and returned with formula/inputs/freshness (`apps/api/app/models/entities.py`, `apps/api/app/schemas/truth.py`, `apps/web/lib/truth.ts`).
@@ -583,3 +583,159 @@ New regression coverage:
 - Added regression: test_approve_and_send_non_draft_returns_idempotent_payload.
 - Verified in rebuilt API container: pytest target passed.
 
+## X) Tenant-Aware Auth + Mobile Runtime Verification (2026-03-07)
+
+### Tenant-aware auth implementation
+- Login now requires `tenant_slug` in addition to email + password; backend scopes user lookup to `(tenant_id, email)` pair.
+- API: `apps/api/app/api/routes_auth.py` — `/auth/login` now accepts `{ tenant_slug, email, password }` and resolves tenant before credential check.
+- API entities: `apps/api/app/models/entities.py` — `Tenant.slug` column added; `User` FK to `Tenant`.
+- Migration: `apps/api/alembic/versions/0005_add_tenant_slug.py` — adds `tenant.slug` unique column, backfills existing tenant row.
+- Seed: `apps/api/app/seed.py` — demo tenant seeded as `slug="demo-realty"`.
+- Mobile: `apps/mobile/app/(auth)/login.tsx` — added Tenant Slug field; blank-slug guard before API call.
+- Mobile: `apps/mobile/lib/api.ts` — `login()` posts `{ tenant_slug, email, password }`.
+- Mobile: `apps/mobile/lib/auth-context.tsx` — `signIn(tenantSlug, email, password)` threaded through; SecureStore persists token + user across force-stop.
+- Web: `apps/web/app/login/page.tsx` — `"use client"` directive added (was missing, caused SSR crash on hooks).
+- Web: `apps/web/lib/auth.ts` — NextAuth credentials provider updated for tenant-aware auth.
+- Tests: `apps/api/tests/test_auth_tenant_scoping.py` — new; covers slug isolation, cross-tenant login rejection, missing slug validation.
+
+### expo-asset pnpm isolation fix
+- Root cause: `@expo/metro-config`'s `getAssetPlugins()` calls `resolve-from(projectRoot, 'expo-asset/tools/hashAssetFiles')`. In pnpm isolated linker mode only direct deps are linked into `apps/mobile/node_modules/`; transitive deps (including `expo-asset`, which is a dep of `expo`) are only in the virtual store and not resolvable from project root.
+- Symptom: `expo start` threw `expo-asset cannot be found in the project dependencies`.
+- Fix: added `"expo-asset": "~11.0.5"` as a direct dependency in `apps/mobile/package.json` and ran `pnpm install`.
+- Verification: `pnpm --filter mobile exec tsc --noEmit -p tsconfig.check.json` exit 0; Metro started successfully (`packager-status:running`).
+
+### Port 8082 workaround
+- Port 8082 was held by a stale node process from a prior session (PID 34680; access denied to kill across user contexts).
+- Workaround: launched Metro on port 8083 instead; tunnelled with `adb reverse tcp:8083 tcp:8083`.
+
+### Android emulator smoke test — full pass (2026-03-07)
+Device: Medium_Phone_API_36.1 (Android 16 / API 36.1) — Expo Go 2.32.17
+
+| # | Check | Result |
+|---|-------|--------|
+| 1 | Blank tenant slug → in-app error "Tenant slug is required" | ✅ PASS |
+| 2 | Wrong slug → API `{"detail":"Invalid credentials"}` shown | ✅ PASS |
+| 3 | Valid login (demo-realty / agent@demo.local / demo123) → Dashboard "Welcome, Demo Agent" | ✅ PASS |
+| 4 | Force-stop Expo Go + cold launch → still signed in (SecureStore persistence) | ✅ PASS |
+| 5 | Sign out → returns to login screen | ✅ PASS |
+
+All 5 checks passed. `react-native-screens@4.4.0` and `@babel/runtime@7.28.6` direct-dep pins confirmed present after clean reinstall.
+
+## Y) Phase2 Typed Boundaries + Full Test Closure (2026-03-07)
+
+Branch: `codex/phase2-sources-ui-tests`
+Commits: `69e6f1b`, `2d6d2e4`, `fd161d3` (in addition to prior commits)
+
+### Phase B — Typed API boundaries (no more `any`)
+
+**`apps/web/app/copilot/page.tsx`**
+- Replaced `data?: any` / `trace?: any` with:
+  - `CopilotTrace = { selected_agent?: string; [key: string]: unknown }`
+  - `CopilotData = { formula_markdown?: string; inputs?:…; provenance?:…; [key: string]: unknown }`
+  - `CopilotResponse = { status; text; data?: CopilotData; trace?: CopilotTrace; missing_inputs? }`
+
+**`apps/web/app/properties/[id]/page.tsx`**
+- Replaced `useState<any>` / `poi: any` with full type tree:
+  - `NearbyPoi`, `TimelineEvent`, `InsightValue`, `Insight`, `ParcelDetail`
+- Types derived directly from FastAPI `get_parcel_detail` + `compute_parcel_insights` return shapes
+- Uses TypeScript index-signature pattern (`[key: string]: unknown`) for `JSON.stringify` compatibility
+
+### Phase C — Golden workflow API integration test
+
+File: `apps/api/tests/test_golden_workflow.py` (must be `docker compose cp`'d into container — no source volume mount)
+
+7 tests covering:
+1. Demo JWT claims (role, tenant_id in token payload)
+2. Parcel search tenant-scoping (query `010` matches all 4 seed parcels; empty results for other tenants)
+3. Parcel detail required fields (id, parcel_number, address, attributes_json)
+4. Insights formula_markdown returned (renovation_roi)
+5. Copilot trace contract (`selected_agent` key present in trace)
+6. Cross-tenant isolation (parcel not visible under a different tenant's token)
+7. End-to-end narrative (login → search → detail → insights → copilot all return 200)
+
+Key fix: initial query `query=E%20` found 0 parcels (none start with "East"); correct prefix is `query=010` (all seed parcels have `parcel_number` starting with `010-`).
+
+Rebuild/reload: `docker compose cp apps/api/tests/test_golden_workflow.py api:/app/tests/test_golden_workflow.py`
+
+### Phase D — Playwright E2E layer
+
+Files:
+- `apps/web/playwright.config.ts` (new)
+- `apps/web/e2e/golden-workflow.spec.ts` (new)
+- `apps/web/e2e/global-setup.ts` (new)
+- `"test:e2e": "playwright test"` added to `apps/web/package.json`
+
+7 E2E tests (all green):
+1. Wrong tenant slug → "Invalid credentials" + stays on /login
+2. Wrong password for real tenant → "Invalid credentials" + stays on /login
+3. Valid demo credentials → redirect to /dashboard
+4. Copilot page loads with heading, Run button, textbox
+5. Copilot command "columbus market snapshot" → `agent:` badge visible
+6. Trace section expandable → pre tag with `selected_agent` JSON
+7. Property list page loads with "Properties" heading
+
+**Playwright selector fixes applied** (strict-mode violations):
+- `getByText("Copilot")` → `getByRole("heading", { name: "Copilot", exact: true })` (3 elements matched)
+- `getByText("Trace")` → `getByText("Trace", { exact: true })` (2 elements matched)
+
+### CI two-job structure
+
+`.github/workflows/ci.yml` rewritten:
+
+**Job 1 `web-checks`** (no Docker, fast):
+- `pnpm install --frozen-lockfile`
+- `pnpm --filter web test:local` (vitest)
+- `pnpm --filter web build` (strict, no ignoreBuildErrors)
+- `pnpm --filter mobile exec tsc --noEmit -p tsconfig.check.json`
+
+**Job 2 `integration`** (Docker):
+- pnpm install + Playwright browser install
+- `pnpm --filter web build:local` (produces `.next/` bundle for `next start`)
+- Docker stack up (api, db, redis, worker, beat)
+- API health poll (60×2s)
+- `docker compose exec -T api pytest -q`
+- Alembic schema at head check
+- `pnpm smoke` (with `DEFAULT_TENANT_SLUG=demo-realty`)
+- `pnpm --filter web test:e2e` with `CI=true` (uses `next start` via playwright.config.ts)
+- Playwright traces artifact on failure
+
+Concurrency group cancels in-progress runs on same branch.
+
+### E2E stability — cold-compilation fix (Windows dev + CI)
+
+Root cause: Next.js dev server compiles routes on-demand. The first test hitting `/api/auth/callback/credentials` triggered a loopback request to `/api/proxy/auth/login` (server → self) which needed cold compilation (~25s). The 8s assertion timeout in test 1 fired before the route was ready.
+
+Fix — `e2e/global-setup.ts`:
+- Runs after webServer starts, before any test
+- `retryGet(/api/auth/csrf)` — compiles NextAuth catch-all
+- `retryPost(/api/proxy/auth/login, fake-creds)` — compiles proxy catch-all
+  - Retries every 3s with 5s per-request timeout, up to 30 attempts (90s ceiling)
+  - Returns when HTTP 401 (< 500) comes back from the API — confirms route compiled
+- Logs: `[globalSetup] POST .../api/proxy/auth/login warmed up (401)`
+
+CI uses `next start` (pre-built production bundle, zero on-demand compilation) — globalSetup is instant.
+
+### Fossil + pnpm cleanup
+
+- Deleted `apps/web/next-auth.d.ts` (empty `export {}`; tsconfig `paths` override handles resolution)
+- Root `package.json` `pnpm` block: added `peerDependencyRules.ignoreMissing: ["@playwright/test"]` and `ignoredOptionalDependencies: ["@playwright/test"]` to suppress phantom-peer virtual store suffix
+
+### smoke.sh fix
+
+`scripts/smoke.sh` now includes `"tenant_slug":"${TENANT_SLUG}"` in the login curl payload (was sending without it → HTTP 422 since tenant-aware auth migration). `TENANT_SLUG` defaults to `${DEFAULT_TENANT_SLUG:-demo-realty}`.
+
+### Verified gates (2026-03-07, commit fd161d3)
+
+| Gate | Result |
+|------|--------|
+| `docker compose exec -T api pytest -q` | **64 passed** |
+| `docker compose exec -T api alembic current` | **0005_add_tenant_slug (head)** |
+| `pnpm --filter web test:local` | **16 passed** |
+| `pnpm --filter mobile exec tsc --noEmit -p tsconfig.check.json` | **pass** |
+| `pnpm --filter web build` | **clean build** (strict, no ignoreBuildErrors) |
+| `pnpm smoke` | **pass** |
+| `pnpm --filter web test:e2e` | **7/7 passed** |
+
+### Known local dev note
+
+On a fresh `.next/` cache (after deleting it), the globalSetup warm-up adds ~30s before tests start (proxy route compilation). Subsequent runs reuse the compiled cache and start in seconds. CI is unaffected (uses `next start` against pre-built bundle).

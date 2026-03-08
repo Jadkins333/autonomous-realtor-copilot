@@ -78,7 +78,11 @@ def test_city_insight_conforms_to_truth_contract() -> None:
     with TestClient(app) as client:
         login = client.post(
             "/auth/login",
-            json={"email": settings.demo_user_email, "password": settings.demo_user_password},
+            json={
+                "tenant_slug": settings.default_tenant_slug,
+                "email": settings.demo_user_email,
+                "password": settings.demo_user_password,
+            },
         )
         assert login.status_code == 200
         token = login.json()["access_token"]

@@ -8,16 +8,24 @@ import { useAuth } from "../../lib/auth-context";
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const router = useRouter();
+  const [tenantSlug, setTenantSlug] = useState("");
   const [email, setEmail] = useState("agent@demo.local");
   const [password, setPassword] = useState("demo123");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const onSubmit = async () => {
+    const normalizedTenantSlug = tenantSlug.trim();
+
+    if (!normalizedTenantSlug) {
+      setError("Tenant slug is required");
+      return;
+    }
+
     setError(null);
     setLoading(true);
     try {
-      await signIn(email, password);
+      await signIn(normalizedTenantSlug, email, password);
       router.replace("/(app)/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -31,6 +39,14 @@ export default function LoginScreen() {
       <Text style={styles.title}>Realtor Copilot Mobile</Text>
       <Text style={styles.subtitle}>Demo API: {getApiBaseUrl()}</Text>
 
+      <TextInput
+        autoCapitalize="none"
+        onChangeText={setTenantSlug}
+        placeholder="Tenant Slug"
+        placeholderTextColor="#64748b"
+        style={styles.input}
+        value={tenantSlug}
+      />
       <TextInput
         autoCapitalize="none"
         keyboardType="email-address"

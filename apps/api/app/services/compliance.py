@@ -120,7 +120,9 @@ def enforce_outbound_policy(db: Session, message: Message) -> tuple[bool, str | 
         )
         return False, "Contact is suppressed"
 
-    if not is_within_allowed_hours():
+    # Quiet-hours is a live-send protection only; skip in sandbox mode so
+    # off-hours smoke/test runs don't shadow contact-suppression compliance events.
+    if not settings.sandbox_mode and not is_within_allowed_hours():
         _write_compliance_event(
             db,
             message.tenant_id,

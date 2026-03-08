@@ -51,6 +51,8 @@ def test_quiet_hours_blocks_outbound(monkeypatch) -> None:
     monkeypatch.setattr(compliance, "is_suppressed", lambda *args, **kwargs: False)
     monkeypatch.setattr(compliance, "is_within_allowed_hours", lambda *args, **kwargs: False)
     monkeypatch.setattr(compliance, "outbound_count_today", lambda *args, **kwargs: 0)
+    # Quiet-hours enforcement is skipped in sandbox mode; disable it for this test.
+    monkeypatch.setattr(compliance.settings, "sandbox_mode", False)
 
     allowed, reason = compliance.enforce_outbound_policy(db, message)
     assert allowed is False

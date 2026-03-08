@@ -207,6 +207,110 @@ def test_system_diagnostics_admin_shape_and_safe_fields(monkeypatch) -> None:
         app.dependency_overrides.clear()
 
 
+def test_resume_requires_admin(monkeypatch) -> None:
+    app.dependency_overrides[get_db] = lambda: DummyDB()
+    monkeypatch.setattr(
+        "app.api.routes_sources.set_source_resume",
+        lambda *_args, **_kwargs: {"source_name": "franklin_auditor", "state": "ok"},
+    )
+
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/sources/franklin_auditor/resume",
+                headers=_auth_header("agent"),
+            )
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_resume_allows_admin(monkeypatch) -> None:
+    app.dependency_overrides[get_db] = lambda: DummyDB()
+    monkeypatch.setattr(
+        "app.api.routes_sources.set_source_resume",
+        lambda *_args, **_kwargs: {"source_name": "franklin_auditor", "state": "ok"},
+    )
+
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/sources/franklin_auditor/resume",
+                headers=_auth_header("admin"),
+            )
+        assert response.status_code == 200
+        assert response.json()["state"] == "ok"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_replay_allows_admin_success(monkeypatch) -> None:
+    app.dependency_overrides[get_db] = lambda: DummyDB()
+    monkeypatch.setattr(
+        "app.api.routes_sources.replay_source_dlq",
+        lambda *_args, **_kwargs: {
+            "ok": True,
+            "attempted": 3,
+            "succeeded": 3,
+            "failed": 0,
+            "skipped_duplicate": 0,
+            "message": "Replayed 3 items",
+        },
+    )
+
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/sources/franklin_auditor/dlq/replay",
+                headers=_auth_header("admin"),
+            )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["ok"] is True
+        assert payload["attempted"] == 3
+        assert payload["succeeded"] == 3
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_sources_status_shape_authenticated(monkeypatch) -> None:
+    app.dependency_overrides[get_db] = lambda: DummyDB()
+    monkeypatch.setattr(
+        "app.api.routes_sources.get_sources_status",
+        lambda *_args, **_kwargs: [
+            {
+                "source_name": "franklin_auditor",
+                "mode": "fixture",
+                "state": "partial",
+                "reachable": None,
+                "is_stale": True,
+                "last_run_started_at": None,
+                "last_run_finished_at": None,
+                "last_success_at": None,
+                "last_error": "Live source unavailable",
+                "drift_detected": False,
+                "drift_reason": None,
+                "dlq_count": 0,
+                "paused_reason": None,
+                "updated_at": "2026-03-07T00:00:00+00:00",
+            }
+        ],
+    )
+
+    try:
+        with TestClient(app) as client:
+            response = client.get("/sources/status", headers=_auth_header("agent"))
+        assert response.status_code == 200
+        payload = response.json()
+        assert "items" in payload
+        item = payload["items"][0]
+        assert item["source_name"] == "franklin_auditor"
+        assert item["state"] == "partial"
+        assert item["is_stale"] is True
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_debug_drift_disabled_in_production(monkeypatch) -> None:
     app.dependency_overrides[get_db] = lambda: DummyDB()
     app.dependency_overrides[get_admin_auth_context] = lambda: AuthContext(user_id=uuid4(), tenant_id=uuid4(), role="admin")

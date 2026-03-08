@@ -28,6 +28,7 @@ export const authOptions: NextAuthOptions = {
  CredentialsProvider({
  name: 'Demo Credentials',
  credentials: {
+ tenant_slug: { label: 'Tenant slug', type: 'text' },
  email: { label: 'Email', type: 'email' },
  password: { label: 'Password', type: 'password' }
  },
@@ -36,6 +37,7 @@ export const authOptions: NextAuthOptions = {
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({
+ tenant_slug: credentials?.tenant_slug,
  email: credentials?.email,
  password: credentials?.password
  }),

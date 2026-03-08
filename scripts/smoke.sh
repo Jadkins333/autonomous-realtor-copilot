@@ -5,6 +5,7 @@ API_BASE="${API_BASE:-http://localhost:8000}"
 WEB_BASE="${WEB_BASE:-http://localhost:3000}"
 EMAIL="${DEMO_USER_EMAIL:-agent@demo.local}"
 PASSWORD="${DEMO_USER_PASSWORD:-demo123}"
+TENANT_SLUG="${DEFAULT_TENANT_SLUG:-demo-realty}"
 MISSING_PARCEL_ID="${TEST_PARCEL_MISSING_SIGNALS_ID:-11111111-1111-1111-1111-111111111111}"
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
 POSTGRES_DB="${POSTGRES_DB:-realtor_copilot}"
@@ -33,7 +34,7 @@ echo "web route check: ${WEB_BASE}/login -> ${web_login_status}"
 
 login_response="$(curl -fsS -X POST "${API_BASE}/auth/login" \
   -H 'Content-Type: application/json' \
-  -d "{\"email\":\"${EMAIL}\",\"password\":\"${PASSWORD}\"}")"
+  -d "{\"tenant_slug\":\"${TENANT_SLUG}\",\"email\":\"${EMAIL}\",\"password\":\"${PASSWORD}\"}")"
 
 token="$(python3 - <<'PY' "${login_response}"
 import json,sys

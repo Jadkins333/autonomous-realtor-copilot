@@ -10,7 +10,11 @@ def _login_token(client: TestClient) -> str:
     settings = get_settings()
     response = client.post(
         "/auth/login",
-        json={"email": settings.demo_user_email, "password": settings.demo_user_password},
+        json={
+            "tenant_slug": settings.default_tenant_slug,
+            "email": settings.demo_user_email,
+            "password": settings.demo_user_password,
+        },
     )
     assert response.status_code == 200
     return response.json()["access_token"]
