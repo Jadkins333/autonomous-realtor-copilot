@@ -390,4 +390,140 @@ describe('OutreachPage', function () {
     expect(screen.getByTestId('approve-confirm')).toBeTruthy()
     expect(screen.queryByTestId('reject-confirm')).toBeNull()
   })
+
+  // ---------------------------------------------------------------------------
+  // Compose form tests
+  // ---------------------------------------------------------------------------
+
+  it('shows compose-toggle button', async function () {
+    mockApiFetch.mockResolvedValue({ items: [] })
+    renderPage()
+    await waitFor(function () {
+      expect(screen.getByTestId('compose-toggle')).toBeTruthy()
+    })
+  })
+
+  it('compose form hidden by default', async function () {
+    mockApiFetch.mockResolvedValue({ items: [] })
+    renderPage()
+    await waitFor(function () {
+      expect(screen.getByTestId('compose-toggle')).toBeTruthy()
+    })
+    expect(screen.queryByTestId('compose-form')).toBeNull()
+  })
+
+  it('clicking compose-toggle shows the form and fetches contacts', async function () {
+    mockApiFetch.mockResolvedValueOnce({ items: [] }) // initial packs load
+    mockApiFetch.mockResolvedValueOnce([                // contacts fetch
+      { id: 'c1', name: 'Alice', email: 'alice@test.com' },
+    ])
+    renderPage()
+    await waitFor(function () {
+      expect(screen.getByTestId('compose-toggle')).toBeTruthy()
+    })
+    fireEvent.click(screen.getByTestId('compose-toggle'))
+    await waitFor(function () {
+      expect(screen.getByTestId('compose-form')).toBeTruthy()
+    })
+    await waitFor(function () {
+      expect(screen.getByText('Alice (alice@test.com)')).toBeTruthy()
+    })
+  })
+
+  it('clicking compose-toggle again hides the form', async function () {
+    mockApiFetch.mockResolvedValueOnce({ items: [] })
+    mockApiFetch.mockResolvedValueOnce([])
+    renderPage()
+    await waitFor(function () {
+      expect(screen.getByTestId('compose-toggle')).toBeTruthy()
+    })
+    fireEvent.click(screen.getByTestId('compose-toggle'))
+    await waitFor(function () {
+      expect(screen.getByTestId('compose-form')).toBeTruthy()
+    })
+    fireEvent.click(screen.getByTestId('compose-toggle'))
+    await waitFor(function () {
+      expect(screen.queryByTestId('compose-form')).toBeNull()
+    })
+  })
+
+  it('submit button is disabled when contact or objective is empty', async function () {
+    mockApiFetch.mockResolvedValueOnce({ items: [] })
+    mockApiFetch.mockResolvedValueOnce([])
+    renderPage()
+    await waitFor(function () {
+      expect(screen.getByTestId('compose-toggle')).toBeTruthy()
+    })
+    fireEvent.click(screen.getByTestId('compose-toggle'))
+    await waitFor(function () {
+      expect(screen.getByTestId('compose-submit')).toBeTruthy()
+    })
+    expect((screen.getByTestId('compose-submit') as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('calls POST /outreach/draft-pack on submit and shows result', async function () {
+    const newPack = makePack({ id: 'pack-new-999', status: 'draft', drafts: [] })
+    mockApiFetch.mockResolvedValueOnce({ items: [] })           // initial packs load
+    mockApiFetch.mockResolvedValueOnce([                         // contacts fetch
+      { id: 'c1', name: 'Alice', email: 'alice@test.com' },
+    ])
+    mockApiFetch.mockResolvedValueOnce(newPack)                  // POST /draft-pack
+    mockApiFetch.mockResolvedValueOnce({ items: [newPack] })     // reload
+
+    renderPage()
+    await waitFor(function () {
+      expect(screen.getByTestId('compose-toggle')).toBeTruthy()
+    })
+    fireEvent.click(screen.getByTestId('compose-toggle'))
+    await waitFor(function () {
+      expect(screen.getByTestId('compose-form')).toBeTruthy()
+    })
+    await waitFor(function () {
+      expect(screen.getByTestId('compose-contact')).toBeTruthy()
+    })
+
+    // Fill form
+    fireEvent.change(screen.getByTestId('compose-contact'), { target: { value: 'c1' } })
+    fireEvent.change(screen.getByTestId('compose-objective'), {
+      target: { value: 'Initial buyer intro' },
+    })
+
+    fireEvent.click(screen.getByTestId('compose-submit'))
+
+    await waitFor(function () {
+      expect(screen.getByTestId('action-result')).toBeTruthy()
+    })
+    expect(screen.getByTestId('action-result').textContent).toContain('pack-new')
+  })
+
+  it('shows compose-error when POST fails', async function () {
+    mockApiFetch.mockResolvedValueOnce({ items: [] })
+    mockApiFetch.mockResolvedValueOnce([
+      { id: 'c1', name: 'Alice', email: null },
+    ])
+    mockApiFetch.mockRejectedValueOnce(new Error('contact not found'))
+
+    renderPage()
+    await waitFor(function () {
+      expect(screen.getByTestId('compose-toggle')).toBeTruthy()
+    })
+    fireEvent.click(screen.getByTestId('compose-toggle'))
+    await waitFor(function () {
+      expect(screen.getByTestId('compose-form')).toBeTruthy()
+    })
+    await waitFor(function () {
+      expect(screen.getByTestId('compose-contact')).toBeTruthy()
+    })
+
+    fireEvent.change(screen.getByTestId('compose-contact'), { target: { value: 'c1' } })
+    fireEvent.change(screen.getByTestId('compose-objective'), {
+      target: { value: 'Test objective' },
+    })
+    fireEvent.click(screen.getByTestId('compose-submit'))
+
+    await waitFor(function () {
+      expect(screen.getByTestId('compose-error')).toBeTruthy()
+    })
+    expect(screen.getByTestId('compose-error').textContent).toContain('contact not found')
+  })
 })

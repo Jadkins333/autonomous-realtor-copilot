@@ -15,6 +15,12 @@ import { apiFetch } from '@/lib/api'
 // Types
 // ---------------------------------------------------------------------------
 
+type ContactRow = {
+  id: string
+  name: string
+  email: string | null
+}
+
 type DraftRow = {
   id: string
   pack_id?: string | null
@@ -99,6 +105,16 @@ export default function OutreachPage() {
   const [confirmRejecting, setConfirmRejecting] = useState<string | null>(null)
   const [confirmSubmitPack, setConfirmSubmitPack] = useState<string | null>(null)
 
+  // Compose form state
+  const [showCompose, setShowCompose] = useState(false)
+  const [contacts, setContacts] = useState<ContactRow[]>([])
+  const [composeContact, setComposeContact] = useState('')
+  const [composeParcel, setComposeParcel] = useState('')
+  const [composeObjective, setComposeObjective] = useState('')
+  const [composeChannels, setComposeChannels] = useState<string[]>(['email'])
+  const [composing, setComposing] = useState(false)
+  const [composeError, setComposeError] = useState<string | null>(null)
+
   const load = useCallback(async () => {
     if (!session) return
     setLoading(true)
@@ -117,6 +133,50 @@ export default function OutreachPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  // Fetch contacts when compose form is opened (lazy to avoid breaking other flows)
+  useEffect(() => {
+    if (!showCompose || !session || contacts.length > 0) return
+    apiFetch<ContactRow[]>('/contacts', session.apiToken)
+      .then(setContacts)
+      .catch(() => setContacts([]))
+  }, [showCompose, session, contacts.length])
+
+  async function createDraftPack() {
+    if (!session || !composeContact || !composeObjective || composeChannels.length === 0) return
+    setComposing(true)
+    setComposeError(null)
+    try {
+      const pack = await apiFetch<DraftPackRow>('/outreach/draft-pack', session.apiToken, {
+        method: 'POST',
+        body: JSON.stringify({
+          contact_id: composeContact,
+          parcel_id: composeParcel || null,
+          objective: composeObjective,
+          channels: composeChannels,
+          sandbox: true,
+        }),
+      })
+      setShowCompose(false)
+      setComposeContact('')
+      setComposeParcel('')
+      setComposeObjective('')
+      setComposeChannels(['email'])
+      await load()
+      setSelectedPackId(pack.id)
+      setActionResult('Draft pack created: ' + pack.id.slice(0, 8))
+    } catch (err) {
+      setComposeError(err instanceof Error ? err.message : 'Failed to create draft pack')
+    } finally {
+      setComposing(false)
+    }
+  }
+
+  function toggleChannel(ch: string) {
+    setComposeChannels((prev) =>
+      prev.includes(ch) ? prev.filter((c) => c !== ch) : [...prev, ch],
+    )
+  }
 
   const selectedPack = useMemo(
     () => packs.find((pack) => pack.id === selectedPackId) || null,
@@ -176,6 +236,100 @@ export default function OutreachPage() {
           <p className='mt-3 text-sm text-muted-foreground' data-testid='action-result'>
             {actionResult}
           </p>
+        ) : null}
+      </Card>
+
+      {/* Compose new draft pack */}
+      <Card className='mb-4' data-testid='compose-card'>
+        <div className='flex items-center justify-between'>
+          <CardTitle>New Outreach</CardTitle>
+          <Button
+            variant='outline'
+            onClick={() => {
+              setShowCompose((v) => !v)
+              setComposeError(null)
+            }}
+            data-testid='compose-toggle'
+          >
+            {showCompose ? 'Cancel' : '+ Compose'}
+          </Button>
+        </div>
+
+        {showCompose ? (
+          <div className='mt-4 space-y-3' data-testid='compose-form'>
+            {/* Contact */}
+            <div>
+              <label className='mb-1 block text-xs text-muted-foreground'>Contact *</label>
+              <select
+                className='w-full rounded-lg border border-input bg-transparent px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring'
+                value={composeContact}
+                onChange={(e) => setComposeContact(e.target.value)}
+                data-testid='compose-contact'
+              >
+                <option value=''>— select contact —</option>
+                {contacts.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}{c.email ? ` (${c.email})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Parcel ID (optional) */}
+            <div>
+              <label className='mb-1 block text-xs text-muted-foreground'>Parcel ID (optional)</label>
+              <input
+                className='w-full rounded-lg border border-input bg-transparent px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring'
+                placeholder='UUID of parcel'
+                value={composeParcel}
+                onChange={(e) => setComposeParcel(e.target.value)}
+                data-testid='compose-parcel'
+              />
+            </div>
+
+            {/* Objective */}
+            <div>
+              <label className='mb-1 block text-xs text-muted-foreground'>Objective *</label>
+              <textarea
+                className='w-full rounded-lg border border-input bg-transparent px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring'
+                rows={3}
+                placeholder='e.g. Introduce myself and ask about selling timeline'
+                value={composeObjective}
+                onChange={(e) => setComposeObjective(e.target.value)}
+                data-testid='compose-objective'
+              />
+            </div>
+
+            {/* Channels */}
+            <div>
+              <label className='mb-1 block text-xs text-muted-foreground'>Channels *</label>
+              <div className='flex gap-4 text-sm' data-testid='compose-channels'>
+                {['email', 'sms'].map((ch) => (
+                  <label key={ch} className='flex items-center gap-1.5 cursor-pointer'>
+                    <input
+                      type='checkbox'
+                      checked={composeChannels.includes(ch)}
+                      onChange={() => toggleChannel(ch)}
+                      data-testid={`compose-channel-${ch}`}
+                    />
+                    {ch}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {composeError ? (
+              <p className='text-xs text-red-400' data-testid='compose-error'>{composeError}</p>
+            ) : null}
+
+            <Button
+              onClick={() => void createDraftPack()}
+              disabled={composing || !composeContact || !composeObjective || composeChannels.length === 0}
+              data-testid='compose-submit'
+            >
+              {composing ? 'Creating…' : 'Create Draft Pack'}
+            </Button>
+          </div>
         ) : null}
       </Card>
 
