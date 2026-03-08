@@ -28,7 +28,6 @@ build/
 node_modules/
 apps/web/node_modules/
 .next/
-pnpm-lock.yaml
 
 # Python
 __pycache__/
