@@ -891,10 +891,9 @@ def _replay_config_for_source(source_name: str):
 
 
 def replay_source_dlq(db: Session, tenant_id, source_name: str) -> dict[str, Any]:
-    source = db.execute(select(Source).where(Source.name == source_name)).scalar_one_or_none()
-    if source is None:
-        raise ValueError(f"Unknown source '{source_name}'")
-
+    # Check drift / paused state first — these apply even before a source row exists
+    # (source rows are created lazily on first ingestion run; source_status rows are
+    # seeded eagerly by ensure_source_status_defaults).
     status_row = get_or_create_source_status(db, source_name)
     if status_row.drift_detected:
         return {
@@ -914,6 +913,11 @@ def replay_source_dlq(db: Session, tenant_id, source_name: str) -> dict[str, Any
             "failed": 0,
             "skipped_duplicate": 0,
         }
+
+    source = db.execute(select(Source).where(Source.name == source_name)).scalar_one_or_none()
+    if source is None:
+        # No source row yet (ingestion never ran for this source) — DLQ is empty.
+        return {"ok": True, "attempted": 0, "succeeded": 0, "failed": 0, "skipped_duplicate": 0}
 
     validator, upserter = _replay_config_for_source(source_name)
 
