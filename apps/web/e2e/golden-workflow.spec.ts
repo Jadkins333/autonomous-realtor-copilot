@@ -135,4 +135,14 @@ test.describe("golden workflow: login → copilot → trace", () => {
     await page.goto("/properties");
     await expect(page.getByText("Properties")).toBeVisible({ timeout: 8_000 });
   });
+
+  test("sources page loads with at least one source card", async ({ page }) => {
+    await page.goto("/sources");
+    // At least one source card must appear (seeded data has 5 sources)
+    await expect(page.locator("[data-testid^='source-card-']").first()).toBeVisible({
+      timeout: 10_000,
+    });
+    // Refresh button must be present
+    await expect(page.getByRole("button", { name: "Refresh" })).toBeVisible();
+  });
 });
