@@ -3,14 +3,17 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * E2E configuration.
  *
- * webServer starts `next dev --port 3001` with the required env vars and
- * forwards requests to the Docker API at localhost:8000.
+ * Local dev  : webServer starts `next dev --port 3001`; globalSetup pre-warms
+ *              the auth + proxy routes so cold-compilation doesn't time-out tests.
+ * CI         : webServer starts `next start --port 3001` against the production
+ *              bundle built earlier in the job (no on-demand compilation).
  *
  * Run: pnpm --filter web test:e2e
  * Prerequisites: Docker stack must be running (docker compose up -d api db redis)
  */
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: require.resolve("./e2e/global-setup"),
   fullyParallel: false, // serial — tests share live DB state
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
@@ -30,10 +33,16 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: "pnpm next dev --port 3001",
-    url: "http://localhost:3001",
-    reuseExistingServer: true, // don't restart if already running locally
-    timeout: 120_000,
+    // CI uses the pre-built production bundle (zero compilation lag).
+    // Local dev uses next dev so code changes are reflected immediately.
+    command: process.env.CI
+      ? "pnpm next start --port 3001"
+      : "pnpm next dev --port 3001",
+    // Wait for the auth CSRF route — this ensures NextAuth routes are compiled
+    // and responding before any test starts.
+    url: "http://localhost:3001/api/auth/csrf",
+    reuseExistingServer: !process.env.CI, // always start fresh in CI; reuse when developing locally
+    timeout: 180_000, // generous: next dev cold-start on Windows can take 2-3 min
     env: {
       NEXTAUTH_URL: "http://localhost:3001",
       NEXTAUTH_SECRET: "e2e-dev-secret",

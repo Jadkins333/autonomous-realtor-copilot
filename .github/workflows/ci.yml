@@ -2,54 +2,141 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: ["main", "codex/**", "claude/**"]
   pull_request:
 
+# Cancel in-progress runs on the same branch when a new push arrives
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 1: Static checks — no Docker required, runs fast in parallel with job 2
+  # ─────────────────────────────────────────────────────────────────────────
+  web-checks:
+    name: "Web build · Vitest · Mobile tsc"
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
 
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: "Web — unit tests (vitest)"
+        run: pnpm --filter web test:local
+
+      - name: "Web — production build (strict: no ignoreBuildErrors)"
+        run: pnpm --filter web build
+
+      - name: "Mobile — TypeScript check"
+        run: pnpm --filter mobile exec tsc --noEmit -p tsconfig.check.json
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 2: Integration — Docker stack + pytest + smoke + Playwright E2E
+  # ─────────────────────────────────────────────────────────────────────────
+  integration:
+    name: "API pytest · Alembic · Smoke · Playwright E2E"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
         with:
           version: 9
 
-      - name: Install
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Bring up core stack
-        run: docker compose up -d --build db redis api worker beat web
+      - name: Install Playwright browsers (chromium only)
+        run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+
+      # Build the Next.js production bundle so Playwright's webServer can start
+      # `next start` (zero on-demand compilation, fully deterministic in CI).
+      - name: "Web — production build for E2E"
+        run: pnpm --filter web build:local
+        env:
+          NEXTAUTH_URL: http://localhost:3001
+          NEXTAUTH_SECRET: ci-e2e-secret
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_API_BASE_URL: /api/proxy
+          NEXT_PUBLIC_ENABLE_SW: "false"
+
+      # Start only the services Playwright and pytest need.
+      # The web container is NOT started here — Playwright's webServer config
+      - name: Build and start Docker stack
+        run: docker compose up -d --build db redis api worker beat
 
       - name: Wait for API health
         run: |
           for i in {1..60}; do
-            if curl -fsS http://localhost:8000/healthz > /dev/null; then
-              echo "API is healthy"
+            if curl -fsS http://localhost:8000/healthz > /dev/null 2>&1; then
+              echo "API healthy after ${i}×2 s"
               exit 0
             fi
             sleep 2
           done
-          echo "API did not become healthy in time"
+          echo "ERROR: API did not become healthy in time"
           docker compose ps
           docker compose logs --no-color --tail=200 api
           exit 1
 
-      - name: Smoke test
+      - name: "API — pytest (all suites)"
+        run: docker compose exec -T api pytest -q
+
+      - name: "API — Alembic schema at head"
+        run: |
+          CURRENT=$(docker compose exec -T api alembic current 2>&1 | tail -1)
+          echo "Alembic current: ${CURRENT}"
+          echo "${CURRENT}" | grep -q "(head)" || {
+            echo "ERROR: schema is not at head"
+            exit 1
+          }
+
+      - name: "Smoke test"
         run: pnpm smoke
+        env:
+          DEFAULT_TENANT_SLUG: demo-realty
 
-      - name: Web build
-        run: pnpm --filter web build
+      - name: "Playwright E2E"
+        run: pnpm --filter web test:e2e
+        env:
+          CI: "true"
+          NEXTAUTH_URL: http://localhost:3001
+          NEXTAUTH_SECRET: ci-e2e-secret
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_API_BASE_URL: /api/proxy
+          NEXT_PUBLIC_ENABLE_SW: "false"
+          DEFAULT_TENANT_SLUG: demo-realty
+          DEMO_USER_EMAIL: agent@demo.local
+          DEMO_USER_PASSWORD: demo123
 
-      - name: Mobile typecheck
-        run: pnpm --filter mobile exec tsc --noEmit
+      - name: Upload Playwright traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces-${{ github.run_id }}
+          path: apps/web/test-results/
+          retention-days: 7
 
-      - name: Compose logs on failure
+      - name: Docker compose logs on failure
         if: failure()
         run: |
           docker compose ps
