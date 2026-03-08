@@ -41,7 +41,7 @@ export default defineConfig({
     // Wait for the auth CSRF route — this ensures NextAuth routes are compiled
     // and responding before any test starts.
     url: "http://localhost:3001/api/auth/csrf",
-    reuseExistingServer: !process.env.CI, // always start fresh in CI; reuse when developing locally
+    reuseExistingServer: true, // CI starts the server before this step; locally reuse if already running
     timeout: 180_000, // generous: next dev cold-start on Windows can take 2-3 min
     env: {
       NEXTAUTH_URL: "http://localhost:3001",

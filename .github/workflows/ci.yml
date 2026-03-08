@@ -76,7 +76,7 @@ jobs:
           NEXT_PUBLIC_ENABLE_SW: "false"
 
       # Start only the services Playwright and pytest need.
-      # The web container is NOT started here — Playwright's webServer config
+      # The web container is NOT started here — we start Next.js directly below.
       - name: Build and start Docker stack
         run: docker compose up -d --build db redis api worker beat
 
@@ -106,10 +106,35 @@ jobs:
             exit 1
           }
 
+      # Start the pre-built Next.js bundle once so both smoke test and Playwright
+      # can hit it. Playwright is configured with reuseExistingServer: true so it
+      # won't try to start a second instance.
+      - name: Start web server (port 3001)
+        run: pnpm --filter web exec next start --port 3001 &
+        env:
+          NEXTAUTH_URL: http://localhost:3001
+          NEXTAUTH_SECRET: ci-e2e-secret
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_API_BASE_URL: /api/proxy
+          NEXT_PUBLIC_ENABLE_SW: "false"
+
+      - name: Wait for web server
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://localhost:3001/api/auth/csrf > /dev/null 2>&1; then
+              echo "Web server ready after ${i}×2 s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "ERROR: Web server did not start in time"
+          exit 1
+
       - name: "Smoke test"
         run: pnpm smoke
         env:
           DEFAULT_TENANT_SLUG: demo-realty
+          WEB_BASE: http://localhost:3001
 
       - name: "Playwright E2E"
         run: pnpm --filter web test:e2e
