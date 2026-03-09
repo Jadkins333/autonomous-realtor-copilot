@@ -4,7 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockUseRequireAuth = vi.fn()
-const mockUseSession = vi.fn()
+const mockGetSession = vi.fn()
 const mockApiFetch = vi.fn()
 
 vi.mock('@/components/auth-guard', function () {
@@ -72,7 +72,7 @@ vi.mock('next/link', function () {
 })
 
 vi.mock('next-auth/react', function () {
-  return { useSession: () => mockUseSession() }
+  return { getSession: () => mockGetSession() }
 })
 
 vi.mock('@/lib/api', function () {
@@ -99,7 +99,7 @@ function makeRow(overrides: Partial<{ id: string; address: string; parcel_number
 
 function setup() {
   mockUseRequireAuth.mockReturnValue({ status: 'authenticated' })
-  mockUseSession.mockReturnValue({ data: SESSION, status: 'authenticated' })
+  mockGetSession.mockResolvedValue(SESSION)
 }
 
 describe('PropertiesPage', function () {

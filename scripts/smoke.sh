@@ -2,7 +2,7 @@
 set -euo pipefail
 
 API_BASE="${API_BASE:-http://localhost:8000}"
-WEB_BASE="${WEB_BASE:-http://localhost:3000}"
+WEB_BASE="${WEB_BASE:-http://localhost:3001}"
 EMAIL="${DEMO_USER_EMAIL:-agent@demo.local}"
 PASSWORD="${DEMO_USER_PASSWORD:-demo123}"
 TENANT_SLUG="${DEFAULT_TENANT_SLUG:-demo-realty}"

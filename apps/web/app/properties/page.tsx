@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { getSession } from "next-auth/react";
 
 import { useRequireAuth } from "@/components/auth-guard";
 import { SiteShell } from "@/components/site-shell";
@@ -22,20 +22,24 @@ type ParcelRow = {
 
 export default function PropertiesPage() {
   const { status } = useRequireAuth();
-  const { data: session } = useSession();
   const [query, setQuery] = useState("High");
   const [rows, setRows] = useState<ParcelRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   async function search() {
-    if (!session) return;
     setLoading(true);
+    setSearchError(null);
     try {
+      const freshSession = await getSession();
+      const token = freshSession?.apiToken;
       const data = await apiFetch<ParcelRow[]>(
         `/parcels/search?query=${encodeURIComponent(query)}`,
-        session?.apiToken,
+        token,
       );
       setRows(data);
+    } catch (err) {
+      setSearchError(err instanceof Error ? err.message : "Search failed");
     } finally {
       setLoading(false);
     }
@@ -60,6 +64,9 @@ export default function PropertiesPage() {
             {loading ? "Searching..." : "Search"}
           </Button>
         </div>
+        {searchError && (
+          <p className="mt-2 text-sm text-red-600" data-testid="search-error">{searchError}</p>
+        )}
       </Card>
 
       <Card data-testid="property-results-card">

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from hashlib import sha256
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import case, func, select, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.models.entities import (
@@ -22,25 +23,32 @@ from app.services.provenance import freshness
 def _ensure_metric_definition(
     db: Session, key: str, name: str, formula_markdown: str, required_inputs_json: list[str]
 ) -> MetricDefinition:
-    existing = db.execute(
-        select(MetricDefinition).where(MetricDefinition.key == key, MetricDefinition.version == "v1")
-    ).scalar_one_or_none()
-    if existing:
-        existing.name = name
-        existing.formula_markdown = formula_markdown
-        existing.required_inputs_json = required_inputs_json
-        return existing
-
-    definition = MetricDefinition(
-        key=key,
-        name=name,
-        version="v1",
-        formula_markdown=formula_markdown,
-        required_inputs_json=required_inputs_json,
+    # Use PostgreSQL upsert so concurrent requests (e.g. React StrictMode double-invoke)
+    # never race on the unique constraint uq_metric_key_version.
+    stmt = (
+        pg_insert(MetricDefinition)
+        .values(
+            id=uuid4(),
+            key=key,
+            name=name,
+            version="v1",
+            formula_markdown=formula_markdown,
+            required_inputs_json=required_inputs_json,
+            created_at=datetime.now(tz=UTC),
+        )
+        .on_conflict_do_update(
+            constraint="uq_metric_key_version",
+            set_={
+                "name": name,
+                "formula_markdown": formula_markdown,
+                "required_inputs_json": required_inputs_json,
+            },
+        )
     )
-    db.add(definition)
-    db.flush()
-    return definition
+    db.execute(stmt)
+    return db.execute(
+        select(MetricDefinition).where(MetricDefinition.key == key, MetricDefinition.version == "v1")
+    ).scalar_one()
 
 
 def _store_metric_value(
