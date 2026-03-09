@@ -1,0 +1,18 @@
+# Fair Housing Advertising Guardrails
+
+See [Compliance Notice](./NOTICE.md).
+
+The marketing package scorer applies a fair-housing risk screen and returns `flagged_terms` in scoring output.
+
+Implementation notes:
+- Guardrails are two-layer:
+  - hard filters for clearly risky preference/exclusion language,
+  - soft rewrite guidance for gray-area phrasing.
+- Flagged language contributes to a compliance risk penalty.
+- Terms are surfaced to the user and stored in Truth Layer metric output.
+- This is a policy-control layer and should be reviewed by counsel for production deployments.
+
+Reference:
+- HUD Fair Housing Act overview (primary): https://www.hud.gov/program_offices/fair_housing_equal_opp/fair_housing_act_overview
+- HUD Office of Fair Housing and Equal Opportunity (primary): https://www.hud.gov/fairhousing
+- Digital advertising guidance summary (secondary): https://www.equalhousing.org/resources/guidance-on-application-of-the-fair-housing-act-to-the-advertising-of-housing-credit-and-other-real-estate-related-transactions-through-digital-platforms/

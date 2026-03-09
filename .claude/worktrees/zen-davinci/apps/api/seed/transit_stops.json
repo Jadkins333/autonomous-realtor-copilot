@@ -1,0 +1,20 @@
+[
+  {
+    "external_id": "stop-10",
+    "name": "N High St & Nationwide Blvd",
+    "lon": -82.9998,
+    "lat": 39.9692
+  },
+  {
+    "external_id": "stop-11",
+    "name": "Neil Ave & Goodale",
+    "lon": -83.0108,
+    "lat": 39.9738
+  },
+  {
+    "external_id": "stop-12",
+    "name": "Indianola Ave & Weber Rd",
+    "lon": -82.9836,
+    "lat": 40.0406
+  }
+]

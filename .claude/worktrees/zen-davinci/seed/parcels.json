@@ -1,0 +1,62 @@
+[
+  {
+    "external_id": "parcel-1001",
+    "parcel_number": "010-234567",
+    "address": "145 N High St",
+    "city": "Columbus",
+    "state": "OH",
+    "zip": "43215",
+    "lon": -82.9989,
+    "lat": 39.9654,
+    "attributes_json": {
+      "property_type": "single_family",
+      "year_built": 1988,
+      "beds": 3,
+      "baths": 2,
+      "sqft": 1890,
+      "lot_sqft": 5100,
+      "last_sale_date": "2018-06-15",
+      "coordinates": [-82.9989, 39.9654]
+    }
+  },
+  {
+    "external_id": "parcel-1002",
+    "parcel_number": "010-765432",
+    "address": "722 Neil Ave",
+    "city": "Columbus",
+    "state": "OH",
+    "zip": "43215",
+    "lon": -83.0097,
+    "lat": 39.9752,
+    "attributes_json": {
+      "property_type": "condo",
+      "year_built": 2007,
+      "beds": 2,
+      "baths": 2,
+      "sqft": 1210,
+      "lot_sqft": 0,
+      "last_sale_date": "2020-04-10",
+      "coordinates": [-83.0097, 39.9752]
+    }
+  },
+  {
+    "external_id": "parcel-1003",
+    "parcel_number": "010-987654",
+    "address": "3508 Indianola Ave",
+    "city": "Columbus",
+    "state": "OH",
+    "zip": "43214",
+    "lon": -82.9832,
+    "lat": 40.0393,
+    "attributes_json": {
+      "property_type": "single_family",
+      "year_built": 1957,
+      "beds": 4,
+      "baths": 3,
+      "sqft": 2210,
+      "lot_sqft": 6600,
+      "last_sale_date": "2012-09-20",
+      "coordinates": [-82.9832, 40.0393]
+    }
+  }
+]

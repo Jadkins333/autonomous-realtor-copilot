@@ -1,0 +1,44 @@
+[
+  {
+    "external_id": "poi-1",
+    "category": "coffee",
+    "name": "High Street Coffee Co.",
+    "lon": -82.9995,
+    "lat": 39.9662
+  },
+  {
+    "external_id": "poi-2",
+    "category": "park",
+    "name": "Scioto Mile Green",
+    "lon": -83.0053,
+    "lat": 39.9614
+  },
+  {
+    "external_id": "poi-3",
+    "category": "grocery",
+    "name": "Downtown Fresh Market",
+    "lon": -82.9944,
+    "lat": 39.9698
+  },
+  {
+    "external_id": "poi-4",
+    "category": "coffee",
+    "name": "Neil Avenue Roasters",
+    "lon": -83.0102,
+    "lat": 39.9759
+  },
+  {
+    "external_id": "poi-5",
+    "category": "park",
+    "name": "Whetstone Park",
+    "lon": -83.0194,
+    "lat": 40.0605
+  },
+  {
+    "external_id": "poi-6",
+    "category": "grocery",
+    "name": "Indianola Neighborhood Grocer",
+    "lon": -82.9825,
+    "lat": 40.0400
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web-dev",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\pnpm.CMD",
+      "runtimeArgs": ["--filter", "web", "exec", "next", "dev", "--port", "3001"],
+      "port": 3001,
+      "autoPort": false
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+.git
+.gitignore
+.DS_Store
+
+node_modules
+**/node_modules
+**/.next
+**/.expo
+**/__pycache__
+**/*.pyc
