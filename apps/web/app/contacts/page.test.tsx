@@ -1,6 +1,6 @@
 import React from 'react'
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // ---------------------------------------------------------------------------
@@ -230,9 +230,10 @@ describe('ContactsPage', function () {
     Object.defineProperty(navigator, 'onLine', { value: true, configurable: true })
   })
 
-  it('returns null when not authenticated', function () {
+  it('returns null when not authenticated', async function () {
     mockUseRequireAuth.mockReturnValue({ status: 'loading' })
     const { container } = render(React.createElement(ContactsPage))
     expect(container.firstChild).toBeNull()
+    await act(async () => {})
   })
 })

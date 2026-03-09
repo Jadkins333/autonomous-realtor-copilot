@@ -1,6 +1,6 @@
 import React from 'react'
 
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockUseRequireAuth = vi.fn()
@@ -121,9 +121,10 @@ describe('CopilotAgentsPage', function () {
     expect(screen.queryByTestId(/^agent-card-/)).toBeNull()
   })
 
-  it('returns null when not authenticated', function () {
+  it('returns null when not authenticated', async function () {
     mockUseRequireAuth.mockReturnValue({ status: 'loading' })
     const { container } = render(React.createElement(CopilotAgentsPage))
     expect(container.firstChild).toBeNull()
+    await act(async () => {})
   })
 })

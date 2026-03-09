@@ -1,6 +1,6 @@
 import React from 'react'
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockUseRequireAuth = vi.fn()
@@ -186,9 +186,10 @@ describe('DashboardPage', function () {
     })
   })
 
-  it('returns null when not authenticated', function () {
+  it('returns null when not authenticated', async function () {
     mockUseRequireAuth.mockReturnValue({ status: 'loading' })
     const { container } = render(React.createElement(DashboardPage))
     expect(container.firstChild).toBeNull()
+    await act(async () => {})
   })
 })

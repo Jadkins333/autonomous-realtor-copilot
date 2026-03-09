@@ -1,6 +1,6 @@
 import React from 'react'
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // ---------------------------------------------------------------------------
@@ -371,9 +371,10 @@ describe('OutreachPage', function () {
     expect(screen.getByTestId('action-result').textContent).toContain('submitted')
   })
 
-  it('returns null when not authenticated', function () {
+  it('returns null when not authenticated', async function () {
     mockUseRequireAuth.mockReturnValue({ status: 'loading' })
     const { container } = renderPage()
+    await act(async () => {})
     expect(container.firstChild).toBeNull()
   })
 
