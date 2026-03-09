@@ -145,4 +145,12 @@ test.describe("golden workflow: login → copilot → trace", () => {
     // Refresh button must be present
     await expect(page.getByRole("button", { name: "Refresh" })).toBeVisible();
   });
+
+  test("sequences page loads with at least one sequence card", async ({ page }) => {
+    await page.goto("/sequences");
+    // At least one sequence card must appear (seeded data includes welcome sequence)
+    await expect(page.locator("[data-testid^='sequence-card-']").first()).toBeVisible({
+      timeout: 10_000,
+    });
+  });
 });
