@@ -3,13 +3,12 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * E2E configuration.
  *
- * Local dev  : webServer starts `next dev --port 3001`; globalSetup pre-warms
- *              the auth + proxy routes so cold-compilation doesn't time-out tests.
- * CI         : webServer starts `next start --port 3001` against the production
- *              bundle built earlier in the job (no on-demand compilation).
+ * Both local and CI use `next start --port 3003` (production bundle).
+ * globalSetup pre-warms the auth + proxy routes before tests start.
  *
  * Run: pnpm --filter web test:e2e
  * Prerequisites: Docker stack must be running (docker compose up -d api db redis)
+ *                Run `pnpm --filter web build` before first run (or after code changes).
  */
 export default defineConfig({
   testDir: "./e2e",
@@ -21,7 +20,7 @@ export default defineConfig({
   reporter: [["list"]],
 
   use: {
-    baseURL: "http://localhost:3001",
+    baseURL: "http://localhost:3003",
     trace: "on-first-retry",
   },
 
@@ -33,18 +32,15 @@ export default defineConfig({
   ],
 
   webServer: {
-    // CI uses the pre-built production bundle (zero compilation lag).
-    // Local dev uses next dev so code changes are reflected immediately.
-    command: process.env.CI
-      ? "pnpm next start --port 3001"
-      : "pnpm next dev --port 3001",
+    // Always use the pre-built production bundle (zero compilation lag, no HMR cache issues).
+    command: "pnpm next start --port 3003",
     // Wait for the auth CSRF route — this ensures NextAuth routes are compiled
     // and responding before any test starts.
-    url: "http://localhost:3001/api/auth/csrf",
+    url: "http://localhost:3003/api/auth/csrf",
     reuseExistingServer: true, // CI starts the server before this step; locally reuse if already running
     timeout: 180_000, // generous: next dev cold-start on Windows can take 2-3 min
     env: {
-      NEXTAUTH_URL: "http://localhost:3001",
+      NEXTAUTH_URL: "http://localhost:3003",
       NEXTAUTH_SECRET: "e2e-dev-secret",
       NEXT_PUBLIC_API_URL: "http://localhost:8000",
       NEXT_PUBLIC_API_BASE_URL: "/api/proxy",

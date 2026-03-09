@@ -17,7 +17,7 @@
 
 import { request } from "@playwright/test";
 
-const BASE = "http://localhost:3001";
+const BASE = "http://localhost:3003";
 const MAX_RETRIES = 30; // 30 × 3 s = 90 s ceiling
 const RETRY_DELAY = 3_000;
 const REQ_TIMEOUT = 5_000;
