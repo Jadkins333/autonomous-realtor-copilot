@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 
 import { useRequireAuth } from '@/components/auth-guard'
@@ -106,7 +107,11 @@ export default function ContactsPage() {
           <tbody>
             {rows.map((row) => (
               <tr key={row.id} data-testid={`contact-row-${row.id}`}>
-                <Td>{row.name}</Td>
+                <Td>
+                  <Link href={`/contacts/${row.id}`} className='text-accent underline hover:opacity-80'>
+                    {row.name}
+                  </Link>
+                </Td>
                 <Td>{row.email ?? '—'}</Td>
                 <Td>{row.phone ?? '—'}</Td>
                 <Td>{(row.tags_json || []).join(', ')}</Td>

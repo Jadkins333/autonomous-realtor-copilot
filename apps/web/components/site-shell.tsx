@@ -18,7 +18,8 @@ const NAV = [
   { href: "/copilot", label: "Copilot" },
   { href: "/properties", label: "Properties" },
   { href: "/contacts", label: "Contacts" },
-  { href: "/outreach", label: "Outreach" }
+  { href: "/outreach", label: "Outreach" },
+  { href: "/sequences", label: "Sequences" },
 ];
 
 export function SiteShell({ children }: { children: ReactNode }) {
