@@ -881,3 +881,129 @@ pnpm --filter web test:e2e
 - Sandbox badge on pack cards
 - Vitest coverage (currently zero for outreach page)
 - E2E test: outreach page loads with at least one draft card
+
+
+---
+
+## Section AA — Phases 4–10: UI Polish, Test Coverage, and Production Hardening (2026-03-09)
+
+### Overview
+
+All 7 remaining phases completed on branch `claude/zen-davinci`, merged into `codex/phase2-sources-ui-tests` (commit `cf58b41`). Every gate verified before and after merge.
+
+---
+
+### Phase 4 — Outreach UI hardening (`762bb03`)
+
+**Files:** `apps/web/app/outreach/page.tsx`, `apps/web/app/outreach/page.test.tsx`
+
+- Removed dead `approveLegacy` / Legacy Draft Queue code path
+- `DraftStatusBadge` with semantic colours (draft=blue, blocked_sandbox=amber, sent=green, rejected=red, approved=emerald)
+- `resultMessage()` helper converts raw API JSON to human-readable strings
+- Truncate draft body preview to 120 chars; two-step confirm for approve/reject/submit
+- Sandbox badge on pack cards; `data-testid` on all interactive elements
+- 17 new vitest unit tests
+
+---
+
+### Phase 5 — Opportunities + Contacts polish (`89a157b`)
+
+**Files:** opportunities/page.tsx, opportunities/events/page.tsx, contacts/page.tsx; 3 new test files
+
+- `data-testid` on loading/cards/badges (opportunities); event cards/types/empty (events); form fields + rows (contacts)
+- `@/` alias imports in contacts page
+- 25 new vitest tests (10 + 7 + 8)
+
+---
+
+### Phase 6 — Dashboard source-health card + Sources inline-pause (`3425b80`)
+
+- Dashboard: Source Health card (ok/partial/failed/stale counts, drift alert, Manage link)
+- Sources: DriftBanner, stale/DLQ badges, inline pause form, two-step DLQ replay confirm, relative timestamps
+- 27 new vitest tests (10 dashboard + 17 sources)
+
+---
+
+### Phase 7 — Copilot + Agents pages (`f9d3e88`)
+
+- Copilot: reformatted from minified, TypeScript cast for trace, `data-testid` throughout
+- Agents: agents-grid + agent-card-{key} testids
+- 16 new vitest tests (10 copilot + 6 agents)
+
+---
+
+### Phase 8 — Properties + Setup polish (`aae2a1f`)
+
+- Properties list: typed `ParcelRow`; **fix**: `getSession()` instead of `useSession()` in async handler
+- Properties detail: typed `ParcelDetail/NearbyPoi/Insight`, `data-testid` on all sections
+- Setup: `data-testid` on copy-cmd buttons, env-key items, diagnostics-pre
+- 29 new vitest tests (8 + 12 + 9)
+
+---
+
+### Phase 9 — TypeScript type cleanup (`0e2533f`)
+
+- Moved `next-auth.d.ts` → `apps/web/types/` to fix baseUrl module shadowing
+- Added `"next-auth"` / `"next-auth/*"` to `tsconfig.json` paths
+- Set `ignoreBuildErrors: false` in `next.config.mjs` — build validates TS for real
+- Fixed `Td`/`Th` HTML attribute types; removed invalid `variant` prop from Badge calls
+- `tsc --noEmit` and `next build` both pass clean
+
+---
+
+### Phase 10 — Outreach compose flow (`a6e882b`)
+
+- New Outreach compose card: contact dropdown (lazy-fetched on form open), parcel ID input, objective textarea, email/sms checkboxes
+- POST /outreach/draft-pack on submit → auto-selects new pack; compose-error on failure
+- Added `e2e/` and `playwright.config.ts` to tsconfig exclude list
+- 7 new vitest tests
+
+---
+
+### Compliance sandbox fix (`f41eb65`)
+
+- `enforce_outbound_policy` skips quiet-hours check when `sandbox_mode=True`
+- Root cause: quiet-hours guard fired before sandbox guard, returning "blocked" at night
+- Fix: `if not settings.sandbox_mode and not is_within_allowed_hours():`
+
+---
+
+### Three production bugs found during live demo (`ca358dd`)
+
+**1. Git Bash POSIX path expansion — `apps/web/lib/env.ts`**
+- Symptom: `NEXT_PUBLIC_API_BASE_URL` baked in as `C:/Program Files/Git/api/proxy` on Windows Git Bash
+- Fix: reject values not starting with `/` or `http`; fall back to `/api/proxy`
+
+**2. React StrictMode double-invoke race on /opportunities — `apps/api/app/services/opportunities.py`**
+- Symptom: HTTP 500 `UniqueViolation` on `uq_metric_key_version`
+- Root cause: dev-mode double effect → two concurrent INSERTs, second violates unique constraint
+- Fix: PostgreSQL upsert (`ON CONFLICT DO UPDATE`) via `sqlalchemy.dialects.postgresql.insert`
+
+**3. Smoke script wrong port — `scripts/smoke.sh`**
+- Fix: `WEB_BASE` default updated from 3000 → 3001
+
+---
+
+### Final verified gates (2026-03-09, commit `cf58b41`)
+
+| Gate | Result |
+|---|---|
+| `docker compose exec -T api pytest -q` | **68 passed** |
+| `docker compose exec -T api alembic current` | **0005_add_tenant_slug (head)** |
+| `pnpm --filter web test:local` | **138 passed** (16 test files) |
+| `pnpm --filter web test:e2e` | **8/8 passed** |
+| `pnpm --filter mobile exec tsc --noEmit` | **pass** |
+| `pnpm --filter web exec tsc --noEmit` | **pass** |
+| `pnpm --filter web build` | **clean** (`ignoreBuildErrors: false`) |
+| `pnpm smoke` | **Smoke test passed** (all 10 contract checks) |
+| Browser live demo | All 8 pages verified: Dashboard, Sources, Opportunities, Copilot, Properties (list + detail), Contacts, Outreach, Setup |
+
+---
+
+### Key architectural notes added in Phases 4–10
+
+- **NEXT_PUBLIC_* bake-in**: env vars inlined at build time by webpack DefinePlugin; runtime validation guard is the only safe approach on Windows Git Bash.
+- **`getSession()` vs `useSession()`**: use `getSession()` (async, fresh token) inside async event handlers; `useSession()` is a React hook and cannot be called inside async functions.
+- **PostgreSQL upsert dialect**: `from sqlalchemy.dialects.postgresql import insert as pg_insert` → `.on_conflict_do_update()` eliminates SELECT-then-INSERT race conditions.
+- **NextAuth v4 type augmentation**: put augmentation file in a subdirectory (`types/next-auth.d.ts`) not at baseUrl root; also add explicit `paths` override in `tsconfig.json`.
+- **E2E port management**: dev server on 3001; kill orphan via `Stop-Process -Id (Get-NetTCPConnection -LocalPort 3001 ...).OwningProcess`.
