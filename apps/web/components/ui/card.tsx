@@ -19,7 +19,7 @@ export function CardTitle({
   ...props
 }: HTMLAttributes<HTMLHeadingElement>) {
   return (
-    <h3
+    <h2
       className={cn(
         "font-heading text-[1.15rem] font-semibold leading-tight tracking-[-0.03em] text-foreground",
         className

@@ -46,6 +46,7 @@ def get_parcel_detail(db: Session, tenant_id: UUID, parcel_id: UUID) -> dict:
         "city": parcel.city,
         "state": parcel.state,
         "zip": parcel.zip,
+        "updated_at": parcel.updated_at.isoformat() if parcel.updated_at else None,
         "attributes_json": parcel.attributes_json,
         "provenance": build_provenance(
             provenance.source_id if provenance else None,

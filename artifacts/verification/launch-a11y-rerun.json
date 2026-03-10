@@ -1,0 +1,55 @@
+{
+  "generated_at": "2026-03-10T14:25:20.731Z",
+  "base_url": "http://localhost:3144",
+  "totals": {
+    "routes_scanned": 9,
+    "violations": 0
+  },
+  "results": [
+    {
+      "route": "dashboard",
+      "path": "/dashboard",
+      "violations": []
+    },
+    {
+      "route": "contacts",
+      "path": "/contacts",
+      "violations": []
+    },
+    {
+      "route": "contact-detail",
+      "path": "/contacts",
+      "violations": []
+    },
+    {
+      "route": "properties",
+      "path": "/properties",
+      "violations": []
+    },
+    {
+      "route": "opportunities",
+      "path": "/opportunities",
+      "violations": []
+    },
+    {
+      "route": "sequences",
+      "path": "/sequences",
+      "violations": []
+    },
+    {
+      "route": "outreach",
+      "path": "/outreach",
+      "violations": []
+    },
+    {
+      "route": "copilot",
+      "path": "/copilot",
+      "violations": []
+    },
+    {
+      "route": "setup",
+      "path": "/setup",
+      "violations": []
+    }
+  ]
+}

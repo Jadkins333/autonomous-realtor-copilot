@@ -119,6 +119,16 @@ describe('PropertiesPage', function () {
     expect(screen.getByTestId('property-search-btn').textContent).toContain('Search')
   })
 
+  it('labels the search input with explicit parcel-search copy', function () {
+    render(React.createElement(PropertiesPage))
+    expect(screen.getByLabelText(/property search query/i)).toBeTruthy()
+  })
+
+  it('describes deterministic parcel-only search behavior in the header', function () {
+    render(React.createElement(PropertiesPage))
+    expect(screen.getAllByText(/no ai ranking or generated parcel data/i).length).toBeGreaterThan(0)
+  })
+
   it('shows empty state row before search', function () {
     render(React.createElement(PropertiesPage))
     expect(screen.getByTestId('property-empty-state')).toBeTruthy()
@@ -138,6 +148,17 @@ describe('PropertiesPage', function () {
     expect(screen.getByTestId('property-row-p2')).toBeTruthy()
   })
 
+  it('renders property cards for narrow-screen browsing', async function () {
+    const rows = [makeRow({ id: 'p1', address: '100 High St' })]
+    mockApiFetch.mockResolvedValue(rows)
+    render(React.createElement(PropertiesPage))
+    fireEvent.click(screen.getByTestId('property-search-btn'))
+    await waitFor(function () {
+      expect(screen.getByTestId('property-card-p1')).toBeTruthy()
+    })
+    expect(screen.getByTestId('property-card-p1').textContent).toContain('100 High St')
+  })
+
   it('renders address, parcel, city for each row', async function () {
     mockApiFetch.mockResolvedValue([makeRow({ id: 'p3', address: '55 Elm Rd', parcel_number: '010-999', city: 'Dublin' })])
     render(React.createElement(PropertiesPage))
@@ -145,9 +166,9 @@ describe('PropertiesPage', function () {
     await waitFor(function () {
       expect(screen.getByTestId('property-row-p3')).toBeTruthy()
     })
-    expect(screen.getByText('55 Elm Rd')).toBeTruthy()
-    expect(screen.getByText('010-999')).toBeTruthy()
-    expect(screen.getByText('Dublin')).toBeTruthy()
+    expect(screen.getAllByText('55 Elm Rd').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('010-999').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Dublin').length).toBeGreaterThan(0)
   })
 
   it('address is a link to /properties/[id]', async function () {
@@ -155,9 +176,9 @@ describe('PropertiesPage', function () {
     render(React.createElement(PropertiesPage))
     fireEvent.click(screen.getByTestId('property-search-btn'))
     await waitFor(function () {
-      expect(screen.getByText('77 Pine Blvd')).toBeTruthy()
+      expect(screen.getAllByText('77 Pine Blvd').length).toBeGreaterThan(0)
     })
-    const link = screen.getByText('77 Pine Blvd').closest('a')
+    const link = screen.getAllByText('77 Pine Blvd')[0].closest('a')
     expect(link?.getAttribute('href')).toBe('/properties/p4')
   })
 

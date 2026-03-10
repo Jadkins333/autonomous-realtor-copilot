@@ -130,6 +130,7 @@ describe('SourcesPage', function () {
     await waitFor(function () {
       expect(screen.getByTestId('source-card-franklin_auditor')).toBeTruthy()
     })
+    expect(screen.getByLabelText(/admin actions for franklin_auditor/i)).toBeTruthy()
   })
 
   it('shows state badge for each source', async function () {
@@ -212,6 +213,7 @@ describe('SourcesPage', function () {
     expect(screen.getByTestId('pause-form')).toBeTruthy()
     expect(screen.getByTestId('pause-submit')).toBeTruthy()
     expect(screen.getByTestId('pause-cancel')).toBeTruthy()
+    expect(screen.getByLabelText(/pause reason/i)).toBeTruthy()
   })
 
   it('hides pause form on cancel without calling API', async function () {
@@ -274,6 +276,7 @@ describe('SourcesPage', function () {
       expect(screen.getByTestId('action-message')).toBeTruthy()
     })
     expect(screen.getByTestId('action-message').textContent).toContain('resumed')
+    expect(screen.getByTestId('action-message').getAttribute('aria-live')).toBe('polite')
   })
 
   it('shows last-error text when present', async function () {

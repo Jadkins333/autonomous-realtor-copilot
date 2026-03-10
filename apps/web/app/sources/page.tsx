@@ -192,6 +192,14 @@ export default function SourcesPage() {
   }
 
   const driftCount = items.filter((item) => item.drift_detected).length;
+  const pausedCount = items.filter((item) => item.state === "paused").length;
+  const reviewCount = items.filter(
+    (item) =>
+      item.state !== "ok" || item.is_stale || item.drift_detected || item.dlq_count > 0
+  ).length;
+  const healthyCount = items.filter(
+    (item) => item.state === "ok" && !item.is_stale && !item.drift_detected && item.dlq_count === 0
+  ).length;
 
   return (
     <SiteShell>
@@ -246,6 +254,8 @@ export default function SourcesPage() {
           <p
             className="text-sm text-muted-foreground"
             data-testid="action-message"
+            role="status"
+            aria-live="polite"
           >
             {actionMessage}
           </p>
@@ -279,6 +289,21 @@ export default function SourcesPage() {
           />
         ) : (
           <div className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="detail-item">
+                <p className="detail-item-label">Healthy sources</p>
+                <p className="detail-item-value">{healthyCount}</p>
+              </div>
+              <div className="detail-item">
+                <p className="detail-item-label">Needs review</p>
+                <p className="detail-item-value">{reviewCount}</p>
+              </div>
+              <div className="detail-item">
+                <p className="detail-item-label">Paused</p>
+                <p className="detail-item-value">{pausedCount}</p>
+              </div>
+            </div>
+
             {items.map((item) => (
               <Card
                 key={item.source_name}
@@ -351,7 +376,11 @@ export default function SourcesPage() {
                     ) : null}
                   </div>
 
-                  <div className="w-full max-w-xl space-y-3 rounded-[24px] border border-border/70 bg-card-muted/75 p-4">
+                  <div
+                    className="w-full max-w-xl space-y-3 rounded-[24px] border border-border/70 bg-card-muted/75 p-4"
+                    role="region"
+                    aria-label={`Admin actions for ${item.source_name}`}
+                  >
                     <div className="flex items-center gap-3">
                       <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                         {item.drift_detected ? (
@@ -370,17 +399,25 @@ export default function SourcesPage() {
 
                     {pausingSource === item.source_name ? (
                       <div className="space-y-3" data-testid="pause-form">
-                        <Input
-                          ref={pauseInputRef}
-                          placeholder="Pause reason"
-                          value={pauseReason}
-                          onChange={(e) => setPauseReason(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter")
-                              void submitPause(item.source_name);
-                            if (e.key === "Escape") setPausingSource(null);
-                          }}
-                        />
+                        <label className="space-y-2">
+                          <span className="section-label">Pause reason</span>
+                          <Input
+                            ref={pauseInputRef}
+                            aria-label="Pause reason"
+                            placeholder="Pause reason"
+                            value={pauseReason}
+                            onChange={(e) => setPauseReason(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter")
+                                void submitPause(item.source_name);
+                              if (e.key === "Escape") setPausingSource(null);
+                            }}
+                          />
+                        </label>
+                        <p className="text-sm text-muted-foreground">
+                          Pauses and replays stay manual. Nothing auto-recovers
+                          or overrides deterministic source status.
+                        </p>
                         <div className="flex flex-wrap gap-2">
                           <Button
                             variant="outline"

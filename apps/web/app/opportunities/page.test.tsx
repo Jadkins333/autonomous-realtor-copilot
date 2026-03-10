@@ -133,6 +133,14 @@ describe('OpportunitiesPage', function () {
     expect(screen.getByTestId('opportunities-loading')).toBeTruthy()
   })
 
+  it('describes deterministic opportunity scoring in the page header', async function () {
+    mockApiFetch.mockResolvedValue({ status: 'ok', model_version: 'v1', items: [] })
+    render(React.createElement(OpportunitiesPage))
+    await waitFor(function () {
+      expect(screen.getByText(/ai does not score these parcels/i)).toBeTruthy()
+    })
+  })
+
   it('shows empty state when no items pass the filter', async function () {
     mockApiFetch.mockResolvedValue({ status: 'ok', model_version: 'v1', items: [] })
     render(React.createElement(OpportunitiesPage))
@@ -197,8 +205,22 @@ describe('OpportunitiesPage', function () {
     const slider = screen.getByRole('slider')
     fireEvent.change(slider, { target: { value: '50' } })
 
+    expect(screen.getByTestId('heat-filter-output').textContent).toContain('50')
     expect(screen.queryByTestId('opportunity-card-low')).toBeNull()
     expect(screen.getByTestId('opportunity-card-high')).toBeTruthy()
+  })
+
+  it('renders a summary card for the filtered opportunity set', async function () {
+    mockApiFetch.mockResolvedValue({
+      status: 'ok',
+      model_version: 'v1',
+      items: [makeItem({ parcel_id: 'parcel-001' }), makeItem({ parcel_id: 'parcel-002' })],
+    })
+    render(React.createElement(OpportunitiesPage))
+    await waitFor(function () {
+      expect(screen.getByTestId('opportunities-summary-card')).toBeTruthy()
+    })
+    expect(screen.getByTestId('opportunities-summary-card').textContent).toContain('2 shown')
   })
 
   it('shows opportunity flags as badges', async function () {

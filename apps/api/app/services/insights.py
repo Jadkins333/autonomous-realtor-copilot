@@ -31,6 +31,57 @@ def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
 
 
+def build_renovation_project_estimates(
+    *,
+    roi_band: str,
+    property_type: str,
+    permit_mix: dict,
+) -> list[dict]:
+    templates = {
+        "Kitchen": {"low": (3, 6), "medium": (6, 11), "high": (10, 15)},
+        "Bath": {"low": (2, 5), "medium": (5, 10), "high": (8, 13)},
+        "Paint": {"low": (1, 3), "medium": (3, 6), "high": (5, 8)},
+        "Curb appeal": {"low": (2, 4), "medium": (4, 8), "high": (6, 10)},
+        "Flooring": {"low": (2, 5), "medium": (4, 8), "high": (6, 11)},
+    }
+
+    activity_level = sum(int(value) for value in permit_mix.values()) if isinstance(permit_mix, dict) else 0
+    confidence = "high" if activity_level >= 8 and property_type in {"single_family", "condo"} else (
+        "medium" if activity_level >= 3 else "low"
+    )
+    base_rationale = (
+        "Neighborhood permit mix shows active remodel work."
+        if activity_level
+        else "Local permit mix is sparse, so treat these ranges as directional rather than decisive."
+    )
+    property_note = (
+        "Single-family resale patterns in the current fixture set reward functional upgrades first."
+        if property_type == "single_family"
+        else "The current property type mix favors lighter, liquidity-friendly upgrades."
+    )
+
+    estimates = []
+    for project, bands in templates.items():
+        low, high = bands.get(roi_band, bands["low"])
+        if activity_level >= 8 and project in {"Kitchen", "Bath"}:
+            low += 1
+            high += 2
+        elif activity_level == 0:
+            low = max(0, low - 1)
+            high = max(low + 1, high - 2)
+
+        estimates.append(
+            {
+                "project": project,
+                "roi_range": f"{low}-{high}% estimated ROI range",
+                "confidence": confidence,
+                "rationale": f"{base_rationale} {property_note}",
+            }
+        )
+
+    return estimates
+
+
 def compute_nowcast_score_components(
     *,
     permits_per_100_parcels_90d: float,
@@ -456,6 +507,15 @@ def compute_parcel_insights(db: Session, tenant_id: UUID, parcel_id: UUID) -> di
             "medium": "5-12% listing-premium potential",
             "high": "12-20% listing-premium potential",
         },
+        "project_estimates": build_renovation_project_estimates(
+            roi_band=roi_band,
+            property_type=property_type,
+            permit_mix=permit_mix,
+        ),
+        "assumptions": [
+            "Ranges come from the deterministic ROI band, property type, and nearby permit mix.",
+            "These ranges are directional, not guaranteed sale-price outcomes.",
+        ],
     }
     renovation_inputs = {
         "property_type": {"value": property_type, "fields": ["parcels.attributes_json.property_type"], "ids": [str(parcel.id)]},

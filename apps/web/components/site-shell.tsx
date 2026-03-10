@@ -165,7 +165,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
                               "mt-0.5 block text-[0.73rem] leading-5",
                               active
                                 ? "text-slate-500"
-                                : "text-sidebar-foreground/50"
+                                : "text-sidebar-foreground/65"
                             )}
                           >
                             {item.description}
@@ -271,13 +271,11 @@ export function SiteShell({ children }: { children: ReactNode }) {
               </nav>
             </div>
           </header>
-
-          <div className="space-y-3">
-            <OfflineBanner />
-            <FixtureModeBanner />
-          </div>
-
           <main id="main-content" tabIndex={-1} className="pb-10 pt-4">
+            <div className="space-y-3">
+              <OfflineBanner />
+              <FixtureModeBanner />
+            </div>
             {children}
           </main>
         </div>

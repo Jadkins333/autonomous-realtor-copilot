@@ -92,9 +92,25 @@ function makeParcel(overrides: Record<string, unknown> = {}) {
     nearby_pois: [],
     timeline: [],
     insights: {
-      renovation_roi: { value: { roi_band: 'medium', guidance: 'Good bones.' }, formula_markdown: '# ROI', inputs: {}, provenance: {} },
+      renovation_roi: {
+        value: {
+          roi_band: 'medium',
+          guidance: 'Good bones.',
+          project_estimates: [
+            { project: 'Kitchen', roi_range: '6-11% estimated ROI range', confidence: 'medium', rationale: 'Neighborhood permit mix shows active remodel work.' },
+            { project: 'Bath', roi_range: '5-10% estimated ROI range', confidence: 'medium', rationale: 'Neighborhood permit mix shows active remodel work.' },
+          ],
+        },
+        formula_markdown: '# ROI',
+        inputs: {},
+        provenance: {},
+        computed_at: '2026-03-10T14:00:00Z',
+        freshness: { staleness: 'fresh', fetched_at: '2026-03-10T13:30:00Z' },
+      },
       insurance_pressure: { value: { pressure_level: 'low', note: 'Low risk area.' } },
     },
+    provenance: { raw_url: 'seed://parcels', freshness: { staleness: 'fresh', fetched_at: '2026-03-10T13:00:00Z' } },
+    updated_at: '2026-03-10T14:00:00Z',
     ...overrides,
   }
 }
@@ -120,6 +136,15 @@ describe('PropertyDetailPage', function () {
     expect(screen.getByText('123 Main St')).toBeTruthy()
   })
 
+  it('describes deterministic parcel and provenance-backed insights in the header', async function () {
+    mockApiFetch.mockResolvedValue(makeParcel())
+    render(React.createElement(PropertyDetailPage))
+    await waitFor(function () {
+      expect(screen.getByText(/deterministic parcel record/i)).toBeTruthy()
+    })
+    expect(screen.getByText(/insight cards explain saved parcel inputs/i)).toBeTruthy()
+  })
+
   it('renders permits, flood, and transit badges', async function () {
     mockApiFetch.mockResolvedValue(makeParcel())
     render(React.createElement(PropertyDetailPage))
@@ -129,6 +154,15 @@ describe('PropertyDetailPage', function () {
     expect(screen.getByTestId('flood-intersects-badge')).toBeTruthy()
     expect(screen.getByTestId('flood-zone-badge')).toBeTruthy()
     expect(screen.getByTestId('transit-badge')).toBeTruthy()
+  })
+
+  it('renders a property facts summary card for quick operator scanning', async function () {
+    mockApiFetch.mockResolvedValue(makeParcel())
+    render(React.createElement(PropertyDetailPage))
+    await waitFor(function () {
+      expect(screen.getByTestId('property-facts-card')).toBeTruthy()
+    })
+    expect(screen.getByTestId('property-facts-card').textContent).toContain('Permits')
   })
 
   it('shows permit count in badge', async function () {
@@ -146,6 +180,7 @@ describe('PropertyDetailPage', function () {
       expect(screen.getByTestId('map-card')).toBeTruthy()
     })
     expect(screen.getByTestId('property-map')).toBeTruthy()
+    expect(screen.getByLabelText(/property map/i)).toBeTruthy()
   })
 
   it('shows POIs when present', async function () {
@@ -157,6 +192,7 @@ describe('PropertyDetailPage', function () {
       expect(screen.getByTestId('poi-item-Coffee Shop')).toBeTruthy()
     })
     expect(screen.getByText(/Coffee Shop/)).toBeTruthy()
+    expect(screen.getByLabelText(/nearby points of interest/i)).toBeTruthy()
   })
 
   it('shows POI empty state when no POIs', async function () {
@@ -175,6 +211,26 @@ describe('PropertyDetailPage', function () {
     })
     expect(screen.getByText(/medium/)).toBeTruthy()
     expect(screen.getByText(/Good bones/)).toBeTruthy()
+  })
+
+  it('renders a renovation ROI planner with project estimates', async function () {
+    mockApiFetch.mockResolvedValue(makeParcel())
+    render(React.createElement(PropertyDetailPage))
+    await waitFor(function () {
+      expect(screen.getByTestId('roi-estimator-card')).toBeTruthy()
+    })
+    expect(screen.getByText(/Kitchen/)).toBeTruthy()
+    expect(screen.getByText(/6-11% estimated ROI range/)).toBeTruthy()
+  })
+
+  it('shows verified record trust copy for parcel facts', async function () {
+    mockApiFetch.mockResolvedValue(makeParcel())
+    render(React.createElement(PropertyDetailPage))
+    await waitFor(function () {
+      expect(screen.getByTestId('record-trust-card')).toBeTruthy()
+    })
+    expect(screen.getByText(/verified record/i)).toBeTruthy()
+    expect(screen.getByText(/source freshness/i)).toBeTruthy()
   })
 
   it('renders insurance pressure insight card', async function () {
@@ -201,6 +257,7 @@ describe('PropertyDetailPage', function () {
     expect(screen.getByTestId('timeline-event-sale')).toBeTruthy()
     expect(screen.getByText('Permit Issued')).toBeTruthy()
     expect(screen.getByText('Property Sale')).toBeTruthy()
+    expect(screen.getByLabelText(/property timeline/i)).toBeTruthy()
   })
 
   it('shows timeline empty state when no events', async function () {

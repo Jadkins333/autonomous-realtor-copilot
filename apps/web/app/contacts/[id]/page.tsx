@@ -530,7 +530,12 @@ export default function ContactDetailPage() {
                 ))}
               </div>
 
-              <div className="table-shell hidden overflow-x-auto md:block">
+              <div
+                className="table-shell hidden overflow-x-auto md:block"
+                tabIndex={0}
+                role="region"
+                aria-label="Contact message history table"
+              >
                 <Table data-testid="messages-table">
                   <thead>
                     <tr>

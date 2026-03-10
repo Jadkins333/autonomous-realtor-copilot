@@ -18,15 +18,22 @@ export function PropertyMap({ lon, lat }: { lon: number; lat: number }) {
       container: containerRef.current,
       style: "https://demotiles.maplibre.org/style.json",
       center: [safeLon, safeLat],
-      zoom: 13
+      zoom: 13,
+      interactive: false,
     });
-
-    new maplibregl.Marker({ color: "#ea580c" }).setLngLat([safeLon, safeLat]).addTo(map);
 
     return () => {
       map.remove();
     };
   }, [safeLon, safeLat]);
 
-  return <div className="h-64 w-full overflow-hidden rounded-2xl border" ref={containerRef} />;
+  return (
+    <div className="relative h-64 w-full overflow-hidden rounded-2xl border">
+      <div className="h-full w-full" ref={containerRef} />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-primary shadow-[0_0_0_6px_rgba(234,88,12,0.22)]"
+      />
+    </div>
+  );
 }

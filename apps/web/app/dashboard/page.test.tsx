@@ -86,7 +86,14 @@ describe('DashboardPage', function () {
   })
 
   it('shows tour card when tour not dismissed', async function () {
-    mockApiFetch.mockResolvedValue({})
+    mockApiFetch.mockResolvedValue({
+      overview: { verified_label: 'Deterministic digest', parcels: 42, messages: 12, drafts: 3 },
+      urgent_tasks: [],
+      market_shift: { status: 'ok', score_0_100: 61.5, freshness: { staleness: 'fresh' }, drivers: [] },
+      client_milestones: [],
+      follow_up_opportunities: [],
+      conversation_starters: { label: 'Verified talking points', verified_facts: [], variants: [], ai_generated: false },
+    })
     render(React.createElement(DashboardPage))
     await waitFor(function () {
       expect(screen.getByTestId('tour-card')).toBeTruthy()
@@ -94,7 +101,14 @@ describe('DashboardPage', function () {
   })
 
   it('hides tour card after dismiss click', async function () {
-    mockApiFetch.mockResolvedValue({})
+    mockApiFetch.mockResolvedValue({
+      overview: { verified_label: 'Deterministic digest', parcels: 42, messages: 12, drafts: 3 },
+      urgent_tasks: [],
+      market_shift: { status: 'ok', score_0_100: 61.5, freshness: { staleness: 'fresh' }, drivers: [] },
+      client_milestones: [],
+      follow_up_opportunities: [],
+      conversation_starters: { label: 'Verified talking points', verified_facts: [], variants: [], ai_generated: false },
+    })
     render(React.createElement(DashboardPage))
     await waitFor(function () {
       expect(screen.getByTestId('dismiss-tour-btn')).toBeTruthy()
@@ -106,84 +120,88 @@ describe('DashboardPage', function () {
 
   it('hides tour card when already dismissed in localStorage', async function () {
     localStorage.setItem('tour_mode_dismissed', 'true')
-    mockApiFetch.mockResolvedValue({})
+    mockApiFetch.mockResolvedValue({
+      overview: { verified_label: 'Deterministic digest', parcels: 42, messages: 12, drafts: 3 },
+      urgent_tasks: [],
+      market_shift: { status: 'ok', score_0_100: 61.5, freshness: { staleness: 'fresh' }, drivers: [] },
+      client_milestones: [],
+      follow_up_opportunities: [],
+      conversation_starters: { label: 'Verified talking points', verified_facts: [], variants: [], ai_generated: false },
+    })
     render(React.createElement(DashboardPage))
     await waitFor(function () {
-      expect(screen.getByTestId('sources-health-card')).toBeTruthy()
+      expect(screen.getByTestId('daily-digest-card')).toBeTruthy()
     })
     expect(screen.queryByTestId('tour-card')).toBeNull()
   })
 
-  it('renders three feature info cards', async function () {
-    mockApiFetch.mockResolvedValue({})
+  it('renders the proactive daily digest and trust framing', async function () {
+    mockApiFetch.mockResolvedValue({
+      generated_at: '2026-03-10T14:00:00Z',
+      verified_at: '2026-03-10T14:00:00Z',
+      overview: { verified_label: 'Deterministic digest', parcels: 42, messages: 12, drafts: 3 },
+      urgent_tasks: [{ title: '1 source requires review', detail: 'franklin_auditor is stale', href: '/sources', severity: 'warning' }],
+      market_shift: {
+        status: 'ok',
+        score_0_100: 61.5,
+        freshness: { staleness: 'fresh', fetched_at: '2026-03-10T13:50:00Z' },
+        drivers: [{ label: 'Permit momentum', value: 'moderate' }],
+      },
+      client_milestones: [],
+      follow_up_opportunities: [],
+      conversation_starters: {
+        label: 'Verified talking points',
+        verified_facts: ['Permit momentum is moderate.'],
+        variants: [{ tone: 'email', text: 'We are seeing moderate permit momentum in your area this month.' }],
+        ai_generated: false,
+      },
+    })
     render(React.createElement(DashboardPage))
     await waitFor(function () {
-      expect(screen.getByTestId('demo-mode-card')).toBeTruthy()
+      expect(screen.getByTestId('daily-digest-card')).toBeTruthy()
     })
-    expect(screen.getByTestId('connectors-card')).toBeTruthy()
-    expect(screen.getByTestId('truth-layer-card')).toBeTruthy()
+    expect(screen.getByTestId('market-shift-card')).toBeTruthy()
+    expect(screen.getByTestId('conversation-starters-card')).toBeTruthy()
+    expect(screen.getByText(/deterministic digest/i)).toBeTruthy()
   })
 
-  it('renders sources health card', async function () {
-    mockApiFetch.mockResolvedValue({})
+  it('renders urgent tasks and opportunity follow-ups', async function () {
+    mockApiFetch.mockResolvedValue({
+      overview: { verified_label: 'Deterministic digest', parcels: 42, messages: 12, drafts: 3 },
+      urgent_tasks: [{ title: '1 source requires review', detail: 'franklin_auditor is stale', href: '/sources', severity: 'warning' }],
+      market_shift: { status: 'ok', score_0_100: 61.5, freshness: { staleness: 'fresh' }, drivers: [] },
+      client_milestones: [{ contact_id: 'c1', contact_name: 'Ava Agent', detail: 'Reply is waiting', href: '/contacts/c1', kind: 'reply_needed' }],
+      follow_up_opportunities: [{ parcel_id: 'p1', address: '145 N High St', heat_score: 72, distress_score: 0.58, href: '/properties/p1' }],
+      conversation_starters: { label: 'Verified talking points', verified_facts: [], variants: [], ai_generated: false },
+    })
     render(React.createElement(DashboardPage))
     await waitFor(function () {
-      expect(screen.getByTestId('sources-health-card')).toBeTruthy()
+      expect(screen.getByTestId('urgent-tasks-card')).toBeTruthy()
     })
+    expect(screen.getByTestId('follow-up-opportunities-card')).toBeTruthy()
+    expect(screen.getByText('145 N High St')).toBeTruthy()
   })
 
-  it('shows ok/partial/failed/stale badges from sources status', async function () {
-    mockApiFetch
-      .mockResolvedValueOnce({}) // /metrics
-      .mockResolvedValueOnce({
-        items: [
-          { source_name: 'a', state: 'ok', drift_detected: false, is_stale: false },
-          { source_name: 'b', state: 'partial', drift_detected: false, is_stale: true },
-          { source_name: 'c', state: 'failed', drift_detected: false, is_stale: false },
-        ],
-      })
+  it('renders verified talking points with facts', async function () {
+    mockApiFetch.mockResolvedValue({
+      overview: { verified_label: 'Deterministic digest', parcels: 42, messages: 12, drafts: 3 },
+      urgent_tasks: [],
+      market_shift: { status: 'ok', score_0_100: 61.5, freshness: { staleness: 'fresh' }, drivers: [] },
+      client_milestones: [],
+      follow_up_opportunities: [],
+      conversation_starters: {
+        label: 'Verified talking points',
+        verified_facts: ['Permit momentum is moderate.', 'Two opportunity rows are above the current heat threshold.'],
+        variants: [{ tone: 'email', text: 'We are seeing moderate permit momentum in your area this month.' }],
+        ai_generated: false,
+      },
+    })
     render(React.createElement(DashboardPage))
     await waitFor(function () {
-      expect(screen.getByTestId('ok-badge')).toBeTruthy()
+      expect(screen.getByTestId('conversation-starters-card')).toBeTruthy()
     })
-    expect(screen.getByTestId('partial-badge')).toBeTruthy()
-    expect(screen.getByTestId('failed-badge')).toBeTruthy()
-    expect(screen.getByTestId('stale-badge')).toBeTruthy()
-  })
-
-  it('shows drift alert when a source has drift', async function () {
-    mockApiFetch
-      .mockResolvedValueOnce({})
-      .mockResolvedValueOnce({
-        items: [
-          { source_name: 'franklin_auditor', state: 'partial', drift_detected: true, is_stale: false },
-        ],
-      })
-    render(React.createElement(DashboardPage))
-    await waitFor(function () {
-      expect(screen.getByTestId('drift-alert')).toBeTruthy()
-    })
-    expect(screen.getByTestId('drift-alert').textContent).toContain('franklin_auditor')
-  })
-
-  it('shows no-sources message when items list is empty', async function () {
-    mockApiFetch
-      .mockResolvedValueOnce({})
-      .mockResolvedValueOnce({ items: [] })
-    render(React.createElement(DashboardPage))
-    await waitFor(function () {
-      expect(screen.getByTestId('no-sources')).toBeTruthy()
-    })
-  })
-
-  it('renders metrics card', async function () {
-    mockApiFetch
-      .mockResolvedValueOnce({ total_parcels: 42 })
-      .mockResolvedValueOnce({ items: [] })
-    render(React.createElement(DashboardPage))
-    await waitFor(function () {
-      expect(screen.getByTestId('metrics-card')).toBeTruthy()
-    })
+    expect(screen.getByText(/permit momentum is moderate/i)).toBeTruthy()
+    expect(screen.getByText(/we are seeing moderate permit momentum/i)).toBeTruthy()
   })
 
   it('returns null when not authenticated', async function () {

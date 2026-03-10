@@ -575,6 +575,8 @@ export default function SetupPage() {
             <pre
               className="mt-4 overflow-auto rounded-[24px] border border-border/70 bg-card-muted/80 p-4 text-xs text-foreground"
               data-testid="diagnostics-pre"
+              tabIndex={0}
+              aria-label="System diagnostics JSON"
             >
               {JSON.stringify(diagnostics, null, 2)}
             </pre>

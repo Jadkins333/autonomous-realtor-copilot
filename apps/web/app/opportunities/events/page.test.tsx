@@ -125,6 +125,25 @@ describe('OpportunityEventsPage', function () {
     })
   })
 
+  it('describes deterministic event feed behavior in the page header', async function () {
+    mockApiFetch.mockResolvedValue({ status: 'ok', filters: {}, items: [] })
+    render(React.createElement(OpportunityEventsPage))
+    await waitFor(function () {
+      expect(screen.getByText(/ai does not generate these event rows/i)).toBeTruthy()
+    })
+  })
+
+  it('labels event filters with explicit form copy', async function () {
+    mockApiFetch.mockResolvedValue({ status: 'ok', filters: {}, items: [] })
+    render(React.createElement(OpportunityEventsPage))
+    await waitFor(function () {
+      expect(mockApiFetch).toHaveBeenCalledTimes(1)
+    })
+    expect(screen.getByLabelText(/event severity filter/i)).toBeTruthy()
+    expect(screen.getByLabelText(/lookback days/i)).toBeTruthy()
+    expect(screen.getByLabelText(/opportunity event filters/i)).toBeTruthy()
+  })
+
   it('renders an event card for each event', async function () {
     mockApiFetch.mockResolvedValue({
       status: 'ok',
@@ -136,6 +155,20 @@ describe('OpportunityEventsPage', function () {
       expect(screen.getByTestId('event-card-evt-001')).toBeTruthy()
     })
     expect(screen.getByTestId('event-card-evt-002')).toBeTruthy()
+  })
+
+  it('renders a summary card for the filtered event set', async function () {
+    mockApiFetch.mockResolvedValue({
+      status: 'ok',
+      filters: {},
+      items: [makeEvent({ id: 'evt-001' }), makeEvent({ id: 'evt-002' })],
+    })
+    render(React.createElement(OpportunityEventsPage))
+    await waitFor(function () {
+      expect(screen.getByTestId('events-summary-card')).toBeTruthy()
+    })
+    expect(screen.getByTestId('events-summary-card').textContent).toContain('2 events')
+    expect(screen.getByTestId('events-summary-status').getAttribute('role')).toBe('status')
   })
 
   it('renders event type with underscores replaced by spaces', async function () {
@@ -171,7 +204,7 @@ describe('OpportunityEventsPage', function () {
       expect(mockApiFetch).toHaveBeenCalledTimes(1)
     })
 
-    const daysInput = screen.getByPlaceholderText('Days')
+    const daysInput = screen.getByLabelText(/lookback days/i)
     fireEvent.change(daysInput, { target: { value: '7' } })
 
     await waitFor(function () {
@@ -181,6 +214,12 @@ describe('OpportunityEventsPage', function () {
     expect(lastCall).toContain('days=7')
   })
 
+  it('marks the event list busy while loading', function () {
+    mockApiFetch.mockReturnValue(new Promise(function () { return }))
+    render(React.createElement(OpportunityEventsPage))
+    expect(screen.getByTestId('events-list').getAttribute('aria-busy')).toBe('true')
+  })
+
   it('re-fetches when severity filter changes', async function () {
     mockApiFetch.mockResolvedValue({ status: 'ok', filters: {}, items: [] })
     render(React.createElement(OpportunityEventsPage))
@@ -188,7 +227,7 @@ describe('OpportunityEventsPage', function () {
       expect(mockApiFetch).toHaveBeenCalledTimes(1)
     })
 
-    const severityInput = screen.getByPlaceholderText('Severity (optional)')
+    const severityInput = screen.getByLabelText(/event severity filter/i)
     fireEvent.change(severityInput, { target: { value: 'high' } })
 
     await waitFor(function () {

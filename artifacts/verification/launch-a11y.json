@@ -1,0 +1,929 @@
+{
+  "generated_at": "2026-03-10T14:23:37.183Z",
+  "base_url": "http://localhost:3138",
+  "totals": {
+    "routes_scanned": 9,
+    "violations": 30
+  },
+  "results": [
+    {
+      "route": "dashboard",
+      "path": "/dashboard",
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/color-contrast?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"setup\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Environment readiness and diagnostics.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"sources\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Connector health, drift status, and replay controls.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"opportunities\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Lead discovery and market pressure signals.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"copilot\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Agent workflows and command execution.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"properties\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Parcel intelligence, maps, and insight cards.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"contacts\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Relationship memory, message history, and enrollments.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"outreach\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Draft packs, approvals, and follow-up.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        },
+        {
+          "id": "heading-order",
+          "impact": "moderate",
+          "description": "Ensure the order of headings is semantically correct",
+          "help": "Heading levels should only increase by one",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/heading-order?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".space-y-2 > h3"
+              ],
+              "html": "<h3 class=\"font-heading text-[1.15rem] font-semibold leading-tight tracking-[-0.03em] text-foreground\">Tour Mode</h3>",
+              "failureSummary": "Fix any of the following:\n  Heading order invalid"
+            }
+          ]
+        },
+        {
+          "id": "region",
+          "impact": "moderate",
+          "description": "Ensure all page content is contained by landmarks",
+          "help": "All page content should be contained by landmarks",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/region?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".min-w-0.flex-1 > .space-y-3"
+              ],
+              "html": "<div class=\"space-y-3\"><div class=\"mb-3 rounded-xl border border-amber-400/30 bg-amber-200/10 px-3 py-2 text-sm text-amber-100\">Fixture mode: demo data in use. Live sources not connected.</div></div>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            }
+          ]
+        },
+        {
+          "id": "scrollable-region-focusable",
+          "impact": "serious",
+          "description": "Ensure elements that have scrollable content are accessible by keyboard",
+          "help": "Scrollable region must have keyboard access",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/scrollable-region-focusable?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                "pre"
+              ],
+              "html": "<pre class=\"mt-5 overflow-auto rounded-[22px] border border-border/70 bg-slate-950 px-4 py-4 text-xs leading-6 text-slate-100\">",
+              "failureSummary": "Fix any of the following:\n  Element should have focusable content\n  Element should be focusable"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "route": "contacts",
+      "path": "/contacts",
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/color-contrast?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"dashboard\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">High-signal view of health, activity, and system posture.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"setup\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Environment readiness and diagnostics.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"sources\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Connector health, drift status, and replay controls.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"opportunities\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Lead discovery and market pressure signals.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"copilot\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Agent workflows and command execution.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"properties\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Parcel intelligence, maps, and insight cards.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"outreach\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Draft packs, approvals, and follow-up.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        },
+        {
+          "id": "heading-order",
+          "impact": "moderate",
+          "description": "Ensure the order of headings is semantically correct",
+          "help": "Heading levels should only increase by one",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/heading-order?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".gap-4.items-start.justify-between > div:nth-child(1) > h3"
+              ],
+              "html": "<h3 class=\"font-heading text-[1.15rem] font-semibold leading-tight tracking-[-0.03em] text-foreground mt-2\">Create Contact</h3>",
+              "failureSummary": "Fix any of the following:\n  Heading order invalid"
+            }
+          ]
+        },
+        {
+          "id": "region",
+          "impact": "moderate",
+          "description": "Ensure all page content is contained by landmarks",
+          "help": "All page content should be contained by landmarks",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/region?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".flex-1.min-w-0 > .space-y-3"
+              ],
+              "html": "<div class=\"space-y-3\"><div class=\"mb-3 rounded-xl border border-amber-400/30 bg-amber-200/10 px-3 py-2 text-sm text-amber-100\">Fixture mode: demo data in use. Live sources not connected.</div></div>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "route": "contact-detail",
+      "path": "/contacts",
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/color-contrast?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"dashboard\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">High-signal view of health, activity, and system posture.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"setup\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Environment readiness and diagnostics.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"sources\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Connector health, drift status, and replay controls.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"opportunities\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Lead discovery and market pressure signals.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"copilot\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Agent workflows and command execution.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"properties\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Parcel intelligence, maps, and insight cards.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"outreach\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Draft packs, approvals, and follow-up.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        },
+        {
+          "id": "heading-order",
+          "impact": "moderate",
+          "description": "Ensure the order of headings is semantically correct",
+          "help": "Heading levels should only increase by one",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/heading-order?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".text-\\[1\\.15rem\\]"
+              ],
+              "html": "<h3 class=\"font-heading text-[1.15rem] font-semibold leading-tight tracking-[-0.03em] text-foreground mt-2\">Contact overview</h3>",
+              "failureSummary": "Fix any of the following:\n  Heading order invalid"
+            }
+          ]
+        },
+        {
+          "id": "region",
+          "impact": "moderate",
+          "description": "Ensure all page content is contained by landmarks",
+          "help": "All page content should be contained by landmarks",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/region?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".min-w-0.flex-1 > .space-y-3"
+              ],
+              "html": "<div class=\"space-y-3\"><div class=\"mb-3 rounded-xl border border-amber-400/30 bg-amber-200/10 px-3 py-2 text-sm text-amber-100\">Fixture mode: demo data in use. Live sources not connected.</div></div>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            }
+          ]
+        },
+        {
+          "id": "scrollable-region-focusable",
+          "impact": "serious",
+          "description": "Ensure elements that have scrollable content are accessible by keyboard",
+          "help": "Scrollable region must have keyboard access",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/scrollable-region-focusable?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".table-shell"
+              ],
+              "html": "<div class=\"table-shell hidden overflow-x-auto md:block\">",
+              "failureSummary": "Fix any of the following:\n  Element should have focusable content\n  Element should be focusable"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "route": "properties",
+      "path": "/properties",
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/color-contrast?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"dashboard\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">High-signal view of health, activity, and system posture.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"setup\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Environment readiness and diagnostics.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"sources\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Connector health, drift status, and replay controls.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"opportunities\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Lead discovery and market pressure signals.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"copilot\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Agent workflows and command execution.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"contacts\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Relationship memory, message history, and enrollments.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"outreach\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Draft packs, approvals, and follow-up.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        },
+        {
+          "id": "heading-order",
+          "impact": "moderate",
+          "description": "Ensure the order of headings is semantically correct",
+          "help": "Heading levels should only increase by one",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/heading-order?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".relative.px-5.py-5:nth-child(1) > .section-heading > .section-heading-copy > .text-\\[1\\.15rem\\].leading-tight"
+              ],
+              "html": "<h3 class=\"font-heading text-[1.15rem] font-semibold leading-tight tracking-[-0.03em] text-foreground\">Authoritative property lookup</h3>",
+              "failureSummary": "Fix any of the following:\n  Heading order invalid"
+            }
+          ]
+        },
+        {
+          "id": "region",
+          "impact": "moderate",
+          "description": "Ensure all page content is contained by landmarks",
+          "help": "All page content should be contained by landmarks",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/region?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".min-w-0.flex-1 > .space-y-3"
+              ],
+              "html": "<div class=\"space-y-3\"><div class=\"mb-3 rounded-xl border border-amber-400/30 bg-amber-200/10 px-3 py-2 text-sm text-amber-100\">Fixture mode: demo data in use. Live sources not connected.</div></div>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "route": "opportunities",
+      "path": "/opportunities",
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/color-contrast?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"dashboard\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">High-signal view of health, activity, and system posture.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"setup\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Environment readiness and diagnostics.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"sources\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Connector health, drift status, and replay controls.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"copilot\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Agent workflows and command execution.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"properties\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Parcel intelligence, maps, and insight cards.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"contacts\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Relationship memory, message history, and enrollments.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"outreach\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Draft packs, approvals, and follow-up.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        },
+        {
+          "id": "heading-order",
+          "impact": "moderate",
+          "description": "Ensure the order of headings is semantically correct",
+          "help": "Heading levels should only increase by one",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/heading-order?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".section-heading-copy > h3"
+              ],
+              "html": "<h3 class=\"font-heading text-[1.15rem] font-semibold leading-tight tracking-[-0.03em] text-foreground\">Opportunity thresholds</h3>",
+              "failureSummary": "Fix any of the following:\n  Heading order invalid"
+            }
+          ]
+        },
+        {
+          "id": "region",
+          "impact": "moderate",
+          "description": "Ensure all page content is contained by landmarks",
+          "help": "All page content should be contained by landmarks",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/region?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".flex-1.min-w-0 > .space-y-3"
+              ],
+              "html": "<div class=\"space-y-3\"><div class=\"mb-3 rounded-xl border border-amber-400/30 bg-amber-200/10 px-3 py-2 text-sm text-amber-100\">Fixture mode: demo data in use. Live sources not connected.</div></div>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "route": "sequences",
+      "path": "/sequences",
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/color-contrast?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".hover\\:border-white\\/10.hover\\:bg-white\\/10[href$=\"dashboard\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">High-signal view of health, activity, and system posture.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".hover\\:border-white\\/10.hover\\:bg-white\\/10[href$=\"setup\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Environment readiness and diagnostics.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".hover\\:border-white\\/10.hover\\:bg-white\\/10[href$=\"sources\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Connector health, drift status, and replay controls.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".hover\\:border-white\\/10.hover\\:bg-white\\/10[href$=\"opportunities\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Lead discovery and market pressure signals.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".hover\\:border-white\\/10.hover\\:bg-white\\/10[href$=\"copilot\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Agent workflows and command execution.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".hover\\:border-white\\/10.hover\\:bg-white\\/10[href$=\"properties\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Parcel intelligence, maps, and insight cards.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".hover\\:border-white\\/10.hover\\:bg-white\\/10[href$=\"contacts\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Relationship memory, message history, and enrollments.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".hover\\:border-white\\/10.hover\\:bg-white\\/10[href$=\"outreach\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Draft packs, approvals, and follow-up.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        },
+        {
+          "id": "heading-order",
+          "impact": "moderate",
+          "description": "Ensure the order of headings is semantically correct",
+          "help": "Heading levels should only increase by one",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/heading-order?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                "div[data-testid=\"sequence-card-annual_checkin\"] > .gap-5.lg\\:flex-row.lg\\:items-start > .min-w-0.flex-1.space-y-3 > .flex-wrap.gap-2.flex:nth-child(1) > h3"
+              ],
+              "html": "<h3 class=\"font-heading font-semibold tracking-[-0.03em] text-foreground text-[1.25rem]\">Annual Home Check-in</h3>",
+              "failureSummary": "Fix any of the following:\n  Heading order invalid"
+            }
+          ]
+        },
+        {
+          "id": "region",
+          "impact": "moderate",
+          "description": "Ensure all page content is contained by landmarks",
+          "help": "All page content should be contained by landmarks",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/region?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".min-w-0.flex-1 > .space-y-3"
+              ],
+              "html": "<div class=\"space-y-3\"><div class=\"mb-3 rounded-xl border border-amber-400/30 bg-amber-200/10 px-3 py-2 text-sm text-amber-100\">Fixture mode: demo data in use. Live sources not connected.</div></div>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "route": "outreach",
+      "path": "/outreach",
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/color-contrast?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"dashboard\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">High-signal view of health, activity, and system posture.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"setup\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Environment readiness and diagnostics.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"sources\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Connector health, drift status, and replay controls.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"opportunities\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Lead discovery and market pressure signals.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"copilot\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Agent workflows and command execution.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"properties\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Parcel intelligence, maps, and insight cards.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"contacts\"] > .min-w-0.flex-1 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Relationship memory, message history, and enrollments.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        },
+        {
+          "id": "heading-order",
+          "impact": "moderate",
+          "description": "Ensure the order of headings is semantically correct",
+          "help": "Heading levels should only increase by one",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/heading-order?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".justify-between > h3"
+              ],
+              "html": "<h3 class=\"font-heading text-[1.15rem] font-semibold leading-tight tracking-[-0.03em] text-foreground\">New Outreach</h3>",
+              "failureSummary": "Fix any of the following:\n  Heading order invalid"
+            }
+          ]
+        },
+        {
+          "id": "region",
+          "impact": "moderate",
+          "description": "Ensure all page content is contained by landmarks",
+          "help": "All page content should be contained by landmarks",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/region?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".min-w-0.flex-1 > .space-y-3"
+              ],
+              "html": "<div class=\"space-y-3\"><div class=\"mb-3 rounded-xl border border-amber-400/30 bg-amber-200/10 px-3 py-2 text-sm text-amber-100\">Fixture mode: demo data in use. Live sources not connected.</div></div>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "route": "copilot",
+      "path": "/copilot",
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/color-contrast?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"dashboard\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">High-signal view of health, activity, and system posture.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"setup\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Environment readiness and diagnostics.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"sources\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Connector health, drift status, and replay controls.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"opportunities\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Lead discovery and market pressure signals.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"properties\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Parcel intelligence, maps, and insight cards.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"contacts\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Relationship memory, message history, and enrollments.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"outreach\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Draft packs, approvals, and follow-up.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        },
+        {
+          "id": "heading-order",
+          "impact": "moderate",
+          "description": "Ensure the order of headings is semantically correct",
+          "help": "Heading levels should only increase by one",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/heading-order?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".relative.px-5.py-5:nth-child(1) > .section-heading > .section-heading-copy > .text-\\[1\\.15rem\\].leading-tight"
+              ],
+              "html": "<h3 class=\"font-heading text-[1.15rem] font-semibold leading-tight tracking-[-0.03em] text-foreground\">Run deterministic workflows</h3>",
+              "failureSummary": "Fix any of the following:\n  Heading order invalid"
+            }
+          ]
+        },
+        {
+          "id": "region",
+          "impact": "moderate",
+          "description": "Ensure all page content is contained by landmarks",
+          "help": "All page content should be contained by landmarks",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/region?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".flex-1.min-w-0 > .space-y-3"
+              ],
+              "html": "<div class=\"space-y-3\"><div class=\"mb-3 rounded-xl border border-amber-400/30 bg-amber-200/10 px-3 py-2 text-sm text-amber-100\">Fixture mode: demo data in use. Live sources not connected.</div></div>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "route": "setup",
+      "path": "/setup",
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/color-contrast?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"dashboard\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">High-signal view of health, activity, and system posture.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"sources\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Connector health, drift status, and replay controls.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"opportunities\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Lead discovery and market pressure signals.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"copilot\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Agent workflows and command execution.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"properties\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Parcel intelligence, maps, and insight cards.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"contacts\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Relationship memory, message history, and enrollments.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-transparent.hover\\:border-white\\/10[href$=\"outreach\"] > .flex-1.min-w-0 > .text-sidebar-foreground\\/50.mt-0\\.5.text-\\[0\\.73rem\\]"
+              ],
+              "html": "<span class=\"mt-0.5 block text-[0.73rem] leading-5 text-sidebar-foreground/50\">Draft packs, approvals, and follow-up.</span>",
+              "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.43 (foreground color: #88909c, background color: #1e2b3e, font size: 8.8pt (11.68px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        },
+        {
+          "id": "heading-order",
+          "impact": "moderate",
+          "description": "Ensure the order of headings is semantically correct",
+          "help": "Heading levels should only increase by one",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/heading-order?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".xl\\:grid-cols-\\[minmax\\(0\\,1\\.15fr\\)\\,minmax\\(0\\,0\\.85fr\\)\\] > .relative.px-5.py-5 > .section-heading > .section-heading-copy > .text-\\[1\\.15rem\\].leading-tight"
+              ],
+              "html": "<h3 class=\"font-heading text-[1.15rem] font-semibold leading-tight tracking-[-0.03em] text-foreground\">Command deck</h3>",
+              "failureSummary": "Fix any of the following:\n  Heading order invalid"
+            }
+          ]
+        },
+        {
+          "id": "region",
+          "impact": "moderate",
+          "description": "Ensure all page content is contained by landmarks",
+          "help": "All page content should be contained by landmarks",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/region?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".flex-1.min-w-0 > .space-y-3"
+              ],
+              "html": "<div class=\"space-y-3\"><div class=\"mb-3 rounded-xl border border-amber-400/30 bg-amber-200/10 px-3 py-2 text-sm text-amber-100\">Fixture mode: demo data in use. Live sources not connected.</div></div>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            }
+          ]
+        },
+        {
+          "id": "scrollable-region-focusable",
+          "impact": "serious",
+          "description": "Ensure elements that have scrollable content are accessible by keyboard",
+          "help": "Scrollable region must have keyboard access",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/scrollable-region-focusable?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                "pre"
+              ],
+              "html": "<pre class=\"mt-4 overflow-auto rounded-[24px] border border-border/70 bg-card-muted/80 p-4 text-xs text-foreground\" data-testid=\"diagnostics-pre\">",
+              "failureSummary": "Fix any of the following:\n  Element should have focusable content\n  Element should be focusable"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
