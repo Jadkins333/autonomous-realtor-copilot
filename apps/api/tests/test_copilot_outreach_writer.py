@@ -36,7 +36,6 @@ def test_outreach_writer_creates_draft_pack_and_excludes_insurance_terms(monkeyp
             "drafts": [
                 SimpleNamespace(id=uuid4(), channel=SimpleNamespace(value="sms")),
                 SimpleNamespace(id=uuid4(), channel=SimpleNamespace(value="email")),
-                SimpleNamespace(id=uuid4(), channel=SimpleNamespace(value="voice")),
             ],
         },
     )
@@ -51,7 +50,8 @@ def test_outreach_writer_creates_draft_pack_and_excludes_insurance_terms(monkeyp
     )
 
     assert result.status == "ok"
-    assert len(result.data.get("draft_ids", [])) == 3
-    assert sorted(result.data.get("channels", [])) == ["email", "sms", "voice"]
+    assert len(result.data.get("draft_ids", [])) == 2
+    assert sorted(result.data.get("channels", [])) == ["email", "sms"]
     assert "insurance_pressure" not in str(result.data).lower()
     assert "verify with insurer" not in str(result.data).lower()
+    assert "voice" not in result.text.lower()

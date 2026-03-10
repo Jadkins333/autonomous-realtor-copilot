@@ -229,7 +229,7 @@ export default function OutreachPage() {
       <Card className='mb-4'>
         <CardTitle>Outreach Autopilot</CardTitle>
         <CardDescription>
-          Sandbox is ON by default. Draft packs group SMS/email/voice drafts and require explicit
+          Sandbox is ON by default. Draft packs group email/SMS drafts and require explicit
           submission and approval.
         </CardDescription>
         {actionResult ? (
@@ -435,8 +435,14 @@ export default function OutreachPage() {
                     <DraftStatusBadge status={draft.status} />
                   </Td>
                   <Td>
-                    {/* Approve — two-step */}
-                    {confirmApproving === draft.id ? (
+                    {draft.channel === 'voice' ? (
+                      <p
+                        className='text-xs text-muted-foreground'
+                        data-testid={`voice-disabled-${draft.id}`}
+                      >
+                        Voice disabled in this build.
+                      </p>
+                    ) : confirmApproving === draft.id ? (
                       <div className='flex gap-2' data-testid='approve-confirm-row'>
                         <Button
                           onClick={() => void approveDraft(draft.id)}

@@ -144,26 +144,10 @@ def generate_outreach_draft(
             logger.debug("llm_outreach_draft_unavailable channel=sms reason=%s", exc)
             return None
 
+    elif channel == "voice":
+        raise ValueError("Voice outreach is not supported in this build.")
     else:
-        # Voice / other: generate a voicemail outline
-        body_prompt = (
-            f"Context:\n{context_block}\n\n"
-            f"{action} a voicemail outline for the above context.\n"
-            f"Tone: {tone_description}.\n"
-            "Include: greeting, purpose, call-to-action, opt-out mention.\n"
-            "Return ONLY the voicemail outline."
-        )
-        if is_rewrite and existing_body:
-            body_prompt += f"\nOriginal outline to improve:\n{existing_body}"
-        if rewrite_notes:
-            body_prompt += f"\nNotes: {rewrite_notes}"
-
-        try:
-            body = provider.complete(body_prompt, system=_SYSTEM_PROMPT).strip()
-            subject = None
-        except LLMUnavailable as exc:
-            logger.debug("llm_outreach_draft_unavailable channel=%s reason=%s", channel, exc)
-            return None
+        raise ValueError(f"Unsupported outreach channel: {channel}")
 
     # Deterministic compliance check — always runs after LLM generation
     compliance_flags = evaluate_fair_housing_text(body)

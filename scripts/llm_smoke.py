@@ -35,6 +35,31 @@ def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def choose_supported_draft(client: TestClient, headers: dict[str, str], contact_id: str) -> dict:
+    drafts = client.get("/outreach/drafts", headers=headers)
+    expect(drafts.status_code == 200, f"draft list failed: {drafts.status_code}")
+    for draft in drafts.json():
+        if draft.get("channel") in {"email", "sms"}:
+            return draft
+
+    created = client.post(
+        "/outreach/draft-pack",
+        headers=headers,
+        json={
+            "contact_id": contact_id,
+            "objective": "Offline provider smoke rewrite proof",
+            "channels": ["email"],
+            "sandbox": True,
+        },
+    )
+    expect(created.status_code == 200, f"draft pack create failed: {created.status_code} {created.text}")
+    for draft in created.json()["drafts"]:
+        if draft.get("channel") in {"email", "sms"}:
+            return draft
+
+    raise AssertionError("Expected a supported draft for rewrite smoke")
+
+
 def main() -> int:
     with TestClient(app) as client:
         token = login(client)
@@ -85,11 +110,8 @@ def main() -> int:
             "Score explanation should degrade with unavailable=true",
         )
 
-        drafts = client.get("/outreach/drafts", headers=headers)
-        expect(drafts.status_code == 200, f"draft list failed: {drafts.status_code}")
-        drafts_json = drafts.json()
-        expect(len(drafts_json) > 0, "Expected at least one draft message for rewrite smoke")
-        draft_id = drafts_json[0]["id"]
+        draft = choose_supported_draft(client, headers, contact_id)
+        draft_id = draft["id"]
 
         rewrite = client.post(
             f"/outreach/drafts/{draft_id}/rewrite",
@@ -118,6 +140,8 @@ def main() -> int:
                 "metric_key": explanation_json["metric_key"],
             },
             "outreach_rewrite": {
+                "draft_id": draft_id,
+                "channel": draft["channel"],
                 "status_code": rewrite.status_code,
                 "detail": rewrite.json()["detail"],
             },

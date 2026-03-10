@@ -67,7 +67,7 @@ def _normalize_channel(value: str) -> Channel:
     if cleaned == "email":
         return Channel.email
     if cleaned == "voice":
-        return Channel.voice
+        raise ValueError("Voice outreach is not supported in this build.")
     raise ValueError(f"Unsupported channel '{value}'")
 
 
@@ -324,6 +324,24 @@ async def approve_and_send(db: Session, tenant_id: UUID, message_id: UUID) -> di
             "idempotent": True,
         }
 
+    if message.channel == Channel.voice:
+        message.status = MessageStatus.blocked
+        message.meta_json = _message_meta(
+            message,
+            approval_state="rejected",
+            blocked_reason="Voice outreach is not supported in this build.",
+            unsupported_channel="voice",
+        )
+        pack_status = _safe_pack_status(db, message.pack_id)
+        db.commit()
+        return {
+            "status": "blocked",
+            "approval_state": "rejected",
+            "pack_id": message.pack_id,
+            "pack_status": pack_status,
+            "reason": "Voice outreach is not supported in this build.",
+        }
+
     allowed, reason = enforce_outbound_policy(db, message)
     if not allowed:
         message.status = MessageStatus.blocked
@@ -408,18 +426,7 @@ async def approve_and_send(db: Session, tenant_id: UUID, message_id: UUID) -> di
             )
         result = await provider.send(contact.phone, message.body)
     else:
-        message.status = MessageStatus.queued
-        message.meta_json = _message_meta(
-            message, voice_provider="not_implemented", sandbox_staged=True
-        )
-        pack_status = _safe_pack_status(db, message.pack_id)
-        db.commit()
-        return {
-            "status": "queued",
-            "sandbox": True,
-            "pack_id": message.pack_id,
-            "pack_status": pack_status,
-        }
+        raise ValueError("Unsupported channel")
 
     if result.ok:
         message.status = MessageStatus.sent

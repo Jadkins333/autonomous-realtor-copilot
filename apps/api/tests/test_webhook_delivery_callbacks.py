@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 
+from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.main import app
 from app.models.entities import Contact, Message, SuppressionList, Tenant, User
@@ -90,7 +94,32 @@ def _cleanup(tenant_ids: list) -> None:
         db.close()
 
 
-def test_twilio_status_webhook_marks_sms_delivered() -> None:
+def _twilio_signature(url: str, params: dict[str, str], token: str) -> str:
+    message = url + "".join(f"{key}{value}" for key, value in sorted(params.items()))
+    digest = hmac.new(token.encode("utf-8"), message.encode("utf-8"), hashlib.sha1).digest()
+    return base64.b64encode(digest).decode("utf-8")
+
+
+def _set_webhook_env(monkeypatch) -> None:
+    monkeypatch.setenv("TWILIO_WEBHOOK_AUTH_TOKEN", "twilio-secret")
+    monkeypatch.setenv("POSTMARK_WEBHOOK_USERNAME", "postmark-user")
+    monkeypatch.setenv("POSTMARK_WEBHOOK_PASSWORD", "postmark-pass")
+    get_settings.cache_clear()
+
+
+def test_twilio_status_webhook_rejects_missing_signature(monkeypatch) -> None:
+    _set_webhook_env(monkeypatch)
+    with TestClient(app) as client:
+        response = client.post(
+            "/webhooks/twilio/status",
+            data={"MessageSid": "SM-missing-signature", "MessageStatus": "delivered"},
+        )
+    assert response.status_code == 403
+    assert "Twilio signature" in response.json()["detail"]
+
+
+def test_twilio_status_webhook_marks_sms_delivered(monkeypatch) -> None:
+    _set_webhook_env(monkeypatch)
     db = SessionLocal()
     tenant_ids = []
     try:
@@ -110,9 +139,17 @@ def test_twilio_status_webhook_marks_sms_delivered() -> None:
 
     try:
         with TestClient(app) as client:
+            params = {"MessageSid": "SM-delivered-123", "MessageStatus": "delivered"}
             response = client.post(
                 "/webhooks/twilio/status",
-                data={"MessageSid": "SM-delivered-123", "MessageStatus": "delivered"},
+                data=params,
+                headers={
+                    "X-Twilio-Signature": _twilio_signature(
+                        "http://testserver/webhooks/twilio/status",
+                        params,
+                        "twilio-secret",
+                    )
+                },
             )
         assert response.status_code == 200
         payload = response.json()
@@ -132,7 +169,8 @@ def test_twilio_status_webhook_marks_sms_delivered() -> None:
         _cleanup(tenant_ids)
 
 
-def test_twilio_status_webhook_marks_sms_failed() -> None:
+def test_twilio_status_webhook_marks_sms_failed(monkeypatch) -> None:
+    _set_webhook_env(monkeypatch)
     db = SessionLocal()
     tenant_ids = []
     try:
@@ -152,13 +190,21 @@ def test_twilio_status_webhook_marks_sms_failed() -> None:
 
     try:
         with TestClient(app) as client:
+            params = {
+                "MessageSid": "SM-failed-123",
+                "MessageStatus": "undelivered",
+                "ErrorCode": "30003",
+                "ErrorMessage": "Unreachable destination handset",
+            }
             response = client.post(
                 "/webhooks/twilio/status",
-                data={
-                    "MessageSid": "SM-failed-123",
-                    "MessageStatus": "undelivered",
-                    "ErrorCode": "30003",
-                    "ErrorMessage": "Unreachable destination handset",
+                data=params,
+                headers={
+                    "X-Twilio-Signature": _twilio_signature(
+                        "http://testserver/webhooks/twilio/status",
+                        params,
+                        "twilio-secret",
+                    )
                 },
             )
         assert response.status_code == 200
@@ -178,7 +224,19 @@ def test_twilio_status_webhook_marks_sms_failed() -> None:
         _cleanup(tenant_ids)
 
 
-def test_postmark_delivery_webhook_marks_email_delivered() -> None:
+def test_postmark_delivery_webhook_rejects_missing_basic_auth(monkeypatch) -> None:
+    _set_webhook_env(monkeypatch)
+    with TestClient(app) as client:
+        response = client.post(
+            "/webhooks/postmark/delivery",
+            json={"RecordType": "Delivery", "MessageID": "pm-no-auth"},
+        )
+    assert response.status_code == 401
+    assert "Postmark webhook authentication" in response.json()["detail"]
+
+
+def test_postmark_delivery_webhook_marks_email_delivered(monkeypatch) -> None:
+    _set_webhook_env(monkeypatch)
     db = SessionLocal()
     tenant_ids = []
     try:
@@ -206,6 +264,7 @@ def test_postmark_delivery_webhook_marks_email_delivered() -> None:
                     "Recipient": "alice@example.com",
                     "DeliveredAt": "2026-03-10T02:00:00Z",
                 },
+                auth=("postmark-user", "postmark-pass"),
             )
         assert response.status_code == 200
         payload = response.json()
@@ -224,7 +283,8 @@ def test_postmark_delivery_webhook_marks_email_delivered() -> None:
         _cleanup(tenant_ids)
 
 
-def test_postmark_bounce_webhook_marks_email_failed_and_suppresses_contact() -> None:
+def test_postmark_bounce_webhook_marks_email_failed_and_suppresses_contact(monkeypatch) -> None:
+    _set_webhook_env(monkeypatch)
     db = SessionLocal()
     tenant_ids = []
     try:
@@ -253,6 +313,7 @@ def test_postmark_bounce_webhook_marks_email_failed_and_suppresses_contact() -> 
                     "Description": "Mailbox unavailable",
                     "Email": "alice@example.com",
                 },
+                auth=("postmark-user", "postmark-pass"),
             )
         assert response.status_code == 200
         payload = response.json()

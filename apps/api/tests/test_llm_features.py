@@ -11,6 +11,7 @@ Tests cover:
 """
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from uuid import UUID
 
@@ -226,6 +227,62 @@ class TestGenerateOutreachDraft:
             )
         assert result is not None
         assert result["provider_label"] == "ollama/llama3.2"
+
+
+# ── score_explainer.explain_score ─────────────────────────────────────────────
+
+class TestExplainScore:
+    def test_negotiation_metric_uses_motivation_score_shape(self):
+        from app.services.llm_features.score_explainer import explain_score
+
+        provider = _mock_provider(
+            "This score comes from a deterministic formula.\n"
+            "• Long ownership is the strongest signal.\n"
+            "→ Ask the seller about timing flexibility."
+        )
+        metric_value = SimpleNamespace(
+            value_json={
+                "motivation_score": 65.0,
+                "signals_used": [
+                    {
+                        "signal": "days_since_last_sale",
+                        "raw_value": 4200,
+                        "rule_hits": ["+25 days_since_last_sale >= 3650"],
+                    }
+                ],
+            },
+            inputs_json={"days_since_last_sale": {"value": 4200}},
+        )
+        metric_def = SimpleNamespace(
+            name="Negotiation Motivation",
+            formula_markdown="score = deterministic formula",
+        )
+        parcel = SimpleNamespace(address="123 Test St")
+
+        metric_row = MagicMock()
+        metric_row.first.return_value = (metric_value, metric_def)
+        parcel_row = MagicMock()
+        parcel_row.scalar_one_or_none.return_value = parcel
+
+        db = MagicMock()
+        db.execute.side_effect = [metric_row, parcel_row]
+
+        result = explain_score(
+            provider,
+            db,
+            tenant_id=UUID("00000000-0000-0000-0000-000000000001"),
+            parcel_id=UUID("00000000-0000-0000-0000-000000000101"),
+            metric_key="negotiation_motivation_v1",
+        )
+
+        assert result is not None
+        assert result["computed_score"] == 65.0
+        assert result["key_drivers"] == ["• Long ownership is the strongest signal."]
+        assert result["suggested_actions"] == ["→ Ask the seller about timing flexibility."]
+
+        prompt = provider.complete.call_args[0][0]
+        assert "Computed score: 65.0" in prompt
+        assert "signals_used" in prompt
 
 
 # ── Copilot router integration ────────────────────────────────────────────────

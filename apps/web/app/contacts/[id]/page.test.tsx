@@ -315,6 +315,7 @@ describe("ContactDetailPage", function () {
     render(React.createElement(ContactDetailPage));
     await waitFor(() => {
       expect(screen.getByTestId("ai-summary-btn")).toBeTruthy();
+      expect(screen.getByText(/AI-assisted summary/i)).toBeTruthy();
     });
   });
 
@@ -341,6 +342,7 @@ describe("ContactDetailPage", function () {
     fireEvent.click(screen.getByTestId("ai-summary-btn"));
     await waitFor(() => {
       expect(screen.getByTestId("ai-summary-panel")).toBeTruthy();
+      expect(screen.getByText(/Generated from saved contact data/i)).toBeTruthy();
       expect(screen.getByText("Interested in 3-bed homes")).toBeTruthy();
       expect(screen.getByText("Budget $350k")).toBeTruthy();
     });

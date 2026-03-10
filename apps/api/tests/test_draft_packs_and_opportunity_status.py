@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+from uuid import uuid4
+
 from fastapi.testclient import TestClient
 
 from app.core.config import get_settings
+from app.db.session import SessionLocal
 from app.main import app
+from app.models.entities import ComplianceEvent, Contact, Message, OutreachDraftPack, Tenant, User
+from app.models.enums import Channel, MessageDirection, MessageStatus, UserRole
+from app.utils.security import get_password_hash
 
 
 def _login_token(client: TestClient) -> str:
@@ -35,13 +41,13 @@ def test_draft_pack_create_submit_approve_reject_flow() -> None:
             json={
                 "contact_id": contact_id,
                 "objective": "Test multi-channel outreach pack",
-                "channels": ["sms", "email", "voice"],
+                "channels": ["sms", "email"],
                 "sandbox": True,
             },
         )
         assert created.status_code == 200
         payload = created.json()
-        assert len(payload["drafts"]) == 3
+        assert len(payload["drafts"]) == 2
         pack_id = payload["id"]
 
         submitted = client.post(f"/outreach/draft-pack/{pack_id}/submit", headers=headers)
@@ -62,6 +68,243 @@ def test_draft_pack_create_submit_approve_reject_flow() -> None:
         fetched = client.get(f"/outreach/draft-pack/{pack_id}", headers=headers)
         assert fetched.status_code == 200
         assert fetched.json()["status"] == "rejected"
+
+
+def test_draft_pack_rejects_voice_channel() -> None:
+    db = SessionLocal()
+    tenant_ids = []
+    suffix = uuid4().hex[:8]
+    tenant_slug = f"voice-channel-{suffix}"
+    tenant_email = f"voice-channel-{suffix}@example.com"
+    try:
+        tenant = Tenant(name="Voice Channel Tenant", slug=tenant_slug)
+        db.add(tenant)
+        db.flush()
+        tenant_ids.append(tenant.id)
+        user = User(
+            tenant_id=tenant.id,
+            email=tenant_email,
+            name="Voice Channel Agent",
+            password_hash=get_password_hash("voice-channel-pw"),
+            role=UserRole.agent,
+        )
+        db.add(user)
+        db.flush()
+        contact = Contact(
+            tenant_id=tenant.id,
+            name="Voice Target",
+            email="voice-target@example.com",
+            phone="+16145550101",
+            tags_json=[],
+        )
+        db.add(contact)
+        db.commit()
+    finally:
+        db.close()
+
+    try:
+        with TestClient(app) as client:
+            login = client.post(
+                "/auth/login",
+                json={
+                    "tenant_slug": tenant_slug,
+                    "email": tenant_email,
+                    "password": "voice-channel-pw",
+                },
+            )
+            assert login.status_code == 200
+            headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+            created = client.post(
+                "/outreach/draft-pack",
+                headers=headers,
+                json={
+                    "contact_id": str(contact.id),
+                    "objective": "Attempt unsupported voice outreach",
+                    "channels": ["voice"],
+                    "sandbox": True,
+                },
+            )
+        assert created.status_code == 400
+        assert "Voice outreach is not supported" in created.json()["detail"]
+    finally:
+        cleanup_db = SessionLocal()
+        try:
+            from sqlalchemy import delete
+
+            for tenant_id in tenant_ids:
+                cleanup_db.execute(delete(ComplianceEvent).where(ComplianceEvent.tenant_id == tenant_id))
+                cleanup_db.execute(delete(Message).where(Message.tenant_id == tenant_id))
+                cleanup_db.execute(delete(OutreachDraftPack).where(OutreachDraftPack.tenant_id == tenant_id))
+                cleanup_db.execute(delete(Contact).where(Contact.tenant_id == tenant_id))
+                cleanup_db.execute(delete(User).where(User.tenant_id == tenant_id))
+                cleanup_db.execute(delete(Tenant).where(Tenant.id == tenant_id))
+            cleanup_db.commit()
+        finally:
+            cleanup_db.close()
+
+
+def test_approve_voice_draft_returns_blocked_unsupported_response() -> None:
+    db = SessionLocal()
+    tenant_ids = []
+    suffix = uuid4().hex[:8]
+    tenant_slug = f"voice-approval-{suffix}"
+    tenant_email = f"voice-approval-{suffix}@example.com"
+    try:
+        tenant = Tenant(name="Voice Approval Tenant", slug=tenant_slug)
+        db.add(tenant)
+        db.flush()
+        tenant_ids.append(tenant.id)
+        user = User(
+            tenant_id=tenant.id,
+            email=tenant_email,
+            name="Voice Approval Agent",
+            password_hash=get_password_hash("voice-approval-pw"),
+            role=UserRole.agent,
+        )
+        db.add(user)
+        db.flush()
+        contact = Contact(
+            tenant_id=tenant.id,
+            name="Voice Approval Contact",
+            email="voice-approval-contact@example.com",
+            phone="+16145550102",
+            tags_json=[],
+        )
+        db.add(contact)
+        db.flush()
+        message = Message(
+            tenant_id=tenant.id,
+            contact_id=contact.id,
+            channel=Channel.voice,
+            direction=MessageDirection.outbound,
+            status=MessageStatus.draft,
+            subject=None,
+            body="Voicemail outline",
+            meta_json={},
+        )
+        db.add(message)
+        db.commit()
+        db.refresh(message)
+    finally:
+        db.close()
+
+    try:
+        with TestClient(app) as client:
+            login = client.post(
+                "/auth/login",
+                json={
+                    "tenant_slug": tenant_slug,
+                    "email": tenant_email,
+                    "password": "voice-approval-pw",
+                },
+            )
+            assert login.status_code == 200
+            headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+            approved = client.post(f"/outreach/drafts/{message.id}/approve", headers=headers)
+
+        assert approved.status_code == 200
+        payload = approved.json()
+        assert payload["status"] == "blocked"
+        assert payload["approval_state"] == "rejected"
+        assert "Voice outreach is not supported" in payload["reason"]
+    finally:
+        cleanup_db = SessionLocal()
+        try:
+            from sqlalchemy import delete
+
+            for tenant_id in tenant_ids:
+                cleanup_db.execute(delete(ComplianceEvent).where(ComplianceEvent.tenant_id == tenant_id))
+                cleanup_db.execute(delete(Message).where(Message.tenant_id == tenant_id))
+                cleanup_db.execute(delete(OutreachDraftPack).where(OutreachDraftPack.tenant_id == tenant_id))
+                cleanup_db.execute(delete(Contact).where(Contact.tenant_id == tenant_id))
+                cleanup_db.execute(delete(User).where(User.tenant_id == tenant_id))
+                cleanup_db.execute(delete(Tenant).where(Tenant.id == tenant_id))
+            cleanup_db.commit()
+        finally:
+            cleanup_db.close()
+
+
+def test_rewrite_voice_draft_returns_unsupported_response() -> None:
+    db = SessionLocal()
+    tenant_ids = []
+    suffix = uuid4().hex[:8]
+    tenant_slug = f"voice-rewrite-{suffix}"
+    tenant_email = f"voice-rewrite-{suffix}@example.com"
+    try:
+        tenant = Tenant(name="Voice Rewrite Tenant", slug=tenant_slug)
+        db.add(tenant)
+        db.flush()
+        tenant_ids.append(tenant.id)
+        user = User(
+            tenant_id=tenant.id,
+            email=tenant_email,
+            name="Voice Rewrite Agent",
+            password_hash=get_password_hash("voice-rewrite-pw"),
+            role=UserRole.agent,
+        )
+        db.add(user)
+        db.flush()
+        contact = Contact(
+            tenant_id=tenant.id,
+            name="Voice Rewrite Contact",
+            email="voice-rewrite-contact@example.com",
+            phone="+16145550103",
+            tags_json=[],
+        )
+        db.add(contact)
+        db.flush()
+        message = Message(
+            tenant_id=tenant.id,
+            contact_id=contact.id,
+            channel=Channel.voice,
+            direction=MessageDirection.outbound,
+            status=MessageStatus.draft,
+            subject=None,
+            body="Legacy voicemail outline",
+            meta_json={},
+        )
+        db.add(message)
+        db.commit()
+        db.refresh(message)
+    finally:
+        db.close()
+
+    try:
+        with TestClient(app) as client:
+            login = client.post(
+                "/auth/login",
+                json={
+                    "tenant_slug": tenant_slug,
+                    "email": tenant_email,
+                    "password": "voice-rewrite-pw",
+                },
+            )
+            assert login.status_code == 200
+            headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+            rewritten = client.post(
+                f"/outreach/drafts/{message.id}/rewrite",
+                headers=headers,
+                json={"tone": "professional", "notes": "Make it warmer"},
+            )
+
+        assert rewritten.status_code == 400
+        assert "Voice outreach is not supported" in rewritten.json()["detail"]
+    finally:
+        cleanup_db = SessionLocal()
+        try:
+            from sqlalchemy import delete
+
+            for tenant_id in tenant_ids:
+                cleanup_db.execute(delete(ComplianceEvent).where(ComplianceEvent.tenant_id == tenant_id))
+                cleanup_db.execute(delete(Message).where(Message.tenant_id == tenant_id))
+                cleanup_db.execute(delete(OutreachDraftPack).where(OutreachDraftPack.tenant_id == tenant_id))
+                cleanup_db.execute(delete(Contact).where(Contact.tenant_id == tenant_id))
+                cleanup_db.execute(delete(User).where(User.tenant_id == tenant_id))
+                cleanup_db.execute(delete(Tenant).where(Tenant.id == tenant_id))
+            cleanup_db.commit()
+        finally:
+            cleanup_db.close()
 
 
 def test_opportunity_status_change_creates_event_row() -> None:

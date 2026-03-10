@@ -216,6 +216,24 @@ describe('OutreachPage', function () {
     expect(screen.getByTestId('draft-status-blocked_sandbox')).toBeTruthy()
   })
 
+  it('shows disabled messaging instead of approve controls for legacy voice drafts', async function () {
+    const voiceDraft = {
+      ...makeDraft(),
+      id: 'draft-voice-1',
+      channel: 'voice',
+      subject: null,
+      body: 'Legacy voicemail outline',
+    }
+    const pack = makePack({ drafts: [voiceDraft] })
+    mockApiFetch.mockResolvedValue({ items: [pack] })
+    renderPage()
+    await waitFor(function () {
+      expect(screen.getByTestId('draft-row-draft-voice-1')).toBeTruthy()
+    })
+    expect(screen.getByText(/Voice disabled in this build/i)).toBeTruthy()
+    expect(screen.queryByTestId('approve-btn-draft-voice-1')).toBeNull()
+  })
+
   it('truncates long body text at 120 characters', async function () {
     const longBody = 'A'.repeat(150)
     const draft = makeDraft({ body: longBody })
@@ -402,6 +420,15 @@ describe('OutreachPage', function () {
     await waitFor(function () {
       expect(screen.getByTestId('compose-toggle')).toBeTruthy()
     })
+  })
+
+  it('describes outreach packs as email and SMS only', async function () {
+    mockApiFetch.mockResolvedValue({ items: [] })
+    renderPage()
+    await waitFor(function () {
+      expect(screen.getByText(/email\/sms drafts/i)).toBeTruthy()
+    })
+    expect(screen.queryByText(/voice drafts/i)).toBeNull()
   })
 
   it('compose form hidden by default', async function () {

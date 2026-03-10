@@ -406,7 +406,7 @@ export default function ContactDetailPage() {
                       disabled={aiSummaryLoading}
                       data-testid="ai-summary-btn"
                     >
-                      {aiSummaryLoading ? "Loading…" : "AI Summary"}
+                      {aiSummaryLoading ? "Loading…" : "AI-assisted summary"}
                     </Button>
                   </>
                 )}
@@ -440,6 +440,9 @@ export default function ContactDetailPage() {
                       </span>
                     ) : null}
                   </div>
+                  <p className="mb-3 text-xs text-muted-foreground">
+                    Generated from saved contact data. The contact record above remains the source of truth.
+                  </p>
                   <ul className="space-y-2 text-sm text-foreground">
                     {aiSummary.summary_bullets.map((bullet, index) => (
                       <li key={`${bullet}-${index}`} className="flex gap-2">

@@ -10,18 +10,24 @@ from app.services.outreach import (
     handle_postmark_delivery_callback,
     handle_twilio_status_callback,
 )
+from app.services.webhook_auth import require_postmark_basic_auth, require_twilio_signature
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 
 @router.post("/twilio/inbound")
-def twilio_inbound(
+async def twilio_inbound(
     request: Request,
     From: str = Form(default=""),
     Body: str = Form(default=""),
     MessageSid: str = Form(default=""),
     db: Session = Depends(get_db),
 ) -> dict:
+    form = await request.form()
+    require_twilio_signature(
+        request,
+        {key: str(value) for key, value in form.items()},
+    )
     tenant = db.execute(select(Tenant).order_by(Tenant.created_at.asc()).limit(1)).scalar_one()
     result = handle_inbound_sms(
         db,
@@ -36,13 +42,19 @@ def twilio_inbound(
 
 
 @router.post("/twilio/status")
-def twilio_status(
+async def twilio_status(
+    request: Request,
     MessageSid: str = Form(default=""),
     MessageStatus: str = Form(default=""),
     ErrorCode: str = Form(default=""),
     ErrorMessage: str = Form(default=""),
     db: Session = Depends(get_db),
 ) -> dict:
+    form = await request.form()
+    require_twilio_signature(
+        request,
+        {key: str(value) for key, value in form.items()},
+    )
     result = handle_twilio_status_callback(
         db,
         provider_message_id=MessageSid,
@@ -60,10 +72,12 @@ def twilio_status(
 
 
 @router.post("/postmark/delivery")
-def postmark_delivery(payload: dict, db: Session = Depends(get_db)) -> dict:
+def postmark_delivery(request: Request, payload: dict, db: Session = Depends(get_db)) -> dict:
+    require_postmark_basic_auth(request)
     return {"ok": True, **handle_postmark_delivery_callback(db, payload)}
 
 
 @router.post("/postmark/bounce")
-def postmark_bounce(payload: dict, db: Session = Depends(get_db)) -> dict:
+def postmark_bounce(request: Request, payload: dict, db: Session = Depends(get_db)) -> dict:
+    require_postmark_basic_auth(request)
     return {"ok": True, **handle_postmark_bounce_callback(db, payload)}

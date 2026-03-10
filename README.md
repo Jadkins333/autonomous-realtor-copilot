@@ -45,6 +45,7 @@ These are seeded automatically at first boot (`apps/api/scripts/start_api.sh` ru
 ## Demo Mode Behavior
 - `SANDBOX_MODE=true` by default.
 - Outreach approvals remain non-sending in sandbox mode and return `blocked_sandbox` with a compliance audit event.
+- The current production surface supports email and SMS outreach only; voice outreach is intentionally disabled in this build.
 - Public-data connectors try live URLs first, then fallback to synthetic seed files.
 - Source failures are non-fatal and recorded in `source_runs`.
 - Drift policy: when schema drift is detected, the source is auto-paused and DLQ replay is blocked until drift is resolved.
@@ -134,6 +135,9 @@ Required env:
 - `TWILIO_AUTH_TOKEN`
 - `TWILIO_FROM_NUMBER`
 - `PUBLIC_API_BASE_URL` if you want Twilio delivery callbacks posted back to this API
+- `TWILIO_WEBHOOK_AUTH_TOKEN` to verify inbound/status callbacks if you want a dedicated verification secret
+
+Twilio callback routes require `X-Twilio-Signature` validation. If `TWILIO_WEBHOOK_AUTH_TOKEN` is unset, the app falls back to `TWILIO_AUTH_TOKEN`.
 
 If any required key is missing, providers fall back to console behavior.
 
@@ -141,6 +145,8 @@ If any required key is missing, providers fall back to console behavior.
 - `POST /webhooks/twilio/status` records Twilio SMS delivery and failure receipts.
 - `POST /webhooks/postmark/delivery` records successful Postmark deliveries.
 - `POST /webhooks/postmark/bounce` marks failed deliveries and suppresses hard-bounced email contacts.
+- `POST /webhooks/twilio/inbound` and `POST /webhooks/twilio/status` now reject missing or invalid Twilio signatures.
+- `POST /webhooks/postmark/delivery` and `POST /webhooks/postmark/bounce` now require HTTP Basic auth using `POSTMARK_WEBHOOK_USERNAME` and `POSTMARK_WEBHOOK_PASSWORD`.
 
 Postmark webhooks are configured on the Postmark server itself; point them at the API routes above.
 
@@ -166,12 +172,14 @@ Responses include:
 
 ## Compliance Enforcement (Code + Docs)
 Code-enforced controls include:
-- Consent gating for SMS/voice outbound (`opt_in` required)
+- Consent gating for SMS outbound (`opt_in` required)
 - STOP keyword inbound handling (`opt_out` + suppression immediately)
 - Quiet hours (`8am–9pm America/New_York`)
 - Frequency cap (max `3` outbound/day/channel/contact)
 - Stop-on-reply enrollment stop
 - Optional global revocation policy toggle (`ENFORCE_GLOBAL_REVOCATION=false` by default)
+
+The data model still preserves legacy voice enums for auditability and backward compatibility, but voice sending/rewrite paths are rejected at runtime in this build.
 
 Compliance behavior is implemented as configurable product policy defaults and audit controls, not legal advice.
 See [Compliance Notice](./docs/compliance/NOTICE.md).

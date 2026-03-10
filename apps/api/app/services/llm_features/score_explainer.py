@@ -62,6 +62,19 @@ _SCORE_CONTEXT = {
 }
 
 
+def _extract_score_payload(metric_key: str, value_json: dict) -> tuple[float | None, dict]:
+    computed_score = value_json.get("score")
+    components = value_json.get("components") or {}
+
+    if metric_key == "negotiation_motivation_v1":
+        if computed_score is None:
+            computed_score = value_json.get("motivation_score")
+        if not components and value_json.get("signals_used"):
+            components = {"signals_used": value_json["signals_used"]}
+
+    return computed_score, components
+
+
 def explain_score(
     provider: LLMProvider,
     db: Session,
@@ -105,8 +118,7 @@ def explain_score(
     value_json = metric_value.value_json or {}
     inputs_json = metric_value.inputs_json or {}
 
-    computed_score = value_json.get("score")
-    components = value_json.get("components", {})
+    computed_score, components = _extract_score_payload(metric_key, value_json)
 
     # Get parcel address if available
     parcel_address = None

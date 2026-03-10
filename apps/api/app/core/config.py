@@ -44,10 +44,13 @@ class Settings(BaseSettings):
 
     postmark_server_token: str = ""
     postmark_sender_email: str = ""
+    postmark_webhook_username: str = ""
+    postmark_webhook_password: str = ""
 
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_from_number: str = ""
+    twilio_webhook_auth_token: str = ""
 
     quiet_hours_start: int = Field(default=8, ge=0, le=23)
     quiet_hours_end: int = Field(default=21, ge=0, le=23)

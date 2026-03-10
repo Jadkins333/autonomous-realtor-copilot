@@ -258,6 +258,8 @@ describe('CopilotPage', function () {
     await waitFor(function () {
       expect(screen.getByTestId('ai-narration')).toBeTruthy()
     })
+    expect(screen.getByText(/Deterministic result/i)).toBeTruthy()
+    expect(screen.getByText(/AI-assisted narration/i)).toBeTruthy()
     expect(screen.getByText('The market score of 72 indicates strong seller conditions.')).toBeTruthy()
     // deterministic text still present
     expect(screen.getByText('Market score is 72.')).toBeTruthy()
@@ -283,5 +285,6 @@ describe('CopilotPage', function () {
       expect(screen.getByTestId('chat-msg-assistant-1')).toBeTruthy()
     })
     expect(screen.queryByTestId('ai-narration')).toBeNull()
+    expect(screen.getByText(/Deterministic result/i)).toBeTruthy()
   })
 })

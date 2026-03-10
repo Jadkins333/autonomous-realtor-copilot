@@ -111,7 +111,7 @@ async def outreach_approve_draft(
             id=message_id,
             pack_id=result.get("pack_id"),
             status=str(result.get("status")),
-            approval_state="approved",
+            approval_state=str(result.get("approval_state") or "approved"),
             pack_status=result.get("pack_status"),
             reason=result.get("reason"),
         )
@@ -160,13 +160,6 @@ def outreach_rewrite_draft(
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ) -> OutreachRewriteResponse:
-    provider = get_llm_provider()
-    if provider is None:
-        raise HTTPException(
-            status_code=503,
-            detail="LLM provider not available. Set LLM_ENABLED=true and configure a local provider.",
-        )
-
     # Load the message and its associated context
     message = db.execute(
         select(Message).where(Message.id == message_id, Message.tenant_id == auth.tenant_id)
@@ -193,19 +186,31 @@ def outreach_rewrite_draft(
                 parcel_address = parcel.address
 
     channel = getattr(message.channel, "value", str(message.channel))
+    if channel == "voice":
+        raise HTTPException(status_code=400, detail="Voice outreach is not supported in this build.")
 
-    result = generate_outreach_draft(
-        provider,
-        contact_name=contact.name if contact else "the recipient",
-        contact_email=contact.email if contact else None,
-        contact_phone=contact.phone if contact else None,
-        channel=channel,
-        objective=message.subject or message.body[:100],
-        tone=payload.tone,
-        parcel_address=parcel_address,
-        existing_body=message.body,
-        rewrite_notes=payload.notes,
-    )
+    provider = get_llm_provider()
+    if provider is None:
+        raise HTTPException(
+            status_code=503,
+            detail="LLM provider not available. Set LLM_ENABLED=true and configure a local provider.",
+        )
+
+    try:
+        result = generate_outreach_draft(
+            provider,
+            contact_name=contact.name if contact else "the recipient",
+            contact_email=contact.email if contact else None,
+            contact_phone=contact.phone if contact else None,
+            channel=channel,
+            objective=message.subject or message.body[:100],
+            tone=payload.tone,
+            parcel_address=parcel_address,
+            existing_body=message.body,
+            rewrite_notes=payload.notes,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     if result is None:
         raise HTTPException(

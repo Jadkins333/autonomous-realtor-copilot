@@ -1,0 +1,64 @@
+{
+  "llm_status": {
+    "llm_enabled": true,
+    "provider": "ollama",
+    "model": "llama3.1:latest",
+    "available": true,
+    "provider_label": "ollama/llama3.1:latest"
+  },
+  "copilot_chat": {
+    "status": "ok",
+    "text": "Columbus market snapshot generated.",
+    "ai_narration": "The Columbus market snapshot shows a complete coverage of the area, with all required data points present. The snapshot is based on a formula that combines three scores: permits score, POI score, and rates score. The overall score is a weighted average of these three scores, with permits score making up 50%, POI score 30%, and rates score 20%.",
+    "trace_llm_used": true,
+    "selected_agent": "market_analyst",
+    "provider_label": "ollama/llama3.1:latest"
+  },
+  "contact_summary": {
+    "contact_id": "5ae3e973-2c28-45c0-b118-b4e1dbb50969",
+    "contact_name": "+16145550001",
+    "summary_bullets": [
+      "\u2022 The lead's phone number is +16145550001, and they have been receiving blocked emails and SMS from the system.",
+      "\u2022 There is no email address associated with the lead, and no sequence enrollments are present.",
+      "\u2022 The lead has been receiving the same blocked messages repeatedly, indicating a possible issue with the outreach pack or the lead's contact information.",
+      "\u2022 The agent should be prepared to start the conversation from scratch and avoid referencing any previous messages or attempts.",
+      "\u2022 The agent may want to ask the lead about their interest in real estate or if they have any specific needs or preferences."
+    ],
+    "provider_label": "ollama/llama3.1:latest",
+    "data_coverage": {
+      "has_email": false,
+      "has_phone": true,
+      "message_count": 10,
+      "enrollment_count": 0
+    }
+  },
+  "score_explanation": {
+    "parcel_id": "463b6cd8-ca57-4799-b01c-d7a7e813498a",
+    "address": "LLM Live Smoke 7c060af3 Test Ave",
+    "computed_score": 60.0,
+    "deterministic_score": 60,
+    "explanation": "Here's the explanation: The Negotiation Motivation score is a calculation that helps us understand how motivated a seller might be to negotiate a sale. It's based on a formula that looks at three main factors: the number of open violations on the property, recent permits issued, and how long the seller has owned the property. The score is higher if there are more open violations, recent permits, or if the seller has owned the property for a long time.",
+    "key_drivers": [
+      "\u2022 The presence of multiple open violations (3 or more) is a significant factor, contributing 25 points to the score.",
+      "\u2022 Recent permits (at least 2 in the last 90 days) also contribute 20 points to the score.",
+      "\u2022 The seller's long ownership of the property (10+ years) adds another 25 points to the score."
+    ],
+    "suggested_actions": [
+      "\u2192 If the score is 60, it's likely that the seller is motivated to negotiate, so you may want to emphasize the benefits of a quick sale and be prepared to make a strong offer.",
+      "\u2192 You could also use this information to your advantage by suggesting repairs or renovations to address the open violations, which might make the seller more willing to negotiate.",
+      "\u2192 Consider exploring other factors that might be contributing to the seller's motivation, such as financial difficulties or a desire to downsize, to build a stronger relationship and potentially get a better deal."
+    ],
+    "provider_label": "ollama/llama3.1:latest",
+    "seeded_parcel": true
+  },
+  "outreach_rewrite": {
+    "draft_id": "a6735543-a962-4f62-9420-4ca6230cb348",
+    "channel": "email",
+    "used_existing_draft": true,
+    "proposed_subject": "Columbus Listing Readiness Snapshot",
+    "proposed_body": "Here is a rewritten email body that meets the compliance requirements and tone guidelines:\n\nDear Ava,\n\nI've prepared a listing readiness snapshot for your area, highlighting local market trends and amenity signals. Would you like me to send a property-specific profile for your review?\n\nBest regards,\n[Your Name]",
+    "compliance_flags": [],
+    "expected_compliance_flags": [],
+    "provider_label": "ollama/llama3.1:latest"
+  }
+}

@@ -56,12 +56,12 @@ class OutreachWriterAgent(CopilotAgent):
             contact_id=contact.id,
             parcel_id=None,
             objective=objective,
-            channels=["sms", "email", "voice"],
+            channels=["sms", "email"],
             sandbox=True,
         )
 
         return AgentResult(
-            text="Draft pack created in sandbox mode with SMS, email, and voice drafts. Submit and approve each draft before send.",
+            text="Draft pack created in sandbox mode with SMS and email drafts. Submit and approve each draft before send.",
             data={
                 "pack_id": str(pack["id"]),
                 "contact_id": str(contact.id),
@@ -72,7 +72,7 @@ class OutreachWriterAgent(CopilotAgent):
                 "draft_ids": [str(draft.id) for draft in pack["drafts"]],
                 "sandbox_default": True,
                 "compliance_notes": [
-                    "SMS/voice sends require explicit opt-in.",
+                    "SMS sends require explicit opt-in.",
                     "Quiet hours and frequency caps are enforced server-side.",
                 ],
             },
