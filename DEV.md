@@ -84,6 +84,7 @@ Auth config:
 - Postmark webhook auth uses `POSTMARK_WEBHOOK_USERNAME` + `POSTMARK_WEBHOOK_PASSWORD`
 - Twilio Voice additionally needs `TWILIO_VOICE_FROM_NUMBER` or a voice-capable `TWILIO_FROM_NUMBER`
 - Voice UI stays unavailable until `SANDBOX_MODE=false`, `PUBLIC_API_BASE_URL` is set, and Twilio voice env is complete
+- For a real external call verification pass, follow `docs/twilio-voice-staging-runbook.md`
 
 ## Local-First LLM Config
 

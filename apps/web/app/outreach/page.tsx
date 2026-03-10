@@ -420,11 +420,19 @@ export default function OutreachPage() {
                       className='bg-amber-500/20 text-amber-200'
                       data-testid={`sandbox-badge-${pack.id}`}
                     >
-                      sandbox
+                      draft staging
                     </Badge>
                   )}
                 </div>
                 <p className='mt-1 text-xs text-muted-foreground'>drafts: {pack.drafts.length}</p>
+                {pack.sandbox ? (
+                  <p
+                    className='text-xs text-muted-foreground'
+                    data-testid={`sandbox-note-${pack.id}`}
+                  >
+                    Real sends still depend on server sandbox mode.
+                  </p>
+                ) : null}
               </div>
             ))}
             {packs.length === 0 ? (

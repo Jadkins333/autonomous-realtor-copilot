@@ -183,7 +183,7 @@ describe('OutreachPage', function () {
     })
   })
 
-  it('renders a pack item with sandbox badge', async function () {
+  it('renders a pack item with draft-staging wording that defers live-send truth to the server', async function () {
     const pack = makePack({ sandbox: true })
     mockApiFetch.mockResolvedValue({ items: [pack] })
     renderPage()
@@ -191,6 +191,10 @@ describe('OutreachPage', function () {
       expect(screen.getByTestId('pack-item-pack-aaa-111')).toBeTruthy()
     })
     expect(screen.getByTestId('sandbox-badge-pack-aaa-111')).toBeTruthy()
+    expect(screen.getByTestId('sandbox-badge-pack-aaa-111').textContent).toContain('draft staging')
+    expect(screen.getByTestId('sandbox-note-pack-aaa-111').textContent).toContain(
+      'Real sends still depend on server sandbox mode.',
+    )
   })
 
   it('does not show sandbox badge for non-sandbox packs', async function () {

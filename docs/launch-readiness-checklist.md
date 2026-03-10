@@ -18,6 +18,7 @@ This checklist is specific to the current `codex/reconcile-ui-llm` product surfa
 - Twilio voice status callback points to `${PUBLIC_API_BASE_URL}/webhooks/twilio/voice/status`.
 - `TWILIO_WEBHOOK_AUTH_TOKEN` is set, or `TWILIO_AUTH_TOKEN` is intentionally reused for signature validation.
 - `TWILIO_VOICE_FROM_NUMBER` or a voice-capable `TWILIO_FROM_NUMBER` is configured.
+- The external voice verification pass followed `docs/twilio-voice-staging-runbook.md`.
 - Postmark delivery webhook points to `${PUBLIC_API_BASE_URL}/webhooks/postmark/delivery`.
 - Postmark bounce webhook points to `${PUBLIC_API_BASE_URL}/webhooks/postmark/bounce`.
 - `POSTMARK_WEBHOOK_USERNAME` and `POSTMARK_WEBHOOK_PASSWORD` are configured in both the app and Postmark.

@@ -165,6 +165,7 @@ Postmark webhooks are configured on the Postmark server itself; point them at:
 - `${PUBLIC_API_BASE_URL}/webhooks/postmark/bounce`
 
 Staging-readiness note: this repo now has test coverage proving Twilio signature validation against a staging-style external base URL, but it has not yet completed a real Twilio/Postmark callback round-trip from a public deployment.
+Use [Twilio Voice Staging Runbook](./docs/twilio-voice-staging-runbook.md) for the exact external voice verification steps and evidence bar.
 
 ## Local-First LLM Configuration
 Required env:
