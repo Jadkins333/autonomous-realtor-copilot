@@ -18,7 +18,9 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [{ url: "/favicon.ico", sizes: "any" }],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }]
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }
+    ]
   }
 };
 
@@ -26,7 +28,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#ea580c"
+  themeColor: "#12576a"
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -37,9 +39,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Realtor Copilot" />
-        <meta name="theme-color" content="#ea580c" />
+        <meta name="theme-color" content="#12576a" />
       </head>
-      <body>
+      <body className="text-foreground">
         <Providers>
           <PWARegister />
           {children}
