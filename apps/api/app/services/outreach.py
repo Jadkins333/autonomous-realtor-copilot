@@ -610,3 +610,150 @@ def handle_inbound_sms(
         "global_revocation_applied": bool(stop_triggered and settings.enforce_global_revocation),
         "enrollments_stopped": stopped,
     }
+
+
+def _find_outbound_message_by_provider_id(
+    db: Session,
+    *,
+    channel: Channel,
+    provider_message_id: str | None,
+) -> Message | None:
+    if not provider_message_id:
+        return None
+    return db.execute(
+        select(Message)
+        .where(
+            Message.channel == channel,
+            Message.direction == MessageDirection.outbound,
+            Message.provider_message_id == provider_message_id,
+        )
+        .order_by(Message.created_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+
+
+def _apply_delivery_status(
+    db: Session,
+    *,
+    message: Message | None,
+    channel: Channel,
+    provider_name: str,
+    provider_status: str,
+    raw_payload: dict,
+    error_code: str | None = None,
+    error_message: str | None = None,
+    suppress_reason: str | None = None,
+) -> dict:
+    if message is None:
+        return {"matched": False}
+
+    normalized = (provider_status or "").strip().lower()
+    target_status = message.status
+    if normalized in {"queued", "accepted", "sending", "sent"}:
+        target_status = MessageStatus.sent
+    elif normalized in {"delivered", "delivery"}:
+        target_status = MessageStatus.delivered
+    elif normalized in {"failed", "undelivered", "bounce", "bounced"}:
+        target_status = MessageStatus.failed
+
+    if message.status not in {MessageStatus.delivered, MessageStatus.failed}:
+        message.status = target_status
+
+    message.meta_json = _message_meta(
+        message,
+        delivery_provider=provider_name,
+        provider_delivery_status=normalized or provider_status,
+        provider_event_payload=raw_payload,
+        provider_error_code=error_code or (message.meta_json or {}).get("provider_error_code"),
+        provider_error_message=error_message or (message.meta_json or {}).get("provider_error_message"),
+        provider_event_recorded_at=datetime.now(tz=UTC).isoformat(),
+    )
+
+    suppressed = False
+    if channel == Channel.email and target_status == MessageStatus.failed and suppress_reason:
+        existing = db.execute(
+            select(SuppressionList).where(
+                SuppressionList.tenant_id == message.tenant_id,
+                SuppressionList.contact_id == message.contact_id,
+                SuppressionList.channel == Channel.email,
+            )
+        ).scalar_one_or_none()
+        if existing is None:
+            db.add(
+                SuppressionList(
+                    tenant_id=message.tenant_id,
+                    contact_id=message.contact_id,
+                    channel=Channel.email,
+                    reason=suppress_reason,
+                )
+            )
+            suppressed = True
+
+    db.commit()
+    return {
+        "matched": True,
+        "message_id": str(message.id),
+        "status": message.status.value,
+        "suppressed": suppressed,
+    }
+
+
+def handle_twilio_status_callback(
+    db: Session,
+    *,
+    provider_message_id: str | None,
+    provider_status: str,
+    error_code: str | None = None,
+    error_message: str | None = None,
+    raw_payload: dict | None = None,
+) -> dict:
+    message = _find_outbound_message_by_provider_id(
+        db,
+        channel=Channel.sms,
+        provider_message_id=provider_message_id,
+    )
+    return _apply_delivery_status(
+        db,
+        message=message,
+        channel=Channel.sms,
+        provider_name="twilio",
+        provider_status=provider_status,
+        raw_payload=raw_payload or {},
+        error_code=error_code,
+        error_message=error_message,
+    )
+
+
+def handle_postmark_delivery_callback(db: Session, payload: dict) -> dict:
+    message = _find_outbound_message_by_provider_id(
+        db,
+        channel=Channel.email,
+        provider_message_id=str(payload.get("MessageID") or ""),
+    )
+    return _apply_delivery_status(
+        db,
+        message=message,
+        channel=Channel.email,
+        provider_name="postmark",
+        provider_status=str(payload.get("RecordType") or "delivery"),
+        raw_payload=payload,
+    )
+
+
+def handle_postmark_bounce_callback(db: Session, payload: dict) -> dict:
+    bounce_type = str(payload.get("Type") or "bounce").strip() or "bounce"
+    message = _find_outbound_message_by_provider_id(
+        db,
+        channel=Channel.email,
+        provider_message_id=str(payload.get("MessageID") or ""),
+    )
+    return _apply_delivery_status(
+        db,
+        message=message,
+        channel=Channel.email,
+        provider_name="postmark",
+        provider_status="bounce",
+        raw_payload=payload,
+        error_message=str(payload.get("Description") or ""),
+        suppress_reason=f"Postmark {bounce_type} bounce",
+    )

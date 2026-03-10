@@ -82,6 +82,9 @@ class TwilioSmsProvider(SmsProvider):
             "From": settings.twilio_from_number,
             "Body": body,
         }
+        callback_base = (settings.public_api_base_url or "").rstrip("/")
+        if callback_base:
+            data["StatusCallback"] = f"{callback_base}/webhooks/twilio/status"
         async with httpx.AsyncClient(timeout=20, auth=(settings.twilio_account_sid, settings.twilio_auth_token)) as client:
             response = await client.post(url, data=data)
         if response.is_success:

@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     frequency_cap_per_day: int = 3
     enforce_global_revocation: bool = False
     cors_allow_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    public_api_base_url: str = ""
 
     # ── LLM provider ─────────────────────────────────────────────────────────
     # Set LLM_ENABLED=true to enable AI assistance features.

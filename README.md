@@ -133,8 +133,16 @@ Required env:
 - `TWILIO_ACCOUNT_SID`
 - `TWILIO_AUTH_TOKEN`
 - `TWILIO_FROM_NUMBER`
+- `PUBLIC_API_BASE_URL` if you want Twilio delivery callbacks posted back to this API
 
 If any required key is missing, providers fall back to console behavior.
+
+### Delivery Webhooks
+- `POST /webhooks/twilio/status` records Twilio SMS delivery and failure receipts.
+- `POST /webhooks/postmark/delivery` records successful Postmark deliveries.
+- `POST /webhooks/postmark/bounce` marks failed deliveries and suppresses hard-bounced email contacts.
+
+Postmark webhooks are configured on the Postmark server itself; point them at the API routes above.
 
 ## Architecture Summary
 - `apps/api`: ingestion, truth-layer metrics, property hub APIs, compliance-enforced outreach, Twilio inbound webhook.
@@ -192,6 +200,9 @@ Reference docs:
 - `GET /outreach/drafts`
 - `POST /outreach/{message_id}/approve_and_send`
 - `POST /webhooks/twilio/inbound`
+- `POST /webhooks/twilio/status`
+- `POST /webhooks/postmark/delivery`
+- `POST /webhooks/postmark/bounce`
 - `POST /copilot/chat`
 - `GET /copilot/agents`
 
