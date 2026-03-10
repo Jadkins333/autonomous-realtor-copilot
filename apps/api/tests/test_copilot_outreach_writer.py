@@ -30,6 +30,10 @@ def test_outreach_writer_creates_draft_pack_and_excludes_insurance_terms(monkeyp
     agent = OutreachWriterAgent()
 
     monkeypatch.setattr(
+        "app.copilot.agents.outreach_writer.get_voice_provider_status",
+        lambda: SimpleNamespace(available=False, reason="Twilio Voice requires configuration."),
+    )
+    monkeypatch.setattr(
         "app.copilot.agents.outreach_writer.create_draft_pack",
         lambda *_args, **_kwargs: {
             "id": uuid4(),
@@ -54,4 +58,40 @@ def test_outreach_writer_creates_draft_pack_and_excludes_insurance_terms(monkeyp
     assert sorted(result.data.get("channels", [])) == ["email", "sms"]
     assert "insurance_pressure" not in str(result.data).lower()
     assert "verify with insurer" not in str(result.data).lower()
-    assert "voice" not in result.text.lower()
+    assert "voice" in result.text.lower()
+    assert "requires configuration" in result.text.lower()
+
+
+def test_outreach_writer_includes_voice_when_provider_is_available(monkeypatch) -> None:
+    contact = SimpleNamespace(id=uuid4(), name="Ava Thompson", email="ava@example.com")
+    db = FakeDB(contact)
+    agent = OutreachWriterAgent()
+
+    monkeypatch.setattr(
+        "app.copilot.agents.outreach_writer.get_voice_provider_status",
+        lambda: SimpleNamespace(available=True, reason=None),
+    )
+    monkeypatch.setattr(
+        "app.copilot.agents.outreach_writer.create_draft_pack",
+        lambda *_args, **_kwargs: {
+            "id": uuid4(),
+            "drafts": [
+                SimpleNamespace(id=uuid4(), channel=SimpleNamespace(value="sms")),
+                SimpleNamespace(id=uuid4(), channel=SimpleNamespace(value="email")),
+                SimpleNamespace(id=uuid4(), channel=SimpleNamespace(value="voice")),
+            ],
+        },
+    )
+
+    result = agent.run(
+        AgentContext(
+            db=db,
+            tenant_id=uuid4(),
+            user_id=uuid4(),
+            message="draft outreach to Ava",
+        )
+    )
+
+    assert result.status == "ok"
+    assert sorted(result.data.get("channels", [])) == ["email", "sms", "voice"]
+    assert "voice call drafts" in result.text.lower()

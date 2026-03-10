@@ -14,6 +14,20 @@ from app.models.enums import Channel, ConsentStatus, EnrollmentState, MessageDir
 settings = get_settings()
 EASTERN = ZoneInfo("America/New_York")
 
+COUNTABLE_OUTBOUND_STATUSES = [
+    MessageStatus.queued,
+    MessageStatus.initiated,
+    MessageStatus.ringing,
+    MessageStatus.in_progress,
+    MessageStatus.sent,
+    MessageStatus.delivered,
+    MessageStatus.completed,
+    MessageStatus.failed,
+    MessageStatus.no_answer,
+    MessageStatus.busy,
+    MessageStatus.canceled,
+]
+
 def evaluate_fair_housing_text(text: str) -> list[str]:
     lowered = text.lower()
     return [term for term in FAIR_HOUSING_FLAGGED_TERMS if term in lowered]
@@ -86,7 +100,7 @@ def outbound_count_today(db: Session, tenant_id, contact_id, channel: Channel) -
         Message.channel == channel,
         Message.direction == MessageDirection.outbound,
         Message.created_at >= datetime.combine(current, datetime.min.time(), tzinfo=EASTERN).astimezone(UTC),
-        Message.status.in_([MessageStatus.queued, MessageStatus.sent, MessageStatus.delivered]),
+        Message.status.in_(COUNTABLE_OUTBOUND_STATUSES),
     )
     return int(db.execute(stmt).scalar() or 0)
 

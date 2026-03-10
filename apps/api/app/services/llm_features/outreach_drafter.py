@@ -32,8 +32,9 @@ Critical rules — violations will cause the draft to be rejected:
 3. NEVER fabricate property statistics, prices, or facts not explicitly provided in the context.
 4. SMS messages MUST be under 160 characters total and MUST include "Reply STOP to opt out."
 5. Email subject lines MUST be under 60 characters.
-6. Match the requested tone exactly: professional | casual | urgent | empathetic.
-7. Return ONLY the requested field (subject line OR message body). No labels, headers, or commentary.
+6. Voice call scripts MUST stay under 90 words, sound natural when spoken aloud, and end with a clear callback request.
+7. Match the requested tone exactly: professional | casual | urgent | empathetic.
+8. Return ONLY the requested field (subject line OR message body). No labels, headers, or commentary.
 """
 
 # Intent → channel → tone mapping
@@ -144,8 +145,26 @@ def generate_outreach_draft(
             logger.debug("llm_outreach_draft_unavailable channel=sms reason=%s", exc)
             return None
 
-    elif channel == "voice":
-        raise ValueError("Voice outreach is not supported in this build.")
+    elif channel_lower == "voice":
+        body_prompt = (
+            f"Context:\n{context_block}\n\n"
+            f"{action} a short outbound voice call script for the above context.\n"
+            f"Tone: {tone_description}.\n"
+            "Hard limits: under 90 words, plain spoken English, no stage directions, "
+            "no markdown, and include a clear callback request.\n"
+            "Return ONLY the script text that should be spoken aloud."
+        )
+        if is_rewrite and existing_body:
+            body_prompt += f"\nOriginal script to improve: {existing_body}"
+        if rewrite_notes:
+            body_prompt += f"\nNotes: {rewrite_notes}"
+
+        try:
+            body = provider.complete(body_prompt, system=_SYSTEM_PROMPT).strip()
+            subject = None
+        except LLMUnavailable as exc:
+            logger.debug("llm_outreach_draft_unavailable channel=voice reason=%s", exc)
+            return None
     else:
         raise ValueError(f"Unsupported outreach channel: {channel}")
 

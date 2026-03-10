@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_from_number: str = ""
+    twilio_voice_from_number: str = ""
     twilio_webhook_auth_token: str = ""
 
     quiet_hours_start: int = Field(default=8, ge=0, le=23)

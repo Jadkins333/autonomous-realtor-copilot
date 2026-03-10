@@ -165,6 +165,12 @@ class _FakeProvider:
         return self.result
 
 
+class _FakeVoiceProvider(_FakeProvider):
+    async def call(self, *args):
+        self.calls.append(args)
+        return self.result
+
+
 def test_approve_and_send_email_non_sandbox_invokes_provider(monkeypatch):
     tenant_id = uuid4()
     message_id = uuid4()
@@ -259,6 +265,114 @@ def test_approve_and_send_sms_non_sandbox_invokes_provider(monkeypatch):
     assert result["pack_id"] == pack_id
     assert result["pack_status"] == "approved"
     assert db.commits == 1
+
+
+def test_approve_and_send_voice_non_sandbox_invokes_provider(monkeypatch):
+    tenant_id = uuid4()
+    message_id = uuid4()
+    pack_id = uuid4()
+
+    message = SimpleNamespace(
+        id=message_id,
+        tenant_id=tenant_id,
+        contact_id=uuid4(),
+        status=MessageStatus.draft,
+        channel=Channel.voice,
+        subject=None,
+        body="Approved voice script",
+        meta_json={},
+        pack_id=pack_id,
+        sent_at=None,
+        provider_message_id=None,
+    )
+    contact = SimpleNamespace(
+        id=message.contact_id, tenant_id=tenant_id, email=None, phone="+15555550123"
+    )
+    db = _FakeDB([message, contact, None])
+
+    provider = _FakeVoiceProvider(
+        result=SimpleNamespace(
+            ok=True,
+            provider_message_id="CA-voice-123",
+            provider_status="queued",
+            provider_payload={"sid": "CA-voice-123", "status": "queued"},
+            error=None,
+        ),
+        name="twilio_voice",
+    )
+
+    monkeypatch.setattr(outreach, "enforce_outbound_policy", lambda *_args, **_kwargs: (True, None))
+    monkeypatch.setattr(outreach.settings, "sandbox_mode", False, raising=False)
+    monkeypatch.setattr(outreach.settings, "public_api_base_url", "https://staging.example.com/api", raising=False)
+    monkeypatch.setattr(
+        outreach,
+        "get_voice_provider_status",
+        lambda: SimpleNamespace(available=True, reason=None, provider_name="twilio_voice"),
+    )
+    monkeypatch.setattr(outreach, "get_voice_provider", lambda: provider)
+    monkeypatch.setattr(outreach, "_safe_pack_status", lambda *_args, **_kwargs: "approved")
+
+    result = asyncio.run(outreach.approve_and_send(db, tenant_id, message_id))
+
+    assert provider.calls == [
+        (
+            "+15555550123",
+            f"https://staging.example.com/api/webhooks/twilio/voice/twiml/{message_id}",
+            "https://staging.example.com/api/webhooks/twilio/voice/status",
+        )
+    ]
+    assert message.status == MessageStatus.queued
+    assert message.provider_message_id == "CA-voice-123"
+    assert message.meta_json["approval_state"] == "approved"
+    assert message.meta_json["voice_twiml_url"].endswith(f"/{message_id}")
+    assert result["status"] == "queued"
+    assert result["provider_message_id"] == "CA-voice-123"
+    assert db.commits == 1
+
+
+def test_approve_and_send_voice_returns_unavailable_without_provider(monkeypatch):
+    tenant_id = uuid4()
+    message_id = uuid4()
+    pack_id = uuid4()
+
+    message = SimpleNamespace(
+        id=message_id,
+        tenant_id=tenant_id,
+        contact_id=uuid4(),
+        status=MessageStatus.draft,
+        channel=Channel.voice,
+        subject=None,
+        body="Approved voice script",
+        meta_json={},
+        pack_id=pack_id,
+        sent_at=None,
+        provider_message_id=None,
+    )
+    contact = SimpleNamespace(
+        id=message.contact_id, tenant_id=tenant_id, email=None, phone="+15555550123"
+    )
+    db = _FakeDB([message, contact])
+
+    monkeypatch.setattr(outreach, "enforce_outbound_policy", lambda *_args, **_kwargs: (True, None))
+    monkeypatch.setattr(outreach.settings, "sandbox_mode", False, raising=False)
+    monkeypatch.setattr(
+        outreach,
+        "get_voice_provider_status",
+        lambda: SimpleNamespace(
+            available=False,
+            reason="Twilio Voice requires TWILIO_VOICE_FROM_NUMBER or TWILIO_FROM_NUMBER.",
+        ),
+    )
+    monkeypatch.setattr(outreach, "get_voice_provider", lambda: None)
+    monkeypatch.setattr(outreach, "_safe_pack_status", lambda *_args, **_kwargs: "submitted")
+
+    result = asyncio.run(outreach.approve_and_send(db, tenant_id, message_id))
+
+    assert result["status"] == "unavailable"
+    assert result["approval_state"] == "draft"
+    assert "TWILIO_VOICE_FROM_NUMBER" in result["reason"]
+    assert message.status == MessageStatus.draft
+    assert db.commits == 0
 
 
 def test_retry_with_jitter_logs_error_context(monkeypatch):

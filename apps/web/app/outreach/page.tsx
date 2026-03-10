@@ -49,6 +49,12 @@ type DraftPackList = {
   next_cursor?: string | null
 }
 
+type VoiceStatus = {
+  available: boolean
+  provider?: string | null
+  reason?: string | null
+}
+
 type ActionResult = Record<string, unknown>
 
 // ---------------------------------------------------------------------------
@@ -57,12 +63,21 @@ type ActionResult = Record<string, unknown>
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-blue-500/20 text-blue-200',
+  queued: 'bg-sky-500/20 text-sky-200',
+  initiated: 'bg-sky-500/20 text-sky-200',
+  ringing: 'bg-amber-500/20 text-amber-200',
+  in_progress: 'bg-amber-500/20 text-amber-200',
   blocked_sandbox: 'bg-amber-500/20 text-amber-200',
   sent: 'bg-green-500/20 text-green-200',
   delivered: 'bg-green-500/20 text-green-200',
+  completed: 'bg-green-500/20 text-green-200',
+  busy: 'bg-amber-500/20 text-amber-200',
+  no_answer: 'bg-amber-500/20 text-amber-200',
+  canceled: 'bg-muted text-muted-foreground',
   blocked: 'bg-red-500/20 text-red-200',
   failed: 'bg-red-500/20 text-red-200',
   rejected: 'bg-muted text-muted-foreground',
+  unavailable: 'bg-red-500/20 text-red-200',
 }
 
 function DraftStatusBadge({ status }: { status: string }) {
@@ -76,6 +91,11 @@ function DraftStatusBadge({ status }: { status: string }) {
 
 function truncate(text: string, max = 120): string {
   return text.length > max ? text.slice(0, max) + '…' : text
+}
+
+function channelLabel(channel: string): string {
+  if (channel === 'voice') return 'voice call'
+  return channel
 }
 
 function resultMessage(result: ActionResult): string {
@@ -114,6 +134,12 @@ export default function OutreachPage() {
   const [composeChannels, setComposeChannels] = useState<string[]>(['email'])
   const [composing, setComposing] = useState(false)
   const [composeError, setComposeError] = useState<string | null>(null)
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>({
+    available: false,
+    provider: null,
+    reason: 'Voice calls are unavailable until Twilio Voice is configured.',
+  })
+  const [voiceStatusLoaded, setVoiceStatusLoaded] = useState(false)
 
   const load = useCallback(async () => {
     if (!session) return
@@ -182,6 +208,27 @@ export default function OutreachPage() {
     () => packs.find((pack) => pack.id === selectedPackId) || null,
     [packs, selectedPackId],
   )
+  const selectedPackHasVoiceDraft = useMemo(
+    () => Boolean(selectedPack?.drafts.some((draft) => draft.channel === 'voice')),
+    [selectedPack],
+  )
+
+  useEffect(() => {
+    if (!session || (!showCompose && !selectedPackHasVoiceDraft) || voiceStatusLoaded) return
+    apiFetch<VoiceStatus>('/outreach/voice-status', session.apiToken)
+      .then((statusPayload) => {
+        setVoiceStatus(statusPayload)
+        setVoiceStatusLoaded(true)
+      })
+      .catch((err) => {
+        setVoiceStatus({
+          available: false,
+          provider: null,
+          reason: err instanceof Error ? err.message : 'Voice calls are unavailable right now.',
+        })
+        setVoiceStatusLoaded(true)
+      })
+  }, [session, selectedPackHasVoiceDraft, showCompose, voiceStatusLoaded])
 
   async function submitPack(id: string) {
     if (!session) return
@@ -229,8 +276,8 @@ export default function OutreachPage() {
       <Card className='mb-4'>
         <CardTitle>Outreach Autopilot</CardTitle>
         <CardDescription>
-          Sandbox is ON by default. Draft packs group email/SMS drafts and require explicit
-          submission and approval.
+          Draft packs group reviewed outbound drafts. Deterministic compliance stays authoritative,
+          and voice call availability is only shown when the server can actually place Twilio calls.
         </CardDescription>
         {actionResult ? (
           <p className='mt-3 text-sm text-muted-foreground' data-testid='action-result'>
@@ -304,7 +351,9 @@ export default function OutreachPage() {
             <div>
               <label className='mb-1 block text-xs text-muted-foreground'>Channels *</label>
               <div className='flex gap-4 text-sm' data-testid='compose-channels'>
-                {['email', 'sms'].map((ch) => (
+                {(['email', 'sms'] as string[])
+                  .concat(voiceStatus.available ? ['voice'] : [])
+                  .map((ch) => (
                   <label key={ch} className='flex items-center gap-1.5 cursor-pointer'>
                     <input
                       type='checkbox'
@@ -312,10 +361,19 @@ export default function OutreachPage() {
                       onChange={() => toggleChannel(ch)}
                       data-testid={`compose-channel-${ch}`}
                     />
-                    {ch}
+                    {channelLabel(ch)}
                   </label>
                 ))}
               </div>
+              {voiceStatus.available ? (
+                <p className='mt-2 text-xs text-muted-foreground' data-testid='voice-available-note'>
+                  Voice calls use approved scripts and signed Twilio callbacks.
+                </p>
+              ) : (
+                <p className='mt-2 text-xs text-muted-foreground' data-testid='voice-unavailable-note'>
+                  Voice call channel unavailable: {voiceStatus.reason}
+                </p>
+              )}
             </div>
 
             {composeError ? (
@@ -428,19 +486,19 @@ export default function OutreachPage() {
             <tbody>
               {selectedPack.drafts.map((draft) => (
                 <tr key={draft.id} data-testid={`draft-row-${draft.id}`}>
-                  <Td>{draft.channel}</Td>
+                  <Td>{channelLabel(draft.channel)}</Td>
                   <Td>{draft.subject ?? '—'}</Td>
                   <Td>{truncate(draft.body)}</Td>
                   <Td>
                     <DraftStatusBadge status={draft.status} />
                   </Td>
                   <Td>
-                    {draft.channel === 'voice' ? (
+                    {draft.channel === 'voice' && !voiceStatus.available ? (
                       <p
                         className='text-xs text-muted-foreground'
                         data-testid={`voice-disabled-${draft.id}`}
                       >
-                        Voice disabled in this build.
+                        Voice unavailable: {voiceStatus.reason}
                       </p>
                     ) : confirmApproving === draft.id ? (
                       <div className='flex gap-2' data-testid='approve-confirm-row'>

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from html import escape
 import logging
 from datetime import UTC, datetime
 from uuid import UUID
@@ -20,7 +21,12 @@ from app.models.entities import (
 )
 from app.models.enums import Channel, ConsentStatus, MessageDirection, MessageStatus
 from app.services.compliance import enforce_outbound_policy, stop_enrollments_on_reply
-from app.services.providers import get_email_provider, get_sms_provider
+from app.services.providers import (
+    get_email_provider,
+    get_sms_provider,
+    get_voice_provider,
+    get_voice_provider_status,
+)
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -28,6 +34,21 @@ logger = logging.getLogger(__name__)
 
 def _message_meta(message: Message, **updates):
     return {**(message.meta_json or {}), **updates}
+
+
+VOICE_TERMINAL_STATUSES = {
+    MessageStatus.completed,
+    MessageStatus.failed,
+    MessageStatus.no_answer,
+    MessageStatus.busy,
+    MessageStatus.canceled,
+}
+
+DELIVERY_TERMINAL_STATUSES = {
+    MessageStatus.delivered,
+    MessageStatus.failed,
+    *VOICE_TERMINAL_STATUSES,
+}
 
 
 def _safe_pack_status(db: Session, pack_id):
@@ -67,8 +88,20 @@ def _normalize_channel(value: str) -> Channel:
     if cleaned == "email":
         return Channel.email
     if cleaned == "voice":
-        raise ValueError("Voice outreach is not supported in this build.")
+        return Channel.voice
     raise ValueError(f"Unsupported channel '{value}'")
+
+
+def _public_api_base_url() -> str:
+    return (settings.public_api_base_url or "").rstrip("/")
+
+
+def _voice_twiml_url(message_id: UUID) -> str:
+    return f"{_public_api_base_url()}/webhooks/twilio/voice/twiml/{message_id}"
+
+
+def _voice_status_callback_url() -> str:
+    return f"{_public_api_base_url()}/webhooks/twilio/voice/status"
 
 
 def _draft_templates(contact_name: str, objective: str, channel: Channel) -> tuple[str | None, str]:
@@ -92,8 +125,9 @@ def _draft_templates(contact_name: str, objective: str, channel: Channel) -> tup
     return (
         None,
         (
-            f"Voicemail outline for {contact_name}: "
-            f"{objective}. Close with opt-out reminder and invite follow-up."
+            f"Hi {contact_name}, this is your Columbus real estate team calling with an update. "
+            f"{objective} If you would like to talk, please call or text us back. "
+            "If you would prefer no more voice calls, please let us know."
         ),
     )
 
@@ -153,6 +187,15 @@ def _pack_to_payload(db: Session, pack: OutreachDraftPack) -> dict:
         "sandbox": pack.sandbox,
         "objective": pack.objective,
         "drafts": drafts,
+    }
+
+
+def voice_channel_status_payload() -> dict:
+    status = get_voice_provider_status()
+    return {
+        "available": status.available,
+        "provider": status.provider_name,
+        "reason": status.reason,
     }
 
 
@@ -324,24 +367,6 @@ async def approve_and_send(db: Session, tenant_id: UUID, message_id: UUID) -> di
             "idempotent": True,
         }
 
-    if message.channel == Channel.voice:
-        message.status = MessageStatus.blocked
-        message.meta_json = _message_meta(
-            message,
-            approval_state="rejected",
-            blocked_reason="Voice outreach is not supported in this build.",
-            unsupported_channel="voice",
-        )
-        pack_status = _safe_pack_status(db, message.pack_id)
-        db.commit()
-        return {
-            "status": "blocked",
-            "approval_state": "rejected",
-            "pack_id": message.pack_id,
-            "pack_status": pack_status,
-            "reason": "Voice outreach is not supported in this build.",
-        }
-
     allowed, reason = enforce_outbound_policy(db, message)
     if not allowed:
         message.status = MessageStatus.blocked
@@ -391,7 +416,7 @@ async def approve_and_send(db: Session, tenant_id: UUID, message_id: UUID) -> di
         provider = get_email_provider()
         if not contact.email:
             message.status = MessageStatus.failed
-            message.meta_json = _message_meta(message, error="Contact has no email")
+            message.meta_json = _message_meta(message, error="Contact has no email", approval_state="approved")
             pack_status = _safe_pack_status(db, message.pack_id)
             db.commit()
             return {
@@ -410,7 +435,7 @@ async def approve_and_send(db: Session, tenant_id: UUID, message_id: UUID) -> di
         provider = get_sms_provider()
         if not contact.phone:
             message.status = MessageStatus.failed
-            message.meta_json = _message_meta(message, error="Contact has no phone")
+            message.meta_json = _message_meta(message, error="Contact has no phone", approval_state="approved")
             pack_status = _safe_pack_status(db, message.pack_id)
             db.commit()
             return {
@@ -425,17 +450,61 @@ async def approve_and_send(db: Session, tenant_id: UUID, message_id: UUID) -> di
                 provider_fallback_reason="Missing Twilio credentials; using console provider",
             )
         result = await provider.send(contact.phone, message.body)
+    elif message.channel == Channel.voice:
+        if not contact.phone:
+            message.status = MessageStatus.failed
+            message.meta_json = _message_meta(message, error="Contact has no phone", approval_state="approved")
+            pack_status = _safe_pack_status(db, message.pack_id)
+            db.commit()
+            return {
+                "status": "failed",
+                "reason": "Contact has no phone",
+                "pack_id": message.pack_id,
+                "pack_status": pack_status,
+            }
+
+        provider_status = get_voice_provider_status()
+        provider = get_voice_provider()
+        if provider is None or not provider_status.available:
+            return {
+                "status": "unavailable",
+                "approval_state": "draft",
+                "reason": provider_status.reason or "Voice provider is unavailable.",
+                "pack_id": message.pack_id,
+                "pack_status": _safe_pack_status(db, message.pack_id),
+            }
+
+        result = await provider.call(
+            contact.phone,
+            _voice_twiml_url(message.id),
+            _voice_status_callback_url(),
+        )
     else:
         raise ValueError("Unsupported channel")
 
     if result.ok:
-        message.status = MessageStatus.sent
+        provider_status_value = getattr(result, "provider_status", None) or ""
+        provider_payload = getattr(result, "provider_payload", None)
+        target_status, normalized_provider_status = _map_delivery_status(
+            message.channel,
+            provider_status_value,
+            current_status=MessageStatus.sent if message.channel != Channel.voice else MessageStatus.queued,
+        )
+        message.status = target_status
         message.sent_at = datetime.now(tz=UTC)
         message.provider_message_id = result.provider_message_id
-        message.meta_json = _message_meta(message, approval_state="approved")
+        message.meta_json = _message_meta(
+            message,
+            approval_state="approved",
+            delivery_provider=getattr(provider, "name", None),
+            provider_delivery_status=normalized_provider_status or provider_status_value,
+            provider_initial_payload=provider_payload,
+            voice_twiml_url=_voice_twiml_url(message.id) if message.channel == Channel.voice else None,
+            voice_status_callback_url=_voice_status_callback_url() if message.channel == Channel.voice else None,
+        )
     else:
         message.status = MessageStatus.failed
-        message.meta_json = _message_meta(message, provider_error=result.error)
+        message.meta_json = _message_meta(message, provider_error=result.error, approval_state="approved")
 
     convo = db.execute(
         select(Conversation).where(
@@ -639,6 +708,50 @@ def _find_outbound_message_by_provider_id(
     ).scalar_one_or_none()
 
 
+def _normalize_provider_status(provider_status: str) -> str:
+    return (provider_status or "").strip().lower().replace("-", "_")
+
+
+def _map_delivery_status(
+    channel: Channel,
+    provider_status: str,
+    *,
+    current_status: MessageStatus,
+) -> tuple[MessageStatus, str]:
+    normalized = _normalize_provider_status(provider_status)
+    target_status = current_status
+
+    if channel == Channel.voice:
+        voice_mapping = {
+            "queued": MessageStatus.queued,
+            "initiated": MessageStatus.initiated,
+            "ringing": MessageStatus.ringing,
+            "answered": MessageStatus.in_progress,
+            "in_progress": MessageStatus.in_progress,
+            "completed": MessageStatus.completed,
+            "busy": MessageStatus.busy,
+            "failed": MessageStatus.failed,
+            "no_answer": MessageStatus.no_answer,
+            "canceled": MessageStatus.canceled,
+            "cancelled": MessageStatus.canceled,
+        }
+        return voice_mapping.get(normalized, current_status), normalized
+
+    if normalized in {"queued", "accepted", "sending", "sent"}:
+        target_status = MessageStatus.sent
+    elif normalized in {"delivered", "delivery"}:
+        target_status = MessageStatus.delivered
+    elif normalized in {"failed", "undelivered", "bounce", "bounced"}:
+        target_status = MessageStatus.failed
+    return target_status, normalized
+
+
+def _provider_event_history(message: Message, entry: dict) -> list[dict]:
+    history = list((message.meta_json or {}).get("provider_event_history") or [])
+    history.append(entry)
+    return history
+
+
 def _apply_delivery_status(
     db: Session,
     *,
@@ -654,26 +767,34 @@ def _apply_delivery_status(
     if message is None:
         return {"matched": False}
 
-    normalized = (provider_status or "").strip().lower()
-    target_status = message.status
-    if normalized in {"queued", "accepted", "sending", "sent"}:
-        target_status = MessageStatus.sent
-    elif normalized in {"delivered", "delivery"}:
-        target_status = MessageStatus.delivered
-    elif normalized in {"failed", "undelivered", "bounce", "bounced"}:
-        target_status = MessageStatus.failed
+    target_status, normalized = _map_delivery_status(
+        channel,
+        provider_status,
+        current_status=message.status,
+    )
 
-    if message.status not in {MessageStatus.delivered, MessageStatus.failed}:
+    if message.status not in DELIVERY_TERMINAL_STATUSES:
         message.status = target_status
 
+    event_recorded_at = datetime.now(tz=UTC).isoformat()
+    event_entry = {
+        "provider": provider_name,
+        "status": normalized or provider_status,
+        "recorded_at": event_recorded_at,
+        "payload": raw_payload,
+        "error_code": error_code,
+        "error_message": error_message,
+    }
     message.meta_json = _message_meta(
         message,
         delivery_provider=provider_name,
         provider_delivery_status=normalized or provider_status,
         provider_event_payload=raw_payload,
+        provider_event_history=_provider_event_history(message, event_entry),
         provider_error_code=error_code or (message.meta_json or {}).get("provider_error_code"),
         provider_error_message=error_message or (message.meta_json or {}).get("provider_error_message"),
-        provider_event_recorded_at=datetime.now(tz=UTC).isoformat(),
+        provider_event_recorded_at=event_recorded_at,
+        voice_call_duration_seconds=raw_payload.get("CallDuration") if channel == Channel.voice else None,
     )
 
     suppressed = False
@@ -728,6 +849,74 @@ def handle_twilio_status_callback(
         raw_payload=raw_payload or {},
         error_code=error_code,
         error_message=error_message,
+    )
+
+
+def handle_twilio_voice_status_callback(
+    db: Session,
+    *,
+    provider_message_id: str | None,
+    provider_status: str,
+    error_code: str | None = None,
+    error_message: str | None = None,
+    raw_payload: dict | None = None,
+) -> dict:
+    message = _find_outbound_message_by_provider_id(
+        db,
+        channel=Channel.voice,
+        provider_message_id=provider_message_id,
+    )
+    return _apply_delivery_status(
+        db,
+        message=message,
+        channel=Channel.voice,
+        provider_name="twilio_voice",
+        provider_status=provider_status,
+        raw_payload=raw_payload or {},
+        error_code=error_code,
+        error_message=error_message,
+    )
+
+
+def render_twilio_voice_twiml(
+    db: Session,
+    *,
+    message_id: UUID,
+    call_sid: str | None,
+    raw_payload: dict | None = None,
+) -> str:
+    message = db.execute(
+        select(Message).where(
+            Message.id == message_id,
+            Message.channel == Channel.voice,
+            Message.direction == MessageDirection.outbound,
+        )
+    ).scalar_one_or_none()
+    if message is None:
+        raise ValueError("Voice message not found")
+    if message.status == MessageStatus.draft:
+        raise ValueError("Voice message is not approved for playback")
+    if call_sid and message.provider_message_id and message.provider_message_id != call_sid:
+        raise ValueError("Voice message does not match the Twilio call")
+
+    script_text = " ".join((message.body or "").split())
+    if not script_text:
+        raise ValueError("Voice script is empty")
+
+    if raw_payload is not None:
+        message.meta_json = _message_meta(
+            message,
+            twiml_last_requested_at=datetime.now(tz=UTC).isoformat(),
+            twiml_last_request_payload=raw_payload,
+            twilio_call_sid=call_sid or message.provider_message_id,
+        )
+        db.commit()
+
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        "<Response>"
+        f'<Say voice="alice" language="en-US">{escape(script_text)}</Say>'
+        "</Response>"
     )
 
 

@@ -62,13 +62,14 @@ def _make_message(
     contact_id,
     channel: Channel,
     provider_message_id: str,
+    status: MessageStatus = MessageStatus.sent,
 ) -> Message:
     message = Message(
         tenant_id=tenant_id,
         contact_id=contact_id,
         channel=channel,
         direction=MessageDirection.outbound,
-        status=MessageStatus.sent,
+        status=status,
         subject="Callback test",
         body="Provider callback verification",
         provider_message_id=provider_message_id,
@@ -295,6 +296,190 @@ def test_twilio_status_webhook_marks_sms_failed(monkeypatch) -> None:
             assert refreshed.status == MessageStatus.failed
             assert refreshed.meta_json["provider_error_code"] == "30003"
             assert refreshed.meta_json["provider_delivery_status"] == "undelivered"
+        finally:
+            db.close()
+    finally:
+        _cleanup(tenant_ids)
+
+
+def test_twilio_voice_status_webhook_marks_ringing_then_completed(monkeypatch) -> None:
+    _set_webhook_env(monkeypatch)
+    db = SessionLocal()
+    tenant_ids = []
+    try:
+        suffix = uuid4().hex[:8]
+        tenant, _user = _make_tenant(db, suffix=suffix)
+        tenant_ids.append(tenant.id)
+        contact = _make_contact(db, tenant_id=tenant.id)
+        message = _make_message(
+            db,
+            tenant_id=tenant.id,
+            contact_id=contact.id,
+            channel=Channel.voice,
+            provider_message_id="CA-ringing-123",
+            status=MessageStatus.queued,
+        )
+    finally:
+        db.close()
+
+    try:
+        with TestClient(app) as client:
+            ringing_params = {
+                "CallSid": "CA-ringing-123",
+                "CallStatus": "ringing",
+                "Direction": "outbound-api",
+            }
+            ringing = client.post(
+                "/webhooks/twilio/voice/status",
+                data=ringing_params,
+                headers={
+                    "X-Twilio-Signature": _twilio_signature(
+                        "http://testserver/webhooks/twilio/voice/status",
+                        ringing_params,
+                        "twilio-secret",
+                    )
+                },
+            )
+            completed_params = {
+                "CallSid": "CA-ringing-123",
+                "CallStatus": "completed",
+                "CallDuration": "32",
+                "Direction": "outbound-api",
+            }
+            completed = client.post(
+                "/webhooks/twilio/voice/status",
+                data=completed_params,
+                headers={
+                    "X-Twilio-Signature": _twilio_signature(
+                        "http://testserver/webhooks/twilio/voice/status",
+                        completed_params,
+                        "twilio-secret",
+                    )
+                },
+            )
+
+        assert ringing.status_code == 200
+        assert ringing.json()["status"] == "ringing"
+        assert completed.status_code == 200
+        assert completed.json()["status"] == "completed"
+
+        db = SessionLocal()
+        try:
+            refreshed = db.execute(select(Message).where(Message.id == message.id)).scalar_one()
+            assert refreshed.status == MessageStatus.completed
+            assert refreshed.meta_json["delivery_provider"] == "twilio_voice"
+            assert refreshed.meta_json["provider_delivery_status"] == "completed"
+            assert refreshed.meta_json["voice_call_duration_seconds"] == "32"
+            assert len(refreshed.meta_json["provider_event_history"]) == 2
+        finally:
+            db.close()
+    finally:
+        _cleanup(tenant_ids)
+
+
+def test_twilio_voice_status_webhook_accepts_public_api_base_url_signature(monkeypatch) -> None:
+    _set_webhook_env(monkeypatch)
+    monkeypatch.setenv("PUBLIC_API_BASE_URL", "https://staging.example.com/api")
+    get_settings.cache_clear()
+
+    db = SessionLocal()
+    tenant_ids = []
+    try:
+        suffix = uuid4().hex[:8]
+        tenant, _user = _make_tenant(db, suffix=suffix)
+        tenant_ids.append(tenant.id)
+        contact = _make_contact(db, tenant_id=tenant.id)
+        _make_message(
+            db,
+            tenant_id=tenant.id,
+            contact_id=contact.id,
+            channel=Channel.voice,
+            provider_message_id="CA-staging-voice-123",
+            status=MessageStatus.queued,
+        )
+    finally:
+        db.close()
+
+    try:
+        with TestClient(app) as client:
+            params = {"CallSid": "CA-staging-voice-123", "CallStatus": "completed"}
+            response = client.post(
+                "/webhooks/twilio/voice/status",
+                data=params,
+                headers={
+                    "X-Twilio-Signature": _twilio_signature(
+                        "https://staging.example.com/api/webhooks/twilio/voice/status",
+                        params,
+                        "twilio-secret",
+                    )
+                },
+            )
+        assert response.status_code == 200
+        assert response.json()["matched"] is True
+    finally:
+        _cleanup(tenant_ids)
+        get_settings.cache_clear()
+
+
+def test_twilio_voice_twiml_rejects_missing_signature(monkeypatch) -> None:
+    _set_webhook_env(monkeypatch)
+    with TestClient(app) as client:
+        response = client.post(f"/webhooks/twilio/voice/twiml/{uuid4()}", data={"CallSid": "CA-nope"})
+    assert response.status_code == 403
+    assert "Twilio signature" in response.json()["detail"]
+
+
+def test_twilio_voice_twiml_returns_approved_script(monkeypatch) -> None:
+    _set_webhook_env(monkeypatch)
+    db = SessionLocal()
+    tenant_ids = []
+    try:
+        suffix = uuid4().hex[:8]
+        tenant, _user = _make_tenant(db, suffix=suffix)
+        tenant_ids.append(tenant.id)
+        contact = _make_contact(db, tenant_id=tenant.id)
+        message = Message(
+            tenant_id=tenant.id,
+            contact_id=contact.id,
+            channel=Channel.voice,
+            direction=MessageDirection.outbound,
+            status=MessageStatus.initiated,
+            subject=None,
+            body="Hi Alice, this is a quick public-data update. Please call us back.",
+            provider_message_id="CA-twiml-123",
+            meta_json={"approval_state": "approved"},
+        )
+        db.add(message)
+        db.commit()
+        db.refresh(message)
+    finally:
+        db.close()
+
+    try:
+        with TestClient(app) as client:
+            params = {"CallSid": "CA-twiml-123", "Direction": "outbound-api"}
+            response = client.post(
+                f"/webhooks/twilio/voice/twiml/{message.id}",
+                data=params,
+                headers={
+                    "X-Twilio-Signature": _twilio_signature(
+                        f"http://testserver/webhooks/twilio/voice/twiml/{message.id}",
+                        params,
+                        "twilio-secret",
+                    )
+                },
+            )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("application/xml")
+        assert "<Say" in response.text
+        assert "Please call us back." in response.text
+
+        db = SessionLocal()
+        try:
+            refreshed = db.execute(select(Message).where(Message.id == message.id)).scalar_one()
+            assert refreshed.meta_json["twilio_call_sid"] == "CA-twiml-123"
+            assert "twiml_last_requested_at" in refreshed.meta_json
         finally:
             db.close()
     finally:

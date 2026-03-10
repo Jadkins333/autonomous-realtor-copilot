@@ -15,6 +15,7 @@ from app.schemas.outreach import (
     DraftPackOut,
     DraftPacksListOut,
     DraftPackSubmitOut,
+    VoiceChannelStatusOut,
 )
 from app.services.llm.provider import get_llm_provider
 from app.services.llm_features.outreach_drafter import generate_outreach_draft
@@ -26,6 +27,7 @@ from app.services.outreach import (
     list_drafts,
     reject_draft,
     submit_draft_pack,
+    voice_channel_status_payload,
 )
 
 router = APIRouter(prefix="/outreach", tags=["outreach"])
@@ -34,6 +36,15 @@ router = APIRouter(prefix="/outreach", tags=["outreach"])
 @router.get("/drafts", response_model=list[DraftMessageOut])
 def outreach_drafts(auth: AuthContext = Depends(get_auth_context), db: Session = Depends(get_db)) -> list[DraftMessageOut]:
     return list_drafts(db, auth.tenant_id)
+
+
+@router.get(
+    "/voice-status",
+    response_model=VoiceChannelStatusOut,
+    summary="Live outbound voice channel availability",
+)
+def outreach_voice_status(auth: AuthContext = Depends(get_auth_context)) -> VoiceChannelStatusOut:
+    return VoiceChannelStatusOut.model_validate(voice_channel_status_payload())
 
 
 @router.post("/draft-pack", response_model=DraftPackOut)
@@ -186,8 +197,6 @@ def outreach_rewrite_draft(
                 parcel_address = parcel.address
 
     channel = getattr(message.channel, "value", str(message.channel))
-    if channel == "voice":
-        raise HTTPException(status_code=400, detail="Voice outreach is not supported in this build.")
 
     provider = get_llm_provider()
     if provider is None:

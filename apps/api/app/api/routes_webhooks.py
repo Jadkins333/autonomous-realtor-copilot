@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, Form, Request
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -9,6 +11,8 @@ from app.services.outreach import (
     handle_postmark_bounce_callback,
     handle_postmark_delivery_callback,
     handle_twilio_status_callback,
+    handle_twilio_voice_status_callback,
+    render_twilio_voice_twiml,
 )
 from app.services.webhook_auth import require_postmark_basic_auth, require_twilio_signature
 
@@ -69,6 +73,74 @@ async def twilio_status(
         },
     )
     return {"ok": True, **result}
+
+
+@router.post("/twilio/voice/status")
+async def twilio_voice_status(
+    request: Request,
+    CallSid: str = Form(default=""),
+    CallStatus: str = Form(default=""),
+    ErrorCode: str = Form(default=""),
+    ErrorMessage: str = Form(default=""),
+    CallDuration: str = Form(default=""),
+    AnsweredBy: str = Form(default=""),
+    To: str = Form(default=""),
+    From: str = Form(default=""),
+    Direction: str = Form(default=""),
+    db: Session = Depends(get_db),
+) -> dict:
+    form = await request.form()
+    payload = {key: str(value) for key, value in form.items()}
+    require_twilio_signature(request, payload)
+    result = handle_twilio_voice_status_callback(
+        db,
+        provider_message_id=CallSid,
+        provider_status=CallStatus,
+        error_code=ErrorCode or None,
+        error_message=ErrorMessage or None,
+        raw_payload={
+            "CallSid": CallSid,
+            "CallStatus": CallStatus,
+            "ErrorCode": ErrorCode,
+            "ErrorMessage": ErrorMessage,
+            "CallDuration": CallDuration,
+            "AnsweredBy": AnsweredBy,
+            "To": To,
+            "From": From,
+            "Direction": Direction,
+        },
+    )
+    return {"ok": True, **result}
+
+
+@router.post("/twilio/voice/twiml/{message_id}")
+async def twilio_voice_twiml(
+    message_id: UUID,
+    request: Request,
+    CallSid: str = Form(default=""),
+    To: str = Form(default=""),
+    From: str = Form(default=""),
+    Direction: str = Form(default=""),
+    db: Session = Depends(get_db),
+) -> Response:
+    form = await request.form()
+    payload = {key: str(value) for key, value in form.items()}
+    require_twilio_signature(request, payload)
+    try:
+        xml = render_twilio_voice_twiml(
+            db,
+            message_id=message_id,
+            call_sid=CallSid or None,
+            raw_payload={
+                "CallSid": CallSid,
+                "To": To,
+                "From": From,
+                "Direction": Direction,
+            },
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return Response(content=xml, media_type="application/xml")
 
 
 @router.post("/postmark/delivery")

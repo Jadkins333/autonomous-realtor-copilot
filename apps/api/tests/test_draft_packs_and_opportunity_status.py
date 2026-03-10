@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -7,8 +8,8 @@ from fastapi.testclient import TestClient
 from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.main import app
-from app.models.entities import ComplianceEvent, Contact, Message, OutreachDraftPack, Tenant, User
-from app.models.enums import Channel, MessageDirection, MessageStatus, UserRole
+from app.models.entities import ComplianceEvent, ConsentEvent, Contact, Message, OutreachDraftPack, Tenant, User
+from app.models.enums import Channel, ConsentStatus, MessageDirection, MessageStatus, UserRole
 from app.utils.security import get_password_hash
 
 
@@ -70,7 +71,7 @@ def test_draft_pack_create_submit_approve_reject_flow() -> None:
         assert fetched.json()["status"] == "rejected"
 
 
-def test_draft_pack_rejects_voice_channel() -> None:
+def test_draft_pack_accepts_voice_channel() -> None:
     db = SessionLocal()
     tenant_ids = []
     suffix = uuid4().hex[:8]
@@ -120,13 +121,16 @@ def test_draft_pack_rejects_voice_channel() -> None:
                 headers=headers,
                 json={
                     "contact_id": str(contact.id),
-                    "objective": "Attempt unsupported voice outreach",
+                    "objective": "Call with a public-data update",
                     "channels": ["voice"],
                     "sandbox": True,
                 },
             )
-        assert created.status_code == 400
-        assert "Voice outreach is not supported" in created.json()["detail"]
+        assert created.status_code == 200
+        payload = created.json()
+        assert len(payload["drafts"]) == 1
+        assert payload["drafts"][0]["channel"] == "voice"
+        assert payload["drafts"][0]["status"] == "draft"
     finally:
         cleanup_db = SessionLocal()
         try:
@@ -144,7 +148,7 @@ def test_draft_pack_rejects_voice_channel() -> None:
             cleanup_db.close()
 
 
-def test_approve_voice_draft_returns_blocked_unsupported_response() -> None:
+def test_approve_voice_draft_returns_unavailable_when_provider_not_configured(monkeypatch) -> None:
     db = SessionLocal()
     tenant_ids = []
     suffix = uuid4().hex[:8]
@@ -173,6 +177,16 @@ def test_approve_voice_draft_returns_blocked_unsupported_response() -> None:
         )
         db.add(contact)
         db.flush()
+        db.add(
+            ConsentEvent(
+                tenant_id=tenant.id,
+                contact_id=contact.id,
+                channel=Channel.voice,
+                status=ConsentStatus.opt_in,
+                consent_text="Call me about listing updates",
+                source="test",
+            )
+        )
         message = Message(
             tenant_id=tenant.id,
             contact_id=contact.id,
@@ -190,6 +204,8 @@ def test_approve_voice_draft_returns_blocked_unsupported_response() -> None:
         db.close()
 
     try:
+        monkeypatch.setattr("app.services.outreach.settings.sandbox_mode", False)
+        monkeypatch.setattr("app.services.providers.settings.sandbox_mode", False)
         with TestClient(app) as client:
             login = client.post(
                 "/auth/login",
@@ -205,9 +221,9 @@ def test_approve_voice_draft_returns_blocked_unsupported_response() -> None:
 
         assert approved.status_code == 200
         payload = approved.json()
-        assert payload["status"] == "blocked"
-        assert payload["approval_state"] == "rejected"
-        assert "Voice outreach is not supported" in payload["reason"]
+        assert payload["status"] == "unavailable"
+        assert payload["approval_state"] == "draft"
+        assert "Twilio Voice" in payload["reason"]
     finally:
         cleanup_db = SessionLocal()
         try:
@@ -215,6 +231,7 @@ def test_approve_voice_draft_returns_blocked_unsupported_response() -> None:
 
             for tenant_id in tenant_ids:
                 cleanup_db.execute(delete(ComplianceEvent).where(ComplianceEvent.tenant_id == tenant_id))
+                cleanup_db.execute(delete(ConsentEvent).where(ConsentEvent.tenant_id == tenant_id))
                 cleanup_db.execute(delete(Message).where(Message.tenant_id == tenant_id))
                 cleanup_db.execute(delete(OutreachDraftPack).where(OutreachDraftPack.tenant_id == tenant_id))
                 cleanup_db.execute(delete(Contact).where(Contact.tenant_id == tenant_id))
@@ -225,7 +242,7 @@ def test_approve_voice_draft_returns_blocked_unsupported_response() -> None:
             cleanup_db.close()
 
 
-def test_rewrite_voice_draft_returns_unsupported_response() -> None:
+def test_rewrite_voice_draft_returns_ai_assisted_response(monkeypatch) -> None:
     db = SessionLocal()
     tenant_ids = []
     suffix = uuid4().hex[:8]
@@ -271,6 +288,19 @@ def test_rewrite_voice_draft_returns_unsupported_response() -> None:
         db.close()
 
     try:
+        monkeypatch.setattr(
+            "app.api.routes_outreach.get_llm_provider",
+            lambda: SimpleNamespace(provider_label="test/mock-llm"),
+        )
+        monkeypatch.setattr(
+            "app.api.routes_outreach.generate_outreach_draft",
+            lambda *_args, **_kwargs: {
+                "subject": None,
+                "body": "Hi there, this is a quick follow-up call about the public-data update we prepared for your area. Please call us back if you want to talk through it.",
+                "compliance_flags": [],
+                "provider_label": "test/mock-llm",
+            },
+        )
         with TestClient(app) as client:
             login = client.post(
                 "/auth/login",
@@ -288,8 +318,12 @@ def test_rewrite_voice_draft_returns_unsupported_response() -> None:
                 json={"tone": "professional", "notes": "Make it warmer"},
             )
 
-        assert rewritten.status_code == 400
-        assert "Voice outreach is not supported" in rewritten.json()["detail"]
+        assert rewritten.status_code == 200
+        payload = rewritten.json()
+        assert payload["ai_generated"] is True
+        assert payload["provider_label"] == "test/mock-llm"
+        assert "call us back" in payload["proposed_body"].lower()
+        assert payload["compliance_flags"] == []
     finally:
         cleanup_db = SessionLocal()
         try:
@@ -305,6 +339,19 @@ def test_rewrite_voice_draft_returns_unsupported_response() -> None:
             cleanup_db.commit()
         finally:
             cleanup_db.close()
+
+
+def test_voice_status_endpoint_reports_unavailable_without_voice_config() -> None:
+    with TestClient(app) as client:
+        token = _login_token(client)
+        headers = {"Authorization": f"Bearer {token}"}
+
+        response = client.get("/outreach/voice-status", headers=headers)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["available"] is False
+    assert "voice" in payload["reason"].lower()
 
 
 def test_opportunity_status_change_creates_event_row() -> None:

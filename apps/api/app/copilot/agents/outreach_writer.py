@@ -5,6 +5,7 @@ from sqlalchemy import select
 from app.copilot.agents.base import AgentContext, AgentMatch, AgentResult, CopilotAgent
 from app.models.entities import Contact
 from app.services.outreach import create_draft_pack
+from app.services.providers import get_voice_provider_status
 
 
 class OutreachWriterAgent(CopilotAgent):
@@ -49,6 +50,10 @@ class OutreachWriterAgent(CopilotAgent):
             "I prepared a Columbus public-data snapshot with permit momentum, transit proximity, and amenity coverage "
             "for your target areas. I can send the property-specific profile next."
         )
+        voice_status = get_voice_provider_status()
+        channels = ["sms", "email"]
+        if voice_status.available:
+            channels.append("voice")
         pack = create_draft_pack(
             context.db,
             tenant_id=context.tenant_id,
@@ -56,12 +61,18 @@ class OutreachWriterAgent(CopilotAgent):
             contact_id=contact.id,
             parcel_id=None,
             objective=objective,
-            channels=["sms", "email"],
+            channels=channels,
             sandbox=True,
         )
 
+        summary = "Draft pack created in sandbox mode with SMS and email drafts."
+        if voice_status.available:
+            summary = "Draft pack created in sandbox mode with SMS, email, and voice call drafts."
+        elif voice_status.reason:
+            summary += f" Voice call drafting is available only after voice is configured: {voice_status.reason}"
+
         return AgentResult(
-            text="Draft pack created in sandbox mode with SMS and email drafts. Submit and approve each draft before send.",
+            text=f"{summary} Submit and approve each draft before send.",
             data={
                 "pack_id": str(pack["id"]),
                 "contact_id": str(contact.id),
@@ -73,6 +84,7 @@ class OutreachWriterAgent(CopilotAgent):
                 "sandbox_default": True,
                 "compliance_notes": [
                     "SMS sends require explicit opt-in.",
+                    "Voice calls require explicit voice consent and signed Twilio callbacks.",
                     "Quiet hours and frequency caps are enforced server-side.",
                 ],
             },

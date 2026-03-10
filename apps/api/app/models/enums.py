@@ -43,8 +43,15 @@ class MessageDirection(str, enum.Enum):
 class MessageStatus(str, enum.Enum):
     draft = "draft"
     queued = "queued"
+    initiated = "initiated"
+    ringing = "ringing"
+    in_progress = "in_progress"
     sent = "sent"
     delivered = "delivered"
+    completed = "completed"
+    no_answer = "no_answer"
+    busy = "busy"
+    canceled = "canceled"
     failed = "failed"
     blocked = "blocked"
 

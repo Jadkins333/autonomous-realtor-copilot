@@ -55,3 +55,9 @@ class DraftActionOut(BaseModel):
     approval_state: str
     pack_status: str | None = None
     reason: str | None = None
+
+
+class VoiceChannelStatusOut(BaseModel):
+    available: bool
+    provider: str | None = None
+    reason: str | None = None

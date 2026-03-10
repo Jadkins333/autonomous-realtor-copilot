@@ -154,6 +154,18 @@ describe('OutreachPage', function () {
   beforeEach(function () {
     vi.clearAllMocks()
     setup()
+    mockApiFetch.mockImplementation(async function (path: unknown) {
+      if (path === '/outreach/voice-status') {
+        return {
+          available: false,
+          provider: 'twilio_voice',
+          reason: 'Twilio Voice is unavailable in this test.',
+        }
+      }
+      if (path === '/contacts') return []
+      if (path === '/outreach/draft-packs?limit=20') return { items: [] }
+      return {}
+    })
   })
 
   it('shows loading state while packs are fetching', function () {
@@ -216,7 +228,7 @@ describe('OutreachPage', function () {
     expect(screen.getByTestId('draft-status-blocked_sandbox')).toBeTruthy()
   })
 
-  it('shows disabled messaging instead of approve controls for legacy voice drafts', async function () {
+  it('shows unavailable messaging instead of approve controls for voice drafts when voice is offline', async function () {
     const voiceDraft = {
       ...makeDraft(),
       id: 'draft-voice-1',
@@ -225,12 +237,14 @@ describe('OutreachPage', function () {
       body: 'Legacy voicemail outline',
     }
     const pack = makePack({ drafts: [voiceDraft] })
-    mockApiFetch.mockResolvedValue({ items: [pack] })
+    mockApiFetch.mockResolvedValueOnce({ items: [pack] })
     renderPage()
     await waitFor(function () {
       expect(screen.getByTestId('draft-row-draft-voice-1')).toBeTruthy()
     })
-    expect(screen.getByText(/Voice disabled in this build/i)).toBeTruthy()
+    await waitFor(function () {
+      expect(screen.getByText(/Voice unavailable:/i)).toBeTruthy()
+    })
     expect(screen.queryByTestId('approve-btn-draft-voice-1')).toBeNull()
   })
 
@@ -422,13 +436,12 @@ describe('OutreachPage', function () {
     })
   })
 
-  it('describes outreach packs as email and SMS only', async function () {
+  it('describes compliance-authoritative outreach flows in the header', async function () {
     mockApiFetch.mockResolvedValue({ items: [] })
     renderPage()
     await waitFor(function () {
-      expect(screen.getByText(/email\/sms drafts/i)).toBeTruthy()
+      expect(screen.getByText(/deterministic compliance stays authoritative/i)).toBeTruthy()
     })
-    expect(screen.queryByText(/voice drafts/i)).toBeNull()
   })
 
   it('compose form hidden by default', async function () {
@@ -456,6 +469,7 @@ describe('OutreachPage', function () {
     await waitFor(function () {
       expect(screen.getByText('Alice (alice@test.com)')).toBeTruthy()
     })
+    expect(screen.getByTestId('voice-unavailable-note')).toBeTruthy()
   })
 
   it('clicking compose-toggle again hides the form', async function () {
@@ -491,12 +505,22 @@ describe('OutreachPage', function () {
 
   it('calls POST /outreach/draft-pack on submit and shows result', async function () {
     const newPack = makePack({ id: 'pack-new-999', status: 'draft', drafts: [] })
-    mockApiFetch.mockResolvedValueOnce({ items: [] })           // initial packs load
-    mockApiFetch.mockResolvedValueOnce([                         // contacts fetch
-      { id: 'c1', name: 'Alice', email: 'alice@test.com' },
-    ])
-    mockApiFetch.mockResolvedValueOnce(newPack)                  // POST /draft-pack
-    mockApiFetch.mockResolvedValueOnce({ items: [newPack] })     // reload
+    mockApiFetch.mockImplementation(async function (path: unknown, _token?: unknown, init?: RequestInit) {
+      if (path === '/outreach/draft-packs?limit=20') {
+        if (init?.method === 'POST') return newPack
+        return { items: [newPack] }
+      }
+      if (path === '/contacts') {
+        return [{ id: 'c1', name: 'Alice', email: 'alice@test.com' }]
+      }
+      if (path === '/outreach/voice-status') {
+        return { available: false, provider: 'twilio_voice', reason: 'Twilio Voice is unavailable in this test.' }
+      }
+      if (path === '/outreach/draft-pack') {
+        return newPack
+      }
+      return {}
+    })
 
     renderPage()
     await waitFor(function () {
@@ -525,11 +549,15 @@ describe('OutreachPage', function () {
   })
 
   it('shows compose-error when POST fails', async function () {
-    mockApiFetch.mockResolvedValueOnce({ items: [] })
-    mockApiFetch.mockResolvedValueOnce([
-      { id: 'c1', name: 'Alice', email: null },
-    ])
-    mockApiFetch.mockRejectedValueOnce(new Error('contact not found'))
+    mockApiFetch.mockImplementation(async function (path: unknown) {
+      if (path === '/outreach/draft-packs?limit=20') return { items: [] }
+      if (path === '/contacts') return [{ id: 'c1', name: 'Alice', email: null }]
+      if (path === '/outreach/voice-status') {
+        return { available: false, provider: 'twilio_voice', reason: 'Twilio Voice is unavailable in this test.' }
+      }
+      if (path === '/outreach/draft-pack') throw new Error('contact not found')
+      return {}
+    })
 
     renderPage()
     await waitFor(function () {
@@ -553,5 +581,50 @@ describe('OutreachPage', function () {
       expect(screen.getByTestId('compose-error')).toBeTruthy()
     })
     expect(screen.getByTestId('compose-error').textContent).toContain('contact not found')
+  })
+
+  it('shows voice compose option when the backend reports live voice support', async function () {
+    mockApiFetch.mockImplementation(async function (path: unknown) {
+      if (path === '/outreach/draft-packs?limit=20') return { items: [] }
+      if (path === '/contacts') return [{ id: 'c1', name: 'Alice', email: 'alice@test.com' }]
+      if (path === '/outreach/voice-status') {
+        return { available: true, provider: 'twilio_voice', reason: null }
+      }
+      return {}
+    })
+
+    renderPage()
+    await waitFor(function () {
+      expect(screen.getByTestId('compose-toggle')).toBeTruthy()
+    })
+    fireEvent.click(screen.getByTestId('compose-toggle'))
+    await waitFor(function () {
+      expect(screen.getByTestId('compose-channel-voice')).toBeTruthy()
+    })
+    expect(screen.getByTestId('voice-available-note')).toBeTruthy()
+  })
+
+  it('shows approve controls for voice drafts when live voice is available', async function () {
+    const voiceDraft = {
+      ...makeDraft(),
+      id: 'draft-voice-2',
+      channel: 'voice',
+      subject: null,
+      body: 'Approved call script',
+    }
+    const pack = makePack({ drafts: [voiceDraft] })
+    mockApiFetch.mockImplementation(async function (path: unknown) {
+      if (path === '/outreach/draft-packs?limit=20') return { items: [pack] }
+      if (path === '/outreach/voice-status') {
+        return { available: true, provider: 'twilio_voice', reason: null }
+      }
+      return {}
+    })
+
+    renderPage()
+    await waitFor(function () {
+      expect(screen.getByTestId('approve-btn-draft-voice-2')).toBeTruthy()
+    })
+    expect(screen.queryByTestId('voice-disabled-draft-voice-2')).toBeNull()
   })
 })

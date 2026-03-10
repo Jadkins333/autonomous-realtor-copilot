@@ -74,12 +74,16 @@ Examples:
 Provider callback targets:
 - Twilio inbound: `${PUBLIC_API_BASE_URL}/webhooks/twilio/inbound`
 - Twilio status: `${PUBLIC_API_BASE_URL}/webhooks/twilio/status`
+- Twilio voice TwiML: `${PUBLIC_API_BASE_URL}/webhooks/twilio/voice/twiml/{message_id}`
+- Twilio voice status: `${PUBLIC_API_BASE_URL}/webhooks/twilio/voice/status`
 - Postmark delivery: `${PUBLIC_API_BASE_URL}/webhooks/postmark/delivery`
 - Postmark bounce: `${PUBLIC_API_BASE_URL}/webhooks/postmark/bounce`
 
 Auth config:
 - Twilio webhook validation uses `TWILIO_WEBHOOK_AUTH_TOKEN` when set, otherwise `TWILIO_AUTH_TOKEN`
 - Postmark webhook auth uses `POSTMARK_WEBHOOK_USERNAME` + `POSTMARK_WEBHOOK_PASSWORD`
+- Twilio Voice additionally needs `TWILIO_VOICE_FROM_NUMBER` or a voice-capable `TWILIO_FROM_NUMBER`
+- Voice UI stays unavailable until `SANDBOX_MODE=false`, `PUBLIC_API_BASE_URL` is set, and Twilio voice env is complete
 
 ## Local-First LLM Config
 

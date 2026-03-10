@@ -177,6 +177,25 @@ class TestGenerateOutreachDraft:
         assert result["subject"] is None
         assert result["body"] is not None
 
+    def test_voice_draft_subject_is_none(self):
+        from app.services.llm_features.outreach_drafter import generate_outreach_draft
+
+        provider = _mock_provider(
+            "Hi Ava, this is a quick call about the property data update we prepared for your area. Please call us back when you have a moment."
+        )
+        with patch("app.services.llm_features.outreach_drafter.evaluate_fair_housing_text", return_value=[]):
+            result = generate_outreach_draft(
+                provider,
+                contact_name="Ava",
+                contact_email=None,
+                contact_phone="+16145551234",
+                channel="voice",
+                objective="Share data",
+            )
+        assert result is not None
+        assert result["subject"] is None
+        assert "call us back" in result["body"].lower()
+
     def test_returns_none_on_llm_unavailable(self):
         from app.services.llm_features.outreach_drafter import generate_outreach_draft
 

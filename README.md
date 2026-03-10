@@ -45,7 +45,7 @@ These are seeded automatically at first boot (`apps/api/scripts/start_api.sh` ru
 ## Demo Mode Behavior
 - `SANDBOX_MODE=true` by default.
 - Outreach approvals remain non-sending in sandbox mode and return `blocked_sandbox` with a compliance audit event.
-- The current production surface supports email and SMS outreach only; voice outreach is intentionally disabled in this build.
+- Voice outreach is a real Twilio channel only when `SANDBOX_MODE=false`, `PUBLIC_API_BASE_URL` is set, and Twilio voice credentials are configured. Otherwise the UI/API mark voice as unavailable and fail closed.
 - Public-data connectors try live URLs first, then fallback to synthetic seed files.
 - Source failures are non-fatal and recorded in `source_runs`.
 - Drift policy: when schema drift is detected, the source is auto-paused and DLQ replay is blocked until drift is resolved.
@@ -134,6 +134,7 @@ Required env:
 - `TWILIO_ACCOUNT_SID`
 - `TWILIO_AUTH_TOKEN`
 - `TWILIO_FROM_NUMBER`
+- `TWILIO_VOICE_FROM_NUMBER` (optional; falls back to `TWILIO_FROM_NUMBER`)
 - `PUBLIC_API_BASE_URL` set to the exact public HTTPS API base seen by Twilio/Postmark, including any path prefix such as `https://staging.example.com/api`
 - `TWILIO_WEBHOOK_AUTH_TOKEN` to verify inbound/status callbacks if you want a dedicated verification secret
 
@@ -142,16 +143,21 @@ Twilio callback routes require `X-Twilio-Signature` validation. If `TWILIO_WEBHO
 Twilio console/staging callback URLs:
 - Inbound SMS webhook: `${PUBLIC_API_BASE_URL}/webhooks/twilio/inbound`
 - Delivery status webhook: `${PUBLIC_API_BASE_URL}/webhooks/twilio/status`
+- Voice TwiML webhook: `${PUBLIC_API_BASE_URL}/webhooks/twilio/voice/twiml/{message_id}`
+- Voice status webhook: `${PUBLIC_API_BASE_URL}/webhooks/twilio/voice/status`
 
-If any required key is missing, providers fall back to console behavior.
+SMS falls back to console behavior when Twilio SMS credentials are missing. Voice does not fake-send: it remains unavailable until the Twilio Voice env is complete.
 
 ### Delivery Webhooks
 - `POSTMARK_WEBHOOK_USERNAME`
 - `POSTMARK_WEBHOOK_PASSWORD`
 - `POST /webhooks/twilio/status` records Twilio SMS delivery and failure receipts.
+- `POST /webhooks/twilio/voice/twiml/{message_id}` serves approved TwiML for outbound calls.
+- `POST /webhooks/twilio/voice/status` records Twilio voice lifecycle events (`queued`, `initiated`, `ringing`, `in-progress`, `completed`, `busy`, `no-answer`, `canceled`, `failed`).
 - `POST /webhooks/postmark/delivery` records successful Postmark deliveries.
 - `POST /webhooks/postmark/bounce` marks failed deliveries and suppresses hard-bounced email contacts.
 - `POST /webhooks/twilio/inbound` and `POST /webhooks/twilio/status` now reject missing or invalid Twilio signatures.
+- `POST /webhooks/twilio/voice/twiml/{message_id}` and `POST /webhooks/twilio/voice/status` also require valid Twilio signatures.
 - `POST /webhooks/postmark/delivery` and `POST /webhooks/postmark/bounce` now require HTTP Basic auth using `POSTMARK_WEBHOOK_USERNAME` and `POSTMARK_WEBHOOK_PASSWORD`.
 
 Postmark webhooks are configured on the Postmark server itself; point them at:
@@ -179,7 +185,7 @@ Behavior notes:
 - If the provider is unavailable, copilot falls back to deterministic-only output and generation endpoints fail closed or return `unavailable=true`.
 
 ## Architecture Summary
-- `apps/api`: ingestion, truth-layer metrics, property hub APIs, compliance-enforced outreach, Twilio inbound webhook.
+- `apps/api`: ingestion, truth-layer metrics, property hub APIs, compliance-enforced outreach, Twilio SMS + voice webhooks.
 - `apps/web`: dashboard, copilot, property hub/detail with provenance drawer, contacts CRUD, outreach approvals, PWA install/offline support.
 - `apps/mobile`: Expo Router app for the same backend endpoints and workflows.
 - `seed/`: synthetic parcels, permits, flood zones, POIs, transit stops, mortgage-rate trend series.
@@ -200,14 +206,13 @@ Responses include:
 
 ## Compliance Enforcement (Code + Docs)
 Code-enforced controls include:
-- Consent gating for SMS outbound (`opt_in` required)
+- Consent gating for SMS and voice outbound (`opt_in` required per channel)
 - STOP keyword inbound handling (`opt_out` + suppression immediately)
 - Quiet hours (`8am–9pm America/New_York`)
 - Frequency cap (max `3` outbound/day/channel/contact)
 - Stop-on-reply enrollment stop
 - Optional global revocation policy toggle (`ENFORCE_GLOBAL_REVOCATION=false` by default)
-
-The data model still preserves legacy voice enums for auditability and backward compatibility, but voice sending/rewrite paths are rejected at runtime in this build.
+- Voice call scripts are served only from approved draft content, and Twilio voice callbacks are signature-verified before status changes are persisted.
 
 Compliance behavior is implemented as configurable product policy defaults and audit controls, not legal advice.
 See [Compliance Notice](./docs/compliance/NOTICE.md).
@@ -234,9 +239,12 @@ Reference docs:
 - `GET /sequences`
 - `POST /sequences/{sequence_id}/enroll/{contact_id}`
 - `GET /outreach/drafts`
+- `GET /outreach/voice-status`
 - `POST /outreach/{message_id}/approve_and_send`
 - `POST /webhooks/twilio/inbound`
 - `POST /webhooks/twilio/status`
+- `POST /webhooks/twilio/voice/twiml/{message_id}`
+- `POST /webhooks/twilio/voice/status`
 - `POST /webhooks/postmark/delivery`
 - `POST /webhooks/postmark/bounce`
 - `POST /copilot/chat`
