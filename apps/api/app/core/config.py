@@ -55,6 +55,18 @@ class Settings(BaseSettings):
     enforce_global_revocation: bool = False
     cors_allow_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
+    # ── LLM provider ─────────────────────────────────────────────────────────
+    # Set LLM_ENABLED=true to enable AI assistance features.
+    # All AI features degrade gracefully: deterministic engine continues to work
+    # even when the provider is unavailable or disabled.
+    llm_enabled: bool = False
+    llm_provider: str = "ollama"          # ollama | lmstudio
+    llm_base_url: str = "http://localhost:11434"
+    llm_model: str = "llama3.2"
+    llm_timeout_seconds: int = 30
+    llm_max_tokens: int = 1024
+    llm_temperature: float = 0.3
+
     @property
     def cors_allow_origins_list(self):
         raw = (self.cors_allow_origins or "").strip()

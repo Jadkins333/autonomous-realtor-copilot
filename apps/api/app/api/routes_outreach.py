@@ -1,10 +1,13 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import AuthContext, get_auth_context
 from app.db.session import get_db
+from app.models.entities import Contact, Message, OutreachDraftPack, Parcel
+from app.schemas.copilot import OutreachRewriteRequest, OutreachRewriteResponse
 from app.schemas.outreach import (
     DraftActionOut,
     DraftMessageOut,
@@ -13,6 +16,8 @@ from app.schemas.outreach import (
     DraftPacksListOut,
     DraftPackSubmitOut,
 )
+from app.services.llm.provider import get_llm_provider
+from app.services.llm_features.outreach_drafter import generate_outreach_draft
 from app.services.outreach import (
     approve_and_send,
     create_draft_pack,
@@ -136,3 +141,82 @@ async def outreach_approve(
         return await approve_and_send(db, auth.tenant_id, message_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post(
+    "/drafts/{message_id}/rewrite",
+    response_model=OutreachRewriteResponse,
+    summary="AI-assisted outreach rewrite",
+    description=(
+        "Use the LLM to propose a rewritten version of an existing draft. "
+        "The result is NOT saved automatically — the agent must review and apply it manually. "
+        "Compliance is always checked after generation. "
+        "Returns 503 if no LLM provider is available."
+    ),
+)
+def outreach_rewrite_draft(
+    message_id: UUID,
+    payload: OutreachRewriteRequest,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+) -> OutreachRewriteResponse:
+    provider = get_llm_provider()
+    if provider is None:
+        raise HTTPException(
+            status_code=503,
+            detail="LLM provider not available. Set LLM_ENABLED=true and configure a local provider.",
+        )
+
+    # Load the message and its associated context
+    message = db.execute(
+        select(Message).where(Message.id == message_id, Message.tenant_id == auth.tenant_id)
+    ).scalar_one_or_none()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    # Load contact for context
+    contact = db.execute(
+        select(Contact).where(Contact.id == message.contact_id, Contact.tenant_id == auth.tenant_id)
+    ).scalar_one_or_none()
+
+    # Load parcel if linked via pack
+    parcel_address: str | None = None
+    if message.pack_id:
+        pack = db.execute(
+            select(OutreachDraftPack).where(OutreachDraftPack.id == message.pack_id)
+        ).scalar_one_or_none()
+        if pack and pack.parcel_id:
+            parcel = db.execute(
+                select(Parcel).where(Parcel.id == pack.parcel_id, Parcel.tenant_id == auth.tenant_id)
+            ).scalar_one_or_none()
+            if parcel:
+                parcel_address = parcel.address
+
+    channel = getattr(message.channel, "value", str(message.channel))
+
+    result = generate_outreach_draft(
+        provider,
+        contact_name=contact.name if contact else "the recipient",
+        contact_email=contact.email if contact else None,
+        contact_phone=contact.phone if contact else None,
+        channel=channel,
+        objective=message.subject or message.body[:100],
+        tone=payload.tone,
+        parcel_address=parcel_address,
+        existing_body=message.body,
+        rewrite_notes=payload.notes,
+    )
+
+    if result is None:
+        raise HTTPException(
+            status_code=503,
+            detail="LLM provider became unavailable during rewrite.",
+        )
+
+    return OutreachRewriteResponse(
+        proposed_subject=result.get("subject"),
+        proposed_body=result["body"],
+        compliance_flags=result.get("compliance_flags", []),
+        ai_generated=True,
+        provider_label=result.get("provider_label"),
+    )

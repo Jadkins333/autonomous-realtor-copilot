@@ -20,6 +20,7 @@ type CopilotResponse = {
   data?: unknown;
   trace?: unknown;
   missing_inputs?: string[];
+  ai_narration?: string | null;
 };
 
 type ChatItem = {
@@ -84,7 +85,7 @@ export default function CopilotPage() {
       <Card className="mb-4">
         <CardTitle>Copilot</CardTitle>
         <CardDescription className="mt-1">
-          Deterministic routing with trace metadata and provenance.
+          Deterministic routing with trace metadata and provenance. AI narration available when local LLM is running.
         </CardDescription>
         <div className="mt-2">
           <Link className="text-sm text-accent underline" href="/copilot/agents">
@@ -141,6 +142,17 @@ export default function CopilotPage() {
                 }
               >
                 <p>{item.text}</p>
+                {item.payload?.ai_narration ? (
+                  <div
+                    className="mt-3 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-sm"
+                    data-testid="ai-narration"
+                  >
+                    <div className="mb-1 flex items-center gap-1">
+                      <Badge className="text-xs">AI-assisted</Badge>
+                    </div>
+                    <p className="text-muted-foreground">{item.payload.ai_narration}</p>
+                  </div>
+                ) : null}
                 {(item.payload?.trace as Record<string, unknown> | undefined)?.selected_agent ? (
                   <div className="mt-2" data-testid="agent-badge">
                     <Badge>

@@ -54,6 +54,15 @@ type EnrollmentRow = {
   next_step_at: string | null;
 };
 
+type ContactSummary = {
+  summary_bullets: string[];
+  raw_summary: string;
+  ai_generated: boolean;
+  provider_label: string | null;
+  data_coverage: Record<string, unknown>;
+  unavailable: boolean;
+};
+
 function relativeTime(iso: string | null): string {
   if (!iso) return "—";
   const diff = Date.now() - new Date(iso).getTime();
@@ -66,10 +75,12 @@ function relativeTime(iso: string | null): string {
 }
 
 function statusColor(status: string): string {
-  if (status === "sent" || status === "delivered")
+  if (status === "sent" || status === "delivered") {
     return "bg-success/10 text-success";
-  if (status === "failed" || status.startsWith("blocked"))
+  }
+  if (status === "failed" || status.startsWith("blocked")) {
     return "bg-destructive/10 text-destructive";
+  }
   if (status === "queued") return "bg-info/10 text-info";
   return "bg-secondary text-secondary-foreground";
 }
@@ -116,6 +127,9 @@ export default function ContactDetailPage() {
   const [enrollments, setEnrollments] = useState<EnrollmentRow[]>([]);
   const [enrollmentsLoading, setEnrollmentsLoading] = useState(true);
   const [enrollmentsError, setEnrollmentsError] = useState(false);
+  const [aiSummary, setAiSummary] = useState<ContactSummary | null>(null);
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const [aiSummaryError, setAiSummaryError] = useState(false);
 
   useEffect(() => {
     if (status !== "authenticated" || !session || !params.id) return;
@@ -127,6 +141,8 @@ export default function ContactDetailPage() {
     setEnrollmentsError(false);
     setMessagesLoading(true);
     setEnrollmentsLoading(true);
+    setAiSummary(null);
+    setAiSummaryError(false);
 
     apiFetch<ContactDetail>(`/contacts/${id}`, token)
       .then(setContact)
@@ -175,6 +191,23 @@ export default function ContactDetailPage() {
       setSaveMsg("Save failed — please try again.");
     } finally {
       setSavePending(false);
+    }
+  }
+
+  async function fetchAiSummary() {
+    if (!session || !params.id) return;
+    setAiSummaryLoading(true);
+    setAiSummaryError(false);
+    try {
+      const result = await apiFetch<ContactSummary>(
+        `/contacts/${params.id}/summary`,
+        session.apiToken
+      );
+      setAiSummary(result);
+    } catch {
+      setAiSummaryError(true);
+    } finally {
+      setAiSummaryLoading(false);
     }
   }
 
@@ -359,17 +392,66 @@ export default function ContactDetailPage() {
                     </Button>
                   </>
                 ) : (
-                  <Button
-                    variant="outline"
-                    onClick={startEdit}
-                    data-testid="edit-btn"
-                  >
-                    Edit
-                  </Button>
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={startEdit}
+                      data-testid="edit-btn"
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={fetchAiSummary}
+                      disabled={aiSummaryLoading}
+                      data-testid="ai-summary-btn"
+                    >
+                      {aiSummaryLoading ? "Loading…" : "AI Summary"}
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
           </div>
+          {aiSummaryError ? (
+            <p className="mt-3 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              Unable to load AI summary. Please try again.
+            </p>
+          ) : null}
+          {aiSummary ? (
+            <div
+              className="mt-4 rounded-[24px] border border-accent/25 bg-accent/10 p-4"
+              data-testid="ai-summary-panel"
+            >
+              {aiSummary.unavailable ? (
+                <p
+                  className="text-sm text-muted-foreground"
+                  data-testid="ai-summary-unavailable"
+                >
+                  AI summary unavailable — local model is offline.
+                </p>
+              ) : (
+                <>
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <Badge className="text-xs">AI-assisted</Badge>
+                    {aiSummary.provider_label ? (
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {aiSummary.provider_label}
+                      </span>
+                    ) : null}
+                  </div>
+                  <ul className="space-y-2 text-sm text-foreground">
+                    {aiSummary.summary_bullets.map((bullet, index) => (
+                      <li key={`${bullet}-${index}`} className="flex gap-2">
+                        <span className="mt-0.5 text-accent">•</span>
+                        <span>{bullet.replace(/^[•-]\s*/, "")}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          ) : null}
         </Card>
       )}
 

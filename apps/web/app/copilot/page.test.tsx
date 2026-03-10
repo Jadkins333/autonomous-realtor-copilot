@@ -238,4 +238,50 @@ describe('CopilotPage', function () {
     expect(container.firstChild).toBeNull()
     await act(async () => {})
   })
+
+  it('shows ai_narration panel when response includes it', async function () {
+    mockApiFetch
+      .mockResolvedValueOnce([]) // agents
+      .mockResolvedValueOnce({
+        status: 'ok',
+        text: 'Market score is 72.',
+        trace: { selected_agent: 'market_analyst', llm_used: true, llm_provider: 'ollama/llama3.2' },
+        ai_narration: 'The market score of 72 indicates strong seller conditions.',
+      })
+
+    render(React.createElement(CopilotPage))
+    await waitFor(function () {
+      expect(screen.getByTestId('copilot-run-btn')).toBeTruthy()
+    })
+    fireEvent.click(screen.getByTestId('copilot-run-btn'))
+
+    await waitFor(function () {
+      expect(screen.getByTestId('ai-narration')).toBeTruthy()
+    })
+    expect(screen.getByText('The market score of 72 indicates strong seller conditions.')).toBeTruthy()
+    // deterministic text still present
+    expect(screen.getByText('Market score is 72.')).toBeTruthy()
+  })
+
+  it('does not show ai_narration panel when narration is null', async function () {
+    mockApiFetch
+      .mockResolvedValueOnce([]) // agents
+      .mockResolvedValueOnce({
+        status: 'ok',
+        text: 'Market score is 72.',
+        trace: { selected_agent: 'market_analyst', llm_used: false },
+        ai_narration: null,
+      })
+
+    render(React.createElement(CopilotPage))
+    await waitFor(function () {
+      expect(screen.getByTestId('copilot-run-btn')).toBeTruthy()
+    })
+    fireEvent.click(screen.getByTestId('copilot-run-btn'))
+
+    await waitFor(function () {
+      expect(screen.getByTestId('chat-msg-assistant-1')).toBeTruthy()
+    })
+    expect(screen.queryByTestId('ai-narration')).toBeNull()
+  })
 })

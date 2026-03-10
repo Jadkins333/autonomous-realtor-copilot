@@ -301,10 +301,71 @@ describe("ContactDetailPage", function () {
       .mockResolvedValueOnce([]);
     render(React.createElement(ContactDetailPage));
     await waitFor(() => {
-      // contact name still visible
       expect(screen.getByTestId("contact-name")).toBeTruthy();
-      // messages section shows error fallback
       expect(screen.getByText(/unable to load message history/i)).toBeTruthy();
+    });
+  });
+
+  it("AI Summary button is visible in contact view", async function () {
+    setup();
+    mockApiFetch
+      .mockResolvedValueOnce(CONTACT)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    render(React.createElement(ContactDetailPage));
+    await waitFor(() => {
+      expect(screen.getByTestId("ai-summary-btn")).toBeTruthy();
+    });
+  });
+
+  it("AI summary panel renders bullets when loaded", async function () {
+    setup();
+    mockApiFetch
+      .mockResolvedValueOnce(CONTACT)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({
+        summary_bullets: [
+          "Interested in 3-bed homes",
+          "Budget $350k"
+        ],
+        raw_summary: "Interested in 3-bed homes. Budget $350k.",
+        ai_generated: true,
+        provider_label: "ollama/llama3.2",
+        data_coverage: {},
+        unavailable: false
+      });
+    render(React.createElement(ContactDetailPage));
+    await waitFor(() => expect(screen.getByTestId("ai-summary-btn")).toBeTruthy());
+
+    fireEvent.click(screen.getByTestId("ai-summary-btn"));
+    await waitFor(() => {
+      expect(screen.getByTestId("ai-summary-panel")).toBeTruthy();
+      expect(screen.getByText("Interested in 3-bed homes")).toBeTruthy();
+      expect(screen.getByText("Budget $350k")).toBeTruthy();
+    });
+  });
+
+  it("shows unavailable message when LLM is offline", async function () {
+    setup();
+    mockApiFetch
+      .mockResolvedValueOnce(CONTACT)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({
+        summary_bullets: [],
+        raw_summary: "",
+        ai_generated: false,
+        provider_label: null,
+        data_coverage: {},
+        unavailable: true
+      });
+    render(React.createElement(ContactDetailPage));
+    await waitFor(() => expect(screen.getByTestId("ai-summary-btn")).toBeTruthy());
+
+    fireEvent.click(screen.getByTestId("ai-summary-btn"));
+    await waitFor(() => {
+      expect(screen.getByTestId("ai-summary-unavailable")).toBeTruthy();
     });
   });
 });
