@@ -62,3 +62,47 @@ bash scripts/reset-dev.sh
 ## Policy Guardrail
 
 - Compliance controls are policy-driven defaults (`SANDBOX_MODE`, consent gates, quiet hours, caps, suppression) and should be treated as configurable deployment policy.
+
+## Staging / Deployment Config
+
+Set `PUBLIC_API_BASE_URL` to the exact public HTTPS base URL that external providers hit, including any path prefix.
+
+Examples:
+- `https://staging.example.com/api`
+- `https://demo.example.com/backend`
+
+Provider callback targets:
+- Twilio inbound: `${PUBLIC_API_BASE_URL}/webhooks/twilio/inbound`
+- Twilio status: `${PUBLIC_API_BASE_URL}/webhooks/twilio/status`
+- Postmark delivery: `${PUBLIC_API_BASE_URL}/webhooks/postmark/delivery`
+- Postmark bounce: `${PUBLIC_API_BASE_URL}/webhooks/postmark/bounce`
+
+Auth config:
+- Twilio webhook validation uses `TWILIO_WEBHOOK_AUTH_TOKEN` when set, otherwise `TWILIO_AUTH_TOKEN`
+- Postmark webhook auth uses `POSTMARK_WEBHOOK_USERNAME` + `POSTMARK_WEBHOOK_PASSWORD`
+
+## Local-First LLM Config
+
+Ollama example:
+```bash
+LLM_ENABLED=true
+LLM_PROVIDER=ollama
+LLM_BASE_URL=http://localhost:11434
+LLM_MODEL=llama3.2
+```
+
+LM Studio example:
+```bash
+LLM_ENABLED=true
+LLM_PROVIDER=lmstudio
+LLM_BASE_URL=http://localhost:1234
+LLM_MODEL=<your-loaded-model>
+```
+
+Validation commands:
+```bash
+python scripts/llm_live_smoke.py --output artifacts/verification/llm-live-smoke.json
+python scripts/llm_smoke.py
+```
+
+Important: the live smoke proves local provider behavior only. It does not prove a deployed/public callback round-trip from Twilio or Postmark.

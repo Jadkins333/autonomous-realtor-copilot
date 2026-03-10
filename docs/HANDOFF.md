@@ -311,7 +311,7 @@ Implemented in:
 - Sequence stop-on-reply: `apps/api/app/services/compliance.py` (`stop_enrollments_on_reply`) called by inbound handler.
 
 Rule behavior in code:
-- SMS/voice require explicit opt-in (`has_explicit_channel_consent`).
+- SMS requires explicit opt-in (`has_explicit_channel_consent`). Voice remains disabled in the current product surface.
 - Suppression list blocks outbound.
 - Quiet hours enforced (`America/New_York`, defaults 8-21 from config).
 - Frequency cap enforced (`settings.frequency_cap_per_day`, default 3).

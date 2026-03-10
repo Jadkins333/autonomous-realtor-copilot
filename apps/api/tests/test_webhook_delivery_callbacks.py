@@ -169,6 +169,83 @@ def test_twilio_status_webhook_marks_sms_delivered(monkeypatch) -> None:
         _cleanup(tenant_ids)
 
 
+def test_twilio_status_webhook_accepts_public_api_base_url_signature(monkeypatch) -> None:
+    _set_webhook_env(monkeypatch)
+    monkeypatch.setenv("PUBLIC_API_BASE_URL", "https://staging.example.com/api")
+    get_settings.cache_clear()
+
+    db = SessionLocal()
+    tenant_ids = []
+    try:
+        suffix = uuid4().hex[:8]
+        tenant, _user = _make_tenant(db, suffix=suffix)
+        tenant_ids.append(tenant.id)
+        contact = _make_contact(db, tenant_id=tenant.id)
+        message = _make_message(
+            db,
+            tenant_id=tenant.id,
+            contact_id=contact.id,
+            channel=Channel.sms,
+            provider_message_id="SM-staging-url-123",
+        )
+    finally:
+        db.close()
+
+    try:
+        with TestClient(app) as client:
+            params = {"MessageSid": "SM-staging-url-123", "MessageStatus": "delivered"}
+            response = client.post(
+                "/webhooks/twilio/status",
+                data=params,
+                headers={
+                    "X-Twilio-Signature": _twilio_signature(
+                        "https://staging.example.com/api/webhooks/twilio/status",
+                        params,
+                        "twilio-secret",
+                    )
+                },
+            )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["ok"] is True
+        assert payload["matched"] is True
+
+        db = SessionLocal()
+        try:
+            refreshed = db.execute(select(Message).where(Message.id == message.id)).scalar_one()
+            assert refreshed.status == MessageStatus.delivered
+        finally:
+            db.close()
+    finally:
+        _cleanup(tenant_ids)
+        get_settings.cache_clear()
+
+
+def test_twilio_status_webhook_rejects_internal_url_signature_when_public_base_is_configured(monkeypatch) -> None:
+    _set_webhook_env(monkeypatch)
+    monkeypatch.setenv("PUBLIC_API_BASE_URL", "https://staging.example.com/api")
+    get_settings.cache_clear()
+
+    with TestClient(app) as client:
+        params = {"MessageSid": "SM-wrong-base-123", "MessageStatus": "delivered"}
+        response = client.post(
+            "/webhooks/twilio/status",
+            data=params,
+            headers={
+                "X-Twilio-Signature": _twilio_signature(
+                    "http://testserver/webhooks/twilio/status",
+                    params,
+                    "twilio-secret",
+                )
+            },
+        )
+
+    assert response.status_code == 403
+    assert "Twilio signature" in response.json()["detail"]
+    get_settings.cache_clear()
+
+
 def test_twilio_status_webhook_marks_sms_failed(monkeypatch) -> None:
     _set_webhook_env(monkeypatch)
     db = SessionLocal()

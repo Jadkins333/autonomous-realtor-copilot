@@ -134,21 +134,49 @@ Required env:
 - `TWILIO_ACCOUNT_SID`
 - `TWILIO_AUTH_TOKEN`
 - `TWILIO_FROM_NUMBER`
-- `PUBLIC_API_BASE_URL` if you want Twilio delivery callbacks posted back to this API
+- `PUBLIC_API_BASE_URL` set to the exact public HTTPS API base seen by Twilio/Postmark, including any path prefix such as `https://staging.example.com/api`
 - `TWILIO_WEBHOOK_AUTH_TOKEN` to verify inbound/status callbacks if you want a dedicated verification secret
 
 Twilio callback routes require `X-Twilio-Signature` validation. If `TWILIO_WEBHOOK_AUTH_TOKEN` is unset, the app falls back to `TWILIO_AUTH_TOKEN`.
 
+Twilio console/staging callback URLs:
+- Inbound SMS webhook: `${PUBLIC_API_BASE_URL}/webhooks/twilio/inbound`
+- Delivery status webhook: `${PUBLIC_API_BASE_URL}/webhooks/twilio/status`
+
 If any required key is missing, providers fall back to console behavior.
 
 ### Delivery Webhooks
+- `POSTMARK_WEBHOOK_USERNAME`
+- `POSTMARK_WEBHOOK_PASSWORD`
 - `POST /webhooks/twilio/status` records Twilio SMS delivery and failure receipts.
 - `POST /webhooks/postmark/delivery` records successful Postmark deliveries.
 - `POST /webhooks/postmark/bounce` marks failed deliveries and suppresses hard-bounced email contacts.
 - `POST /webhooks/twilio/inbound` and `POST /webhooks/twilio/status` now reject missing or invalid Twilio signatures.
 - `POST /webhooks/postmark/delivery` and `POST /webhooks/postmark/bounce` now require HTTP Basic auth using `POSTMARK_WEBHOOK_USERNAME` and `POSTMARK_WEBHOOK_PASSWORD`.
 
-Postmark webhooks are configured on the Postmark server itself; point them at the API routes above.
+Postmark webhooks are configured on the Postmark server itself; point them at:
+- `${PUBLIC_API_BASE_URL}/webhooks/postmark/delivery`
+- `${PUBLIC_API_BASE_URL}/webhooks/postmark/bounce`
+
+Staging-readiness note: this repo now has test coverage proving Twilio signature validation against a staging-style external base URL, but it has not yet completed a real Twilio/Postmark callback round-trip from a public deployment.
+
+## Local-First LLM Configuration
+Required env:
+- `LLM_ENABLED=true`
+- `LLM_PROVIDER=ollama` with `LLM_BASE_URL=http://localhost:11434`
+  or `LLM_PROVIDER=lmstudio` with `LLM_BASE_URL=http://localhost:1234`
+- `LLM_MODEL=<local model name>`
+
+Optional tuning:
+- `LLM_TIMEOUT_SECONDS`
+- `LLM_MAX_TOKENS`
+- `LLM_TEMPERATURE`
+
+Behavior notes:
+- Deterministic results remain authoritative whether the provider is online or offline.
+- `/copilot/llm-status` reports live reachability.
+- Ollama uses `/api/generate`; LM Studio uses `/v1/chat/completions`.
+- If the provider is unavailable, copilot falls back to deterministic-only output and generation endpoints fail closed or return `unavailable=true`.
 
 ## Architecture Summary
 - `apps/api`: ingestion, truth-layer metrics, property hub APIs, compliance-enforced outreach, Twilio inbound webhook.

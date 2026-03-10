@@ -1,15 +1,19 @@
-# TCPA Policy Guardrails (SMS/Voice)
+# TCPA Policy Guardrails (SMS Active; Voice Disabled In This Build)
 
-This project uses conservative, configurable policy defaults for outbound SMS/voice.
+This project uses conservative, configurable policy defaults for outbound messaging.
+The current product surface actively sends SMS only; voice outreach is intentionally disabled in this build.
 See [Compliance Notice](./NOTICE.md).
 
 Implementation defaults:
 - Human approval before send remains the default product flow.
-- SMS/voice outbound is blocked unless latest channel consent is `opt_in`.
+- SMS outbound is blocked unless latest channel consent is `opt_in`.
 - Inbound STOP-style keywords create `opt_out` + suppression immediately with auditable timestamps.
 - Operational target is immediate processing with an auditable timeline and a configurable outer SLA.
 - Quiet hours and daily frequency caps are policy controls and can be tuned per deployment.
 - Global cross-channel revocation is a separate feature flag (`ENFORCE_GLOBAL_REVOCATION`, default `false`).
+
+Implementation note:
+- Legacy voice enums and cross-channel policy hooks remain in the data model for auditability and future explicit enablement, but runtime voice sending and rewrite flows are rejected today.
 
 Policy notes:
 - TCPA/FCC interpretation and case law can change over time.
