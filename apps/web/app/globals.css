@@ -108,6 +108,23 @@
     @apply transition-colors duration-200;
   }
 
+  :where(
+      a[href],
+      button,
+      input,
+      select,
+      textarea,
+      summary,
+      [role="button"],
+      [tabindex]:not([tabindex="-1"])
+    ):focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 3px;
+    box-shadow:
+      0 0 0 6px hsl(var(--background) / 0.96),
+      0 0 0 8px hsl(var(--ring) / 0.22);
+  }
+
   button,
   input,
   select,
@@ -263,6 +280,29 @@
     @apply rounded-2xl px-4 py-3 text-sm text-muted-foreground;
     border: 1px solid hsl(var(--border) / 0.7);
     background-color: hsl(var(--card-muted) / 0.75);
+  }
+
+  .skip-link {
+    position: absolute;
+    left: 1rem;
+    top: 1rem;
+    z-index: 60;
+    transform: translateY(-160%);
+    border-radius: 999px;
+    border: 1px solid hsl(var(--primary) / 0.22);
+    background-color: hsl(var(--card));
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: hsl(var(--foreground));
+    box-shadow: 0 18px 50px -28px rgba(15, 23, 42, 0.28);
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .skip-link:focus-visible {
+    transform: translateY(0);
   }
 }
 

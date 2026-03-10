@@ -373,6 +373,7 @@ export default function ContactDetailPage() {
                       ? "border border-destructive/20 bg-destructive/10 text-destructive"
                       : "border border-success/20 bg-success/10 text-success"
                   ].join(" ")}
+                  aria-live="polite"
                 >
                   {saveMsg}
                 </p>
@@ -428,7 +429,7 @@ export default function ContactDetailPage() {
                   className="text-sm text-muted-foreground"
                   data-testid="ai-summary-unavailable"
                 >
-                  AI summary unavailable — local model is offline.
+                  AI summary unavailable — the local model is offline or disabled.
                 </p>
               ) : (
                 <>
@@ -493,51 +494,88 @@ export default function ContactDetailPage() {
               </span>
             </div>
           ) : (
-            <div className="table-shell mt-5 overflow-x-auto">
-              <Table data-testid="messages-table">
-                <thead>
-                  <tr>
-                    <Th>Channel</Th>
-                    <Th>Status</Th>
-                    <Th>Subject / Preview</Th>
-                    <Th>Sent</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {messages.map((msg) => (
-                    <tr key={msg.id} data-testid={`message-row-${msg.id}`}>
-                      <Td>
-                        <Badge variant="outline" className="text-xs capitalize">
-                          {msg.channel}
-                        </Badge>
-                      </Td>
-                      <Td>
-                        <Badge
-                          className={[
-                            "text-xs capitalize",
-                            statusColor(msg.status)
-                          ].join(" ")}
-                        >
-                          {msg.status}
-                        </Badge>
-                      </Td>
-                      <Td className="max-w-[320px]">
-                        {msg.subject ? (
-                          <p className="truncate font-semibold">
-                            {msg.subject}
-                          </p>
-                        ) : null}
-                        <p className="truncate text-xs text-muted-foreground">
-                          {msg.body_preview}
-                        </p>
-                      </Td>
-                      <Td className="whitespace-nowrap text-xs text-muted-foreground">
-                        {relativeTime(msg.sent_at ?? msg.created_at)}
-                      </Td>
+            <div className="mt-5 space-y-4">
+              <div className="space-y-3 md:hidden">
+                {messages.map((msg) => (
+                  <article
+                    key={msg.id}
+                    className="app-panel-muted px-4 py-4"
+                    data-testid={`message-card-${msg.id}`}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="text-xs capitalize">
+                        {msg.channel}
+                      </Badge>
+                      <Badge
+                        className={[
+                          "text-xs capitalize",
+                          statusColor(msg.status)
+                        ].join(" ")}
+                      >
+                        {msg.status}
+                      </Badge>
+                    </div>
+                    {msg.subject ? (
+                      <p className="mt-3 font-semibold text-foreground">
+                        {msg.subject}
+                      </p>
+                    ) : null}
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {msg.body_preview}
+                    </p>
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      {relativeTime(msg.sent_at ?? msg.created_at)}
+                    </p>
+                  </article>
+                ))}
+              </div>
+
+              <div className="table-shell hidden overflow-x-auto md:block">
+                <Table data-testid="messages-table">
+                  <thead>
+                    <tr>
+                      <Th>Channel</Th>
+                      <Th>Status</Th>
+                      <Th>Subject / Preview</Th>
+                      <Th>Sent</Th>
                     </tr>
-                  ))}
-                </tbody>
-              </Table>
+                  </thead>
+                  <tbody>
+                    {messages.map((msg) => (
+                      <tr key={msg.id} data-testid={`message-row-${msg.id}`}>
+                        <Td>
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {msg.channel}
+                          </Badge>
+                        </Td>
+                        <Td>
+                          <Badge
+                            className={[
+                              "text-xs capitalize",
+                              statusColor(msg.status)
+                            ].join(" ")}
+                          >
+                            {msg.status}
+                          </Badge>
+                        </Td>
+                        <Td className="max-w-[320px]">
+                          {msg.subject ? (
+                            <p className="truncate font-semibold">
+                              {msg.subject}
+                            </p>
+                          ) : null}
+                          <p className="truncate text-xs text-muted-foreground">
+                            {msg.body_preview}
+                          </p>
+                        </Td>
+                        <Td className="whitespace-nowrap text-xs text-muted-foreground">
+                          {relativeTime(msg.sent_at ?? msg.created_at)}
+                        </Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
             </div>
           )}
         </Card>

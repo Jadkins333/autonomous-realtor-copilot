@@ -75,6 +75,26 @@ function makeDiag(overrides: Record<string, unknown> = {}) {
   }
 }
 
+function makeLlmStatus(overrides: Record<string, unknown> = {}) {
+  return {
+    llm_enabled: true,
+    provider: 'ollama',
+    model: 'llama3.2',
+    available: false,
+    provider_label: 'ollama/llama3.2',
+    ...overrides,
+  }
+}
+
+function makeVoiceStatus(overrides: Record<string, unknown> = {}) {
+  return {
+    available: false,
+    provider: 'twilio_voice',
+    reason: 'Voice calls stay disabled while SANDBOX_MODE=true.',
+    ...overrides,
+  }
+}
+
 function makeSource(name: string, state = 'ok') {
   return {
     source_name: name,
@@ -92,6 +112,18 @@ function setup() {
   mockUseSession.mockReturnValue({ data: SESSION, status: 'authenticated' })
 }
 
+function mockSetupApis(overrides: {
+  diagnostics?: Record<string, unknown>
+  sources?: { items: unknown[] }
+  llmStatus?: Record<string, unknown>
+  voiceStatus?: Record<string, unknown>
+} = {}) {
+  mockApiFetch.mockResolvedValueOnce(overrides.diagnostics ?? makeDiag())
+  mockApiFetch.mockResolvedValueOnce(overrides.sources ?? { items: [] })
+  mockApiFetch.mockResolvedValueOnce(overrides.llmStatus ?? makeLlmStatus())
+  mockApiFetch.mockResolvedValueOnce(overrides.voiceStatus ?? makeVoiceStatus())
+}
+
 describe('SetupPage', function () {
   beforeEach(function () {
     vi.clearAllMocks()
@@ -99,8 +131,7 @@ describe('SetupPage', function () {
   })
 
   it('renders copy buttons for each command', async function () {
-    mockApiFetch.mockResolvedValueOnce(makeDiag())
-    mockApiFetch.mockResolvedValueOnce({ items: [] })
+    mockSetupApis()
     render(React.createElement(SetupPage))
     await waitFor(function () {
       expect(screen.getByTestId('copy-cmd-project:setup')).toBeTruthy()
@@ -110,8 +141,7 @@ describe('SetupPage', function () {
   })
 
   it('renders env key checklist items', async function () {
-    mockApiFetch.mockResolvedValueOnce(makeDiag())
-    mockApiFetch.mockResolvedValueOnce({ items: [] })
+    mockSetupApis()
     render(React.createElement(SetupPage))
     await waitFor(function () {
       expect(screen.getByTestId('env-key-SANDBOX_MODE')).toBeTruthy()
@@ -121,8 +151,7 @@ describe('SetupPage', function () {
   })
 
   it('shows configured/missing status for env keys', async function () {
-    mockApiFetch.mockResolvedValueOnce(makeDiag())
-    mockApiFetch.mockResolvedValueOnce({ items: [] })
+    mockSetupApis()
     render(React.createElement(SetupPage))
     await waitFor(function () {
       expect(screen.getByTestId('env-key-SANDBOX_MODE')).toBeTruthy()
@@ -136,8 +165,9 @@ describe('SetupPage', function () {
   })
 
   it('renders source rows when sources returned', async function () {
-    mockApiFetch.mockResolvedValueOnce(makeDiag())
-    mockApiFetch.mockResolvedValueOnce({ items: [makeSource('franklin_auditor'), makeSource('permits_api')] })
+    mockSetupApis({
+      sources: { items: [makeSource('franklin_auditor'), makeSource('permits_api')] },
+    })
     render(React.createElement(SetupPage))
     await waitFor(function () {
       expect(screen.getByTestId('source-row-franklin_auditor')).toBeTruthy()
@@ -146,21 +176,36 @@ describe('SetupPage', function () {
   })
 
   it('shows no source status rows text when empty', async function () {
-    mockApiFetch.mockResolvedValueOnce(makeDiag())
-    mockApiFetch.mockResolvedValueOnce({ items: [] })
+    mockSetupApis()
     render(React.createElement(SetupPage))
     await waitFor(function () {
-      expect(screen.getByText('No source status rows found.')).toBeTruthy()
+      expect(screen.getByText('No source status rows found')).toBeTruthy()
     })
   })
 
   it('renders diagnostics pre block', async function () {
-    mockApiFetch.mockResolvedValueOnce(makeDiag({ default_locale: 'columbus_oh' }))
-    mockApiFetch.mockResolvedValueOnce({ items: [] })
+    mockSetupApis({
+      diagnostics: makeDiag({ default_locale: 'columbus_oh' }),
+    })
     render(React.createElement(SetupPage))
     await waitFor(function () {
       expect(screen.getByTestId('diagnostics-pre')).toBeTruthy()
     })
+  })
+
+  it('renders truthful feature status cards for llm and voice availability', async function () {
+    mockSetupApis({
+      llmStatus: makeLlmStatus({ available: true }),
+      voiceStatus: makeVoiceStatus({ reason: 'Twilio Voice caller ID is missing.' }),
+    })
+    render(React.createElement(SetupPage))
+    await waitFor(function () {
+      expect(screen.getByTestId('feature-card-llm')).toBeTruthy()
+    })
+    expect(screen.getByTestId('feature-card-llm').textContent).toContain('Local LLM')
+    expect(screen.getByTestId('feature-card-llm').textContent).toContain('Available')
+    expect(screen.getByTestId('feature-card-voice').textContent).toContain('Voice delivery')
+    expect(screen.getByTestId('feature-card-voice').textContent).toContain('Twilio Voice caller ID is missing.')
   })
 
   it('shows error card when API fails', async function () {
@@ -172,9 +217,10 @@ describe('SetupPage', function () {
   })
 
   it('shows last_error for source when present', async function () {
-    mockApiFetch.mockResolvedValueOnce(makeDiag())
-    mockApiFetch.mockResolvedValueOnce({
-      items: [{ ...makeSource('bad_source'), last_error: 'connection refused' }],
+    mockSetupApis({
+      sources: {
+        items: [{ ...makeSource('bad_source'), last_error: 'connection refused' }],
+      },
     })
     render(React.createElement(SetupPage))
     await waitFor(function () {

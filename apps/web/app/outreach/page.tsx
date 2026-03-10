@@ -8,7 +8,11 @@ import { SiteShell } from '@/components/site-shell'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardTitle } from '@/components/ui/card'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Input } from '@/components/ui/input'
+import { PageHeader } from '@/components/ui/page-header'
 import { Table, Td, Th } from '@/components/ui/table'
+import { Textarea } from '@/components/ui/textarea'
 import { apiFetch } from '@/lib/api'
 
 // ---------------------------------------------------------------------------
@@ -272,19 +276,33 @@ export default function OutreachPage() {
 
   return (
     <SiteShell>
-      {/* Header */}
-      <Card className='mb-4'>
-        <CardTitle>Outreach Autopilot</CardTitle>
-        <CardDescription>
-          Draft packs group reviewed outbound drafts. Deterministic compliance stays authoritative,
-          and voice call availability is only shown when the server can actually place Twilio calls.
-        </CardDescription>
-        {actionResult ? (
-          <p className='mt-3 text-sm text-muted-foreground' data-testid='action-result'>
+      <PageHeader
+        eyebrow='Approval queue'
+        title='Outreach'
+        description='Draft packs stage outbound work for deterministic review. Voice availability only appears when the server reports a real Twilio path, and approval never overrides server send authority.'
+        meta={
+          <>
+            <Badge variant='outline'>{packs.length} draft pack{packs.length === 1 ? '' : 's'}</Badge>
+            <span>
+              {voiceStatus.available
+                ? 'Voice ready for real approval attempts'
+                : `Voice unavailable: ${voiceStatus.reason}`}
+            </span>
+          </>
+        }
+      />
+
+      {actionResult ? (
+        <Card className='mb-4'>
+          <p
+            className='text-sm text-muted-foreground'
+            data-testid='action-result'
+            aria-live='polite'
+          >
             {actionResult}
           </p>
-        ) : null}
-      </Card>
+        </Card>
+      ) : null}
 
       {/* Compose new draft pack */}
       <Card className='mb-4' data-testid='compose-card'>
@@ -303,91 +321,104 @@ export default function OutreachPage() {
         </div>
 
         {showCompose ? (
-          <div className='mt-4 space-y-3' data-testid='compose-form'>
-            {/* Contact */}
-            <div>
-              <label className='mb-1 block text-xs text-muted-foreground'>Contact *</label>
-              <select
-                className='w-full rounded-lg border border-input bg-transparent px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring'
-                value={composeContact}
-                onChange={(e) => setComposeContact(e.target.value)}
-                data-testid='compose-contact'
-              >
-                <option value=''>— select contact —</option>
-                {contacts.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}{c.email ? ` (${c.email})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <form
+            className='mt-4 space-y-4'
+            data-testid='compose-form'
+            onSubmit={(event) => {
+              event.preventDefault()
+              void createDraftPack()
+            }}
+          >
+            <div className='grid gap-4 xl:grid-cols-[minmax(0,1fr),minmax(0,0.9fr)]'>
+              <div className='space-y-4'>
+                <div>
+                  <label className='mb-1 block text-xs text-muted-foreground'>Contact *</label>
+                  <select
+                    className='h-11 w-full rounded-2xl border border-input/80 bg-white/90 px-4 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] transition-all duration-200 hover:border-border'
+                    value={composeContact}
+                    onChange={(e) => setComposeContact(e.target.value)}
+                    data-testid='compose-contact'
+                  >
+                    <option value=''>— select contact —</option>
+                    {contacts.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}{c.email ? ` (${c.email})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            {/* Parcel ID (optional) */}
-            <div>
-              <label className='mb-1 block text-xs text-muted-foreground'>Parcel ID (optional)</label>
-              <input
-                className='w-full rounded-lg border border-input bg-transparent px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring'
-                placeholder='UUID of parcel'
-                value={composeParcel}
-                onChange={(e) => setComposeParcel(e.target.value)}
-                data-testid='compose-parcel'
-              />
-            </div>
+                <div>
+                  <label className='mb-1 block text-xs text-muted-foreground'>Parcel ID (optional)</label>
+                  <Input
+                    placeholder='UUID of parcel'
+                    value={composeParcel}
+                    onChange={(e) => setComposeParcel(e.target.value)}
+                    data-testid='compose-parcel'
+                  />
+                </div>
 
-            {/* Objective */}
-            <div>
-              <label className='mb-1 block text-xs text-muted-foreground'>Objective *</label>
-              <textarea
-                className='w-full rounded-lg border border-input bg-transparent px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring'
-                rows={3}
-                placeholder='e.g. Introduce myself and ask about selling timeline'
-                value={composeObjective}
-                onChange={(e) => setComposeObjective(e.target.value)}
-                data-testid='compose-objective'
-              />
-            </div>
-
-            {/* Channels */}
-            <div>
-              <label className='mb-1 block text-xs text-muted-foreground'>Channels *</label>
-              <div className='flex gap-4 text-sm' data-testid='compose-channels'>
-                {(['email', 'sms'] as string[])
-                  .concat(voiceStatus.available ? ['voice'] : [])
-                  .map((ch) => (
-                  <label key={ch} className='flex items-center gap-1.5 cursor-pointer'>
-                    <input
-                      type='checkbox'
-                      checked={composeChannels.includes(ch)}
-                      onChange={() => toggleChannel(ch)}
-                      data-testid={`compose-channel-${ch}`}
-                    />
-                    {channelLabel(ch)}
-                  </label>
-                ))}
+                <div>
+                  <label className='mb-1 block text-xs text-muted-foreground'>Objective *</label>
+                  <Textarea
+                    rows={3}
+                    placeholder='e.g. Introduce myself and ask about selling timeline'
+                    value={composeObjective}
+                    onChange={(e) => setComposeObjective(e.target.value)}
+                    data-testid='compose-objective'
+                  />
+                </div>
               </div>
-              {voiceStatus.available ? (
-                <p className='mt-2 text-xs text-muted-foreground' data-testid='voice-available-note'>
-                  Voice calls use approved scripts and signed Twilio callbacks.
-                </p>
-              ) : (
-                <p className='mt-2 text-xs text-muted-foreground' data-testid='voice-unavailable-note'>
-                  Voice call channel unavailable: {voiceStatus.reason}
-                </p>
-              )}
+
+              <div className='app-panel-muted px-4 py-4'>
+                <fieldset>
+                  <legend className='section-label'>Channels *</legend>
+                  <div className='mt-3 flex flex-wrap gap-3 text-sm' data-testid='compose-channels'>
+                    {(['email', 'sms'] as string[])
+                      .concat(voiceStatus.available ? ['voice'] : [])
+                      .map((ch) => (
+                      <label
+                        key={ch}
+                        className='flex items-center gap-2 rounded-full border border-border/70 bg-white/75 px-3 py-2'
+                      >
+                        <input
+                          type='checkbox'
+                          checked={composeChannels.includes(ch)}
+                          onChange={() => toggleChannel(ch)}
+                          data-testid={`compose-channel-${ch}`}
+                        />
+                        {channelLabel(ch)}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+
+                {voiceStatus.available ? (
+                  <p className='mt-4 text-sm text-muted-foreground' data-testid='voice-available-note'>
+                    Voice calls use approved scripts, signed Twilio callbacks, and still depend on deterministic approval.
+                  </p>
+                ) : (
+                  <p className='mt-4 text-sm text-muted-foreground' data-testid='voice-unavailable-note'>
+                    Voice call channel unavailable: {voiceStatus.reason}
+                  </p>
+                )}
+              </div>
             </div>
 
             {composeError ? (
-              <p className='text-xs text-red-400' data-testid='compose-error'>{composeError}</p>
+              <p className='text-xs text-red-400' data-testid='compose-error' aria-live='polite'>
+                {composeError}
+              </p>
             ) : null}
 
             <Button
-              onClick={() => void createDraftPack()}
               disabled={composing || !composeContact || !composeObjective || composeChannels.length === 0}
               data-testid='compose-submit'
+              type='submit'
             >
               {composing ? 'Creating…' : 'Create Draft Pack'}
             </Button>
-          </div>
+          </form>
         ) : null}
       </Card>
 
@@ -401,13 +432,15 @@ export default function OutreachPage() {
         ) : (
           <div className='space-y-2'>
             {packs.map((pack) => (
-              <div
+              <button
                 key={pack.id}
+                type='button'
                 className={
-                  'cursor-pointer rounded-xl border p-3 text-sm ' +
-                  (selectedPackId === pack.id ? 'border-accent' : 'border-border')
+                  'w-full rounded-xl border p-3 text-left text-sm transition-all ' +
+                  (selectedPackId === pack.id ? 'border-accent shadow-soft' : 'border-border hover:border-primary/20')
                 }
                 onClick={() => setSelectedPackId(pack.id)}
+                aria-pressed={selectedPackId === pack.id}
                 data-testid={`pack-item-${pack.id}`}
               >
                 <div className='flex flex-wrap items-center gap-2'>
@@ -433,12 +466,19 @@ export default function OutreachPage() {
                     Real sends still depend on server sandbox mode.
                   </p>
                 ) : null}
-              </div>
+              </button>
             ))}
             {packs.length === 0 ? (
-              <p className='text-sm text-muted-foreground' data-testid='no-packs'>
-                No draft packs yet.
-              </p>
+              <EmptyState
+                title='No draft packs yet'
+                description='Create a new pack to stage reviewed outreach. Approval still routes through deterministic compliance before any send attempt.'
+                action={
+                  <span className='sr-only' data-testid='no-packs'>
+                    No draft packs yet.
+                  </span>
+                }
+                className='border-none bg-card-muted/65 shadow-none'
+              />
             ) : null}
           </div>
         )}
@@ -481,94 +521,184 @@ export default function OutreachPage() {
             )}
           </div>
 
-          <Table>
-            <thead>
-              <tr>
-                <Th>Channel</Th>
-                <Th>Subject</Th>
-                <Th>Body</Th>
-                <Th>Status</Th>
-                <Th>Actions</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {selectedPack.drafts.map((draft) => (
-                <tr key={draft.id} data-testid={`draft-row-${draft.id}`}>
-                  <Td>{channelLabel(draft.channel)}</Td>
-                  <Td>{draft.subject ?? '—'}</Td>
-                  <Td>{truncate(draft.body)}</Td>
-                  <Td>
-                    <DraftStatusBadge status={draft.status} />
-                  </Td>
-                  <Td>
-                    {draft.channel === 'voice' && !voiceStatus.available ? (
-                      <p
-                        className='text-xs text-muted-foreground'
-                        data-testid={`voice-disabled-${draft.id}`}
+          <div className='space-y-3 md:hidden'>
+            {selectedPack.drafts.map((draft) => (
+              <article
+                key={draft.id}
+                className='app-panel-muted px-4 py-4'
+                data-testid={`draft-card-${draft.id}`}
+              >
+                <div className='flex flex-wrap items-center justify-between gap-3'>
+                  <Badge variant='outline' className='text-xs capitalize'>
+                    {channelLabel(draft.channel)}
+                  </Badge>
+                  <DraftStatusBadge status={draft.status} />
+                </div>
+                <p className='mt-3 font-semibold text-foreground'>
+                  {draft.subject ?? 'Voice script'}
+                </p>
+                <p className='mt-2 text-sm leading-6 text-muted-foreground'>
+                  {truncate(draft.body)}
+                </p>
+                <div className='mt-4'>
+                  {draft.channel === 'voice' && !voiceStatus.available ? (
+                    <p
+                      className='text-xs text-muted-foreground'
+                      data-testid={`voice-disabled-${draft.id}`}
+                    >
+                      Voice unavailable: {voiceStatus.reason}
+                    </p>
+                  ) : confirmApproving === draft.id ? (
+                    <div className='flex flex-wrap gap-2' data-testid='approve-confirm-row'>
+                      <Button
+                        onClick={() => void approveDraft(draft.id)}
+                        data-testid='approve-confirm'
                       >
-                        Voice unavailable: {voiceStatus.reason}
-                      </p>
-                    ) : confirmApproving === draft.id ? (
-                      <div className='flex gap-2' data-testid='approve-confirm-row'>
-                        <Button
-                          onClick={() => void approveDraft(draft.id)}
-                          data-testid='approve-confirm'
-                        >
-                          Confirm Approve
-                        </Button>
-                        <Button
-                          variant='outline'
-                          onClick={() => setConfirmApproving(null)}
-                          data-testid='approve-cancel'
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    ) : confirmRejecting === draft.id ? (
-                      <div className='flex gap-2' data-testid='reject-confirm-row'>
-                        <Button
-                          variant='outline'
-                          onClick={() => void rejectDraft(draft.id)}
-                          data-testid='reject-confirm'
-                        >
-                          Confirm Reject
-                        </Button>
-                        <Button
-                          variant='outline'
-                          onClick={() => setConfirmRejecting(null)}
-                          data-testid='reject-cancel'
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className='flex gap-2'>
-                        <Button
-                          onClick={() => {
-                            setConfirmApproving(draft.id)
-                            setConfirmRejecting(null)
-                          }}
-                          data-testid={`approve-btn-${draft.id}`}
-                        >
-                          Approve
-                        </Button>
-                        <Button
-                          variant='outline'
-                          onClick={() => {
-                            setConfirmRejecting(draft.id)
-                            setConfirmApproving(null)
-                          }}
-                          data-testid={`reject-btn-${draft.id}`}
-                        >
-                          Reject
-                        </Button>
-                      </div>
-                    )}
-                  </Td>
+                        Confirm Approve
+                      </Button>
+                      <Button
+                        variant='outline'
+                        onClick={() => setConfirmApproving(null)}
+                        data-testid='approve-cancel'
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : confirmRejecting === draft.id ? (
+                    <div className='flex flex-wrap gap-2' data-testid='reject-confirm-row'>
+                      <Button
+                        variant='outline'
+                        onClick={() => void rejectDraft(draft.id)}
+                        data-testid='reject-confirm'
+                      >
+                        Confirm Reject
+                      </Button>
+                      <Button
+                        variant='outline'
+                        onClick={() => setConfirmRejecting(null)}
+                        data-testid='reject-cancel'
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className='flex flex-wrap gap-2'>
+                      <Button
+                        onClick={() => {
+                          setConfirmApproving(draft.id)
+                          setConfirmRejecting(null)
+                        }}
+                        data-testid={`approve-btn-${draft.id}`}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        variant='outline'
+                        onClick={() => {
+                          setConfirmRejecting(draft.id)
+                          setConfirmApproving(null)
+                        }}
+                        data-testid={`reject-btn-${draft.id}`}
+                      >
+                        Reject
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className='hidden md:block'>
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Channel</Th>
+                  <Th>Subject</Th>
+                  <Th>Body</Th>
+                  <Th>Status</Th>
+                  <Th>Actions</Th>
                 </tr>
-              ))}
-            </tbody>
-          </Table>
+              </thead>
+              <tbody>
+                {selectedPack.drafts.map((draft) => (
+                  <tr key={draft.id} data-testid={`draft-row-${draft.id}`}>
+                    <Td>{channelLabel(draft.channel)}</Td>
+                    <Td>{draft.subject ?? '—'}</Td>
+                    <Td>{truncate(draft.body)}</Td>
+                    <Td>
+                      <DraftStatusBadge status={draft.status} />
+                    </Td>
+                    <Td>
+                      {draft.channel === 'voice' && !voiceStatus.available ? (
+                        <p
+                          className='text-xs text-muted-foreground'
+                          data-testid={`voice-disabled-${draft.id}`}
+                        >
+                          Voice unavailable: {voiceStatus.reason}
+                        </p>
+                      ) : confirmApproving === draft.id ? (
+                        <div className='flex gap-2' data-testid='approve-confirm-row'>
+                          <Button
+                            onClick={() => void approveDraft(draft.id)}
+                            data-testid='approve-confirm'
+                          >
+                            Confirm Approve
+                          </Button>
+                          <Button
+                            variant='outline'
+                            onClick={() => setConfirmApproving(null)}
+                            data-testid='approve-cancel'
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : confirmRejecting === draft.id ? (
+                        <div className='flex gap-2' data-testid='reject-confirm-row'>
+                          <Button
+                            variant='outline'
+                            onClick={() => void rejectDraft(draft.id)}
+                            data-testid='reject-confirm'
+                          >
+                            Confirm Reject
+                          </Button>
+                          <Button
+                            variant='outline'
+                            onClick={() => setConfirmRejecting(null)}
+                            data-testid='reject-cancel'
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className='flex gap-2'>
+                          <Button
+                            onClick={() => {
+                              setConfirmApproving(draft.id)
+                              setConfirmRejecting(null)
+                            }}
+                            data-testid={`approve-btn-${draft.id}`}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            variant='outline'
+                            onClick={() => {
+                              setConfirmRejecting(draft.id)
+                              setConfirmApproving(null)
+                            }}
+                            data-testid={`reject-btn-${draft.id}`}
+                          >
+                            Reject
+                          </Button>
+                        </div>
+                      )}
+                    </Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </div>
         </Card>
       ) : null}
     </SiteShell>

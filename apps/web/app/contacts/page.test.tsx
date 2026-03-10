@@ -147,7 +147,7 @@ describe("ContactsPage", function () {
     await waitFor(function () {
       expect(screen.getByTestId("contact-row-contact-001")).toBeTruthy();
     });
-    expect(screen.getByText("Alice Smith")).toBeTruthy();
+    expect(screen.getAllByText("Alice Smith").length).toBeGreaterThan(0);
   });
 
   it("renders multiple contacts", async function () {
@@ -160,8 +160,19 @@ describe("ContactsPage", function () {
       expect(screen.getByTestId("contact-row-c1")).toBeTruthy();
     });
     expect(screen.getByTestId("contact-row-c2")).toBeTruthy();
-    expect(screen.getByText("Alice")).toBeTruthy();
-    expect(screen.getByText("Bob")).toBeTruthy();
+    expect(screen.getAllByText("Alice").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Bob").length).toBeGreaterThan(0);
+  });
+
+  it("renders contact cards for narrow-screen browsing", async function () {
+    mockApiFetch.mockResolvedValue([makeContact({ id: "c1", tags_json: ["investor"] })]);
+    render(React.createElement(ContactsPage));
+    await waitFor(function () {
+      expect(screen.getByTestId("contact-card-c1")).toBeTruthy();
+    });
+    expect(screen.getByTestId("contact-card-c1").textContent).toContain(
+      "investor"
+    );
   });
 
   it("renders em-dash for missing email and phone", async function () {

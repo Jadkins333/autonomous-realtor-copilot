@@ -93,6 +93,17 @@ const SESSION = {
   expires: '2099-01-01',
 }
 
+function makeLlmStatus(overrides: Record<string, unknown> = {}) {
+  return {
+    llm_enabled: true,
+    provider: 'ollama',
+    model: 'llama3.2',
+    available: false,
+    provider_label: 'ollama/llama3.2',
+    ...overrides,
+  }
+}
+
 function setup() {
   mockUseRequireAuth.mockReturnValue({ status: 'authenticated' })
   mockUseSession.mockReturnValue({ data: SESSION, status: 'authenticated' })
@@ -102,8 +113,11 @@ describe('CopilotPage', function () {
   beforeEach(function () {
     vi.clearAllMocks()
     setup()
-    // agents sidebar fetch
-    mockApiFetch.mockResolvedValue([])
+    mockApiFetch.mockImplementation(async function (path: unknown) {
+      if (path === '/copilot/llm-status') return makeLlmStatus()
+      if (path === '/copilot/agents') return []
+      return {}
+    })
   })
 
   it('renders input and Run button', async function () {
@@ -143,13 +157,18 @@ describe('CopilotPage', function () {
   })
 
   it('appends user message and assistant response on Run', async function () {
-    mockApiFetch
-      .mockResolvedValueOnce([]) // agents
-      .mockResolvedValueOnce({
-        status: 'ok',
-        text: 'Market snapshot result',
-        trace: { selected_agent: 'market_snapshot_agent' },
-      })
+    mockApiFetch.mockImplementation(async function (path: unknown) {
+      if (path === '/copilot/llm-status') return makeLlmStatus()
+      if (path === '/copilot/agents') return []
+      if (path === '/copilot/chat') {
+        return {
+          status: 'ok',
+          text: 'Market snapshot result',
+          trace: { selected_agent: 'market_snapshot_agent' },
+        }
+      }
+      return {}
+    })
 
     render(React.createElement(CopilotPage))
     await waitFor(function () {
@@ -165,13 +184,18 @@ describe('CopilotPage', function () {
   })
 
   it('shows agent badge when trace has selected_agent', async function () {
-    mockApiFetch
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce({
-        status: 'ok',
-        text: 'Done',
-        trace: { selected_agent: 'market_snapshot_agent' },
-      })
+    mockApiFetch.mockImplementation(async function (path: unknown) {
+      if (path === '/copilot/llm-status') return makeLlmStatus()
+      if (path === '/copilot/agents') return []
+      if (path === '/copilot/chat') {
+        return {
+          status: 'ok',
+          text: 'Done',
+          trace: { selected_agent: 'market_snapshot_agent' },
+        }
+      }
+      return {}
+    })
 
     render(React.createElement(CopilotPage))
     await waitFor(function () {
@@ -186,13 +210,18 @@ describe('CopilotPage', function () {
   })
 
   it('shows trace details section when trace present', async function () {
-    mockApiFetch
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce({
-        status: 'ok',
-        text: 'Done',
-        trace: { selected_agent: 'agent_x', steps: [] },
-      })
+    mockApiFetch.mockImplementation(async function (path: unknown) {
+      if (path === '/copilot/llm-status') return makeLlmStatus()
+      if (path === '/copilot/agents') return []
+      if (path === '/copilot/chat') {
+        return {
+          status: 'ok',
+          text: 'Done',
+          trace: { selected_agent: 'agent_x', steps: [] },
+        }
+      }
+      return {}
+    })
 
     render(React.createElement(CopilotPage))
     await waitFor(function () {
@@ -206,9 +235,13 @@ describe('CopilotPage', function () {
   })
 
   it('renders agents sidebar when agents are returned', async function () {
-    mockApiFetch.mockResolvedValue([
-      { key: 'market_agent', name: 'Market Agent', description: 'Snapshots' },
-    ])
+    mockApiFetch.mockImplementation(async function (path: unknown) {
+      if (path === '/copilot/llm-status') return makeLlmStatus()
+      if (path === '/copilot/agents') {
+        return [{ key: 'market_agent', name: 'Market Agent', description: 'Snapshots' }]
+      }
+      return {}
+    })
     render(React.createElement(CopilotPage))
     await waitFor(function () {
       expect(screen.getByTestId('sidebar-agent-market_agent')).toBeTruthy()
@@ -217,9 +250,12 @@ describe('CopilotPage', function () {
   })
 
   it('shows error message when API throws', async function () {
-    mockApiFetch
-      .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error('API down'))
+    mockApiFetch.mockImplementation(async function (path: unknown) {
+      if (path === '/copilot/llm-status') return makeLlmStatus()
+      if (path === '/copilot/agents') return []
+      if (path === '/copilot/chat') throw new Error('API down')
+      return {}
+    })
 
     render(React.createElement(CopilotPage))
     await waitFor(function () {
@@ -232,6 +268,23 @@ describe('CopilotPage', function () {
     })
   })
 
+  it('shows the current local model status in the operator note', async function () {
+    mockApiFetch.mockImplementation(async function (path: unknown) {
+      if (path === '/copilot/llm-status') {
+        return makeLlmStatus({ available: true, provider_label: 'ollama/phi4-mini' })
+      }
+      if (path === '/copilot/agents') return []
+      return {}
+    })
+
+    render(React.createElement(CopilotPage))
+    await waitFor(function () {
+      expect(screen.getByTestId('llm-status-card')).toBeTruthy()
+    })
+    expect(screen.getByTestId('llm-status-card').textContent).toContain('Available')
+    expect(screen.getByTestId('llm-status-card').textContent).toContain('ollama/phi4-mini')
+  })
+
   it('returns null when not authenticated', async function () {
     mockUseRequireAuth.mockReturnValue({ status: 'loading' })
     const { container } = render(React.createElement(CopilotPage))
@@ -240,14 +293,19 @@ describe('CopilotPage', function () {
   })
 
   it('shows ai_narration panel when response includes it', async function () {
-    mockApiFetch
-      .mockResolvedValueOnce([]) // agents
-      .mockResolvedValueOnce({
-        status: 'ok',
-        text: 'Market score is 72.',
-        trace: { selected_agent: 'market_analyst', llm_used: true, llm_provider: 'ollama/llama3.2' },
-        ai_narration: 'The market score of 72 indicates strong seller conditions.',
-      })
+    mockApiFetch.mockImplementation(async function (path: unknown) {
+      if (path === '/copilot/llm-status') return makeLlmStatus({ available: true })
+      if (path === '/copilot/agents') return []
+      if (path === '/copilot/chat') {
+        return {
+          status: 'ok',
+          text: 'Market score is 72.',
+          trace: { selected_agent: 'market_analyst', llm_used: true, llm_provider: 'ollama/llama3.2' },
+          ai_narration: 'The market score of 72 indicates strong seller conditions.',
+        }
+      }
+      return {}
+    })
 
     render(React.createElement(CopilotPage))
     await waitFor(function () {
@@ -259,21 +317,26 @@ describe('CopilotPage', function () {
       expect(screen.getByTestId('ai-narration')).toBeTruthy()
     })
     expect(screen.getByText(/Deterministic result/i)).toBeTruthy()
-    expect(screen.getByText(/AI-assisted narration/i)).toBeTruthy()
+    expect(screen.getByTestId('ai-narration').textContent).toContain('AI-assisted narration')
     expect(screen.getByText('The market score of 72 indicates strong seller conditions.')).toBeTruthy()
     // deterministic text still present
     expect(screen.getByText('Market score is 72.')).toBeTruthy()
   })
 
   it('does not show ai_narration panel when narration is null', async function () {
-    mockApiFetch
-      .mockResolvedValueOnce([]) // agents
-      .mockResolvedValueOnce({
-        status: 'ok',
-        text: 'Market score is 72.',
-        trace: { selected_agent: 'market_analyst', llm_used: false },
-        ai_narration: null,
-      })
+    mockApiFetch.mockImplementation(async function (path: unknown) {
+      if (path === '/copilot/llm-status') return makeLlmStatus({ available: false })
+      if (path === '/copilot/agents') return []
+      if (path === '/copilot/chat') {
+        return {
+          status: 'ok',
+          text: 'Market score is 72.',
+          trace: { selected_agent: 'market_analyst', llm_used: false },
+          ai_narration: null,
+        }
+      }
+      return {}
+    })
 
     render(React.createElement(CopilotPage))
     await waitFor(function () {

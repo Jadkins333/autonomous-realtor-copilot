@@ -199,6 +199,21 @@ describe("ContactDetailPage", function () {
     });
   });
 
+  it("renders message cards for narrow-screen review", async function () {
+    setup();
+    mockApiFetch
+      .mockResolvedValueOnce(CONTACT)
+      .mockResolvedValueOnce([MESSAGE])
+      .mockResolvedValueOnce([]);
+    render(React.createElement(ContactDetailPage));
+    await waitFor(() => {
+      expect(screen.getByTestId(`message-card-${MESSAGE.id}`)).toBeTruthy();
+    });
+    expect(screen.getByTestId(`message-card-${MESSAGE.id}`).textContent).toContain(
+      "Hello Alice"
+    );
+  });
+
   it("shows no-messages state when empty", async function () {
     setup();
     mockApiFetch

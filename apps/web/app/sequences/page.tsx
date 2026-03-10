@@ -240,6 +240,7 @@ export default function SequencesPage() {
                       className="gap-2"
                       onClick={() => toggleExpand(seq.id)}
                       aria-expanded={isOpen}
+                      aria-controls={`sequence-panel-${seq.id}`}
                     >
                       {isOpen ? (
                         <>
@@ -269,6 +270,7 @@ export default function SequencesPage() {
 
                 <div
                   data-testid={`sequence-steps-${seq.id}`}
+                  id={`sequence-panel-${seq.id}`}
                   className={[
                     "overflow-hidden transition-all duration-300 ease-out",
                     isOpen
@@ -372,8 +374,19 @@ export default function SequencesPage() {
                         : "border border-success/20 bg-success/10 text-success"
                     ].join(" ")}
                     data-testid={`enroll-result-${seq.id}`}
+                    aria-live="polite"
                   >
                     {result}
+                  </p>
+                ) : null}
+
+                {seq.sandbox_only ? (
+                  <p
+                    className="mt-4 text-xs text-muted-foreground"
+                    data-testid={`sequence-note-${seq.id}`}
+                  >
+                    Sandbox-only templates still depend on server send mode and
+                    provider availability before anything can leave the system.
                   </p>
                 ) : null}
               </Card>

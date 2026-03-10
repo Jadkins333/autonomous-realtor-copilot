@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react";
 
 import { useRequireAuth } from "@/components/auth-guard";
 import { SiteShell } from "@/components/site-shell";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
@@ -129,7 +130,13 @@ export default function ContactsPage() {
             </p>
           ) : null}
 
-          <div className="mt-5 space-y-4">
+          <form
+            className="mt-5 space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void createContact();
+            }}
+          >
             <Field label="Name">
               <Input
                 placeholder="Enter contact name"
@@ -155,14 +162,14 @@ export default function ContactsPage() {
               />
             </Field>
             <Button
-              onClick={createContact}
               data-testid="add-contact-btn"
               className="w-full"
               disabled={!name.trim() || submitting}
+              type="submit"
             >
               {submitting ? "Saving contact…" : "Add Contact"}
             </Button>
-          </div>
+          </form>
         </Card>
 
         <Card data-testid="contacts-table-card">
@@ -189,20 +196,16 @@ export default function ContactsPage() {
               />
             </div>
           ) : (
-            <div className="table-shell mt-5 overflow-x-auto">
-              <Table>
-                <thead>
-                  <tr>
-                    <Th>Name</Th>
-                    <Th>Email</Th>
-                    <Th>Phone</Th>
-                    <Th>Tags</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.id} data-testid={`contact-row-${row.id}`}>
-                      <Td>
+            <div className="mt-5 space-y-4">
+              <div className="space-y-3 md:hidden">
+                {rows.map((row) => (
+                  <article
+                    key={row.id}
+                    className="app-panel-muted px-4 py-4"
+                    data-testid={`contact-card-${row.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 space-y-2">
                         <Link
                           href={`/contacts/${row.id}`}
                           className="inline-flex items-center gap-2 font-semibold text-primary hover:text-primary/80"
@@ -210,14 +213,61 @@ export default function ContactsPage() {
                           {row.name}
                           <ArrowRight className="h-3.5 w-3.5" />
                         </Link>
-                      </Td>
-                      <Td>{row.email ?? "—"}</Td>
-                      <Td>{row.phone ?? "—"}</Td>
-                      <Td>{(row.tags_json || []).join(", ") || "—"}</Td>
+                        <p className="text-sm text-muted-foreground">
+                          {row.email ?? "No email yet"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {row.phone ?? "No phone yet"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {(row.tags_json || []).length > 0 ? (
+                        row.tags_json?.map((tag) => (
+                          <Badge key={tag} variant="outline" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))
+                      ) : (
+                        <Badge variant="outline" className="text-xs">
+                          No tags yet
+                        </Badge>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              <div className="table-shell hidden overflow-x-auto md:block">
+                <Table>
+                  <thead>
+                    <tr>
+                      <Th>Name</Th>
+                      <Th>Email</Th>
+                      <Th>Phone</Th>
+                      <Th>Tags</Th>
                     </tr>
-                  ))}
-                </tbody>
-              </Table>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => (
+                      <tr key={row.id} data-testid={`contact-row-${row.id}`}>
+                        <Td>
+                          <Link
+                            href={`/contacts/${row.id}`}
+                            className="inline-flex items-center gap-2 font-semibold text-primary hover:text-primary/80"
+                          >
+                            {row.name}
+                            <ArrowRight className="h-3.5 w-3.5" />
+                          </Link>
+                        </Td>
+                        <Td>{row.email ?? "—"}</Td>
+                        <Td>{row.phone ?? "—"}</Td>
+                        <Td>{(row.tags_json || []).join(", ") || "—"}</Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
             </div>
           )}
         </Card>

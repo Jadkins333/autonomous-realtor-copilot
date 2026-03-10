@@ -142,6 +142,18 @@ describe('SequencesPage', function () {
     })
   })
 
+  it('explains that sandbox-only sequences still depend on server send authority', async function () {
+    setup()
+    mockApiFetch.mockResolvedValue([makeSequence({ id: 'seq-sandbox-note', sandbox_only: true })])
+    render(React.createElement(SequencesPage))
+    await waitFor(() => {
+      expect(screen.getByTestId('sequence-note-seq-sandbox-note')).toBeTruthy()
+    })
+    expect(screen.getByTestId('sequence-note-seq-sandbox-note').textContent).toContain(
+      'server send mode and provider availability',
+    )
+  })
+
   it('shows disabled badge for disabled sequences', async function () {
     setup()
     mockApiFetch.mockResolvedValue([makeSequence({ is_enabled: false })])

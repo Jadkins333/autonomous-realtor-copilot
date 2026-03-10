@@ -218,6 +218,17 @@ describe('OutreachPage', function () {
     expect(screen.getByTestId('draft-row-draft-bbb-222')).toBeTruthy()
   })
 
+  it('renders mobile draft cards for narrow-width pack review', async function () {
+    const draft = makeDraft()
+    const pack = makePack({ drafts: [draft] })
+    mockApiFetch.mockResolvedValue({ items: [pack] })
+    renderPage()
+    await waitFor(function () {
+      expect(screen.getByTestId('draft-card-draft-bbb-222')).toBeTruthy()
+    })
+    expect(screen.getByTestId('draft-card-draft-bbb-222').textContent).toContain('Hello')
+  })
+
   it('renders DraftStatusBadge for pack and draft', async function () {
     const draft = makeDraft({ status: 'blocked_sandbox' })
     const pack = makePack({ status: 'draft', drafts: [draft] })
@@ -229,7 +240,7 @@ describe('OutreachPage', function () {
     // Pack status badge appears (at least 1 draft-status-draft badge)
     expect(screen.getAllByTestId('draft-status-draft').length).toBeGreaterThan(0)
     // Draft blocked_sandbox badge
-    expect(screen.getByTestId('draft-status-blocked_sandbox')).toBeTruthy()
+    expect(screen.getAllByTestId('draft-status-blocked_sandbox').length).toBeGreaterThan(0)
   })
 
   it('shows unavailable messaging instead of approve controls for voice drafts when voice is offline', async function () {
@@ -247,7 +258,7 @@ describe('OutreachPage', function () {
       expect(screen.getByTestId('draft-row-draft-voice-1')).toBeTruthy()
     })
     await waitFor(function () {
-      expect(screen.getByText(/Voice unavailable:/i)).toBeTruthy()
+      expect(screen.getAllByTestId('voice-disabled-draft-voice-1').length).toBeGreaterThan(0)
     })
     expect(screen.queryByTestId('approve-btn-draft-voice-1')).toBeNull()
   })
@@ -272,11 +283,11 @@ describe('OutreachPage', function () {
     mockApiFetch.mockResolvedValue({ items: [pack] })
     renderPage()
     await waitFor(function () {
-      expect(screen.getByTestId('approve-btn-draft-bbb-222')).toBeTruthy()
+      expect(screen.getAllByTestId('approve-btn-draft-bbb-222').length).toBeGreaterThan(0)
     })
-    fireEvent.click(screen.getByTestId('approve-btn-draft-bbb-222'))
-    expect(screen.getByTestId('approve-confirm')).toBeTruthy()
-    expect(screen.getByTestId('approve-cancel')).toBeTruthy()
+    fireEvent.click(screen.getAllByTestId('approve-btn-draft-bbb-222')[0])
+    expect(screen.getAllByTestId('approve-confirm').length).toBeGreaterThan(0)
+    expect(screen.getAllByTestId('approve-cancel').length).toBeGreaterThan(0)
   })
 
   it('cancels approve confirm without calling API', async function () {
@@ -285,15 +296,15 @@ describe('OutreachPage', function () {
     mockApiFetch.mockResolvedValue({ items: [pack] })
     renderPage()
     await waitFor(function () {
-      expect(screen.getByTestId('approve-btn-draft-bbb-222')).toBeTruthy()
+      expect(screen.getAllByTestId('approve-btn-draft-bbb-222').length).toBeGreaterThan(0)
     })
     // First call was the load() — clear it
     mockApiFetch.mockClear()
     mockApiFetch.mockResolvedValue({ items: [pack] })
 
-    fireEvent.click(screen.getByTestId('approve-btn-draft-bbb-222'))
-    fireEvent.click(screen.getByTestId('approve-cancel'))
-    expect(screen.queryByTestId('approve-confirm')).toBeNull()
+    fireEvent.click(screen.getAllByTestId('approve-btn-draft-bbb-222')[0])
+    fireEvent.click(screen.getAllByTestId('approve-cancel')[0])
+    expect(screen.queryAllByTestId('approve-confirm')).toHaveLength(0)
     // No extra API call
     expect(mockApiFetch).not.toHaveBeenCalled()
   })
@@ -307,13 +318,13 @@ describe('OutreachPage', function () {
 
     renderPage()
     await waitFor(function () {
-      expect(screen.getByTestId('approve-btn-draft-bbb-222')).toBeTruthy()
+      expect(screen.getAllByTestId('approve-btn-draft-bbb-222').length).toBeGreaterThan(0)
     })
-    fireEvent.click(screen.getByTestId('approve-btn-draft-bbb-222'))
+    fireEvent.click(screen.getAllByTestId('approve-btn-draft-bbb-222')[0])
     await waitFor(function () {
-      expect(screen.getByTestId('approve-confirm')).toBeTruthy()
+      expect(screen.getAllByTestId('approve-confirm').length).toBeGreaterThan(0)
     })
-    fireEvent.click(screen.getByTestId('approve-confirm'))
+    fireEvent.click(screen.getAllByTestId('approve-confirm')[0])
 
     await waitFor(function () {
       expect(screen.getByTestId('action-result')).toBeTruthy()
@@ -327,11 +338,11 @@ describe('OutreachPage', function () {
     mockApiFetch.mockResolvedValue({ items: [pack] })
     renderPage()
     await waitFor(function () {
-      expect(screen.getByTestId('reject-btn-draft-bbb-222')).toBeTruthy()
+      expect(screen.getAllByTestId('reject-btn-draft-bbb-222').length).toBeGreaterThan(0)
     })
-    fireEvent.click(screen.getByTestId('reject-btn-draft-bbb-222'))
-    expect(screen.getByTestId('reject-confirm')).toBeTruthy()
-    expect(screen.getByTestId('reject-cancel')).toBeTruthy()
+    fireEvent.click(screen.getAllByTestId('reject-btn-draft-bbb-222')[0])
+    expect(screen.getAllByTestId('reject-confirm').length).toBeGreaterThan(0)
+    expect(screen.getAllByTestId('reject-cancel').length).toBeGreaterThan(0)
   })
 
   it('calls reject API on confirm', async function () {
@@ -343,13 +354,13 @@ describe('OutreachPage', function () {
 
     renderPage()
     await waitFor(function () {
-      expect(screen.getByTestId('reject-btn-draft-bbb-222')).toBeTruthy()
+      expect(screen.getAllByTestId('reject-btn-draft-bbb-222').length).toBeGreaterThan(0)
     })
-    fireEvent.click(screen.getByTestId('reject-btn-draft-bbb-222'))
+    fireEvent.click(screen.getAllByTestId('reject-btn-draft-bbb-222')[0])
     await waitFor(function () {
-      expect(screen.getByTestId('reject-confirm')).toBeTruthy()
+      expect(screen.getAllByTestId('reject-confirm').length).toBeGreaterThan(0)
     })
-    fireEvent.click(screen.getByTestId('reject-confirm'))
+    fireEvent.click(screen.getAllByTestId('reject-confirm')[0])
 
     await waitFor(function () {
       expect(screen.getByTestId('action-result')).toBeTruthy()
@@ -420,12 +431,12 @@ describe('OutreachPage', function () {
     mockApiFetch.mockResolvedValue({ items: [pack] })
     renderPage()
     await waitFor(function () {
-      expect(screen.getByTestId('approve-btn-draft-bbb-222')).toBeTruthy()
+      expect(screen.getAllByTestId('approve-btn-draft-bbb-222').length).toBeGreaterThan(0)
     })
     // Start approve confirm
-    fireEvent.click(screen.getByTestId('approve-btn-draft-bbb-222'))
-    expect(screen.getByTestId('approve-confirm')).toBeTruthy()
-    expect(screen.queryByTestId('reject-confirm')).toBeNull()
+    fireEvent.click(screen.getAllByTestId('approve-btn-draft-bbb-222')[0])
+    expect(screen.getAllByTestId('approve-confirm').length).toBeGreaterThan(0)
+    expect(screen.queryAllByTestId('reject-confirm')).toHaveLength(0)
   })
 
   // ---------------------------------------------------------------------------
@@ -444,7 +455,7 @@ describe('OutreachPage', function () {
     mockApiFetch.mockResolvedValue({ items: [] })
     renderPage()
     await waitFor(function () {
-      expect(screen.getByText(/deterministic compliance stays authoritative/i)).toBeTruthy()
+      expect(screen.getByText(/approval never overrides server send authority/i)).toBeTruthy()
     })
   })
 
@@ -627,7 +638,7 @@ describe('OutreachPage', function () {
 
     renderPage()
     await waitFor(function () {
-      expect(screen.getByTestId('approve-btn-draft-voice-2')).toBeTruthy()
+      expect(screen.getAllByTestId('approve-btn-draft-voice-2').length).toBeGreaterThan(0)
     })
     expect(screen.queryByTestId('voice-disabled-draft-voice-2')).toBeNull()
   })
