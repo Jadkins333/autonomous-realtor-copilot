@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import {
   Settings,
@@ -64,10 +64,10 @@ export default function SetupPage() {
       try {
         setError(null);
         const [diag, sourcePayload] = await Promise.all([
-          apiFetch<Record<string, unknown>>("/system/diagnostics", (session as any).apiToken),
-          apiFetch<SourceStatusResponse>("/sources/status", (session as any).apiToken),
+          apiFetch<Record<string, unknown>>("/system/diagnostics", session?.apiToken),
+          apiFetch<SourceStatusResponse>("/sources/status", session?.apiToken),
         ]);
-        if (!mounted) return;
+        if (!active) return;
         setDiagnostics(diag);
         setSources(sourcePayload.items || []);
       } catch (err) {

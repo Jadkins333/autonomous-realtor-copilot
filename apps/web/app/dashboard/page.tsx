@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import {
   Activity,
@@ -59,6 +60,12 @@ export default function DashboardPage() {
   }, [session]);
 
   if (status !== "authenticated") return null;
+
+  const driftSources = sources?.filter((s) => s.drift_detected) ?? [];
+  const staleSources = sources?.filter((s) => s.is_stale) ?? [];
+  const okCount = sources?.filter((s) => s.state === "ok").length ?? 0;
+  const partialCount = sources?.filter((s) => s.state === "partial").length ?? 0;
+  const failedCount = sources?.filter((s) => s.state === "failed").length ?? 0;
 
   return (
     <SiteShell>

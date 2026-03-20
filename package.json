@@ -3,6 +3,12 @@
   "private": true,
   "version": "1.0.0",
   "packageManager": "pnpm@9.12.2",
+  "pnpm": {
+    "peerDependencyRules": {
+      "ignoreMissing": ["@playwright/test"]
+    },
+    "ignoredOptionalDependencies": ["@playwright/test"]
+  },
   "scripts": {
     "project:setup": "bash scripts/setup.sh",
     "project:doctor": "bash scripts/doctor.sh",

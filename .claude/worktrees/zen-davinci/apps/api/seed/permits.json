@@ -1,0 +1,62 @@
+[
+  {
+    "external_id": "permit-201",
+    "address": "145 N High St",
+    "permit_type": "Electrical Remodel",
+    "permit_subtype": "Panel Upgrade",
+    "status": "finaled",
+    "applied_date": "2025-12-17",
+    "issued_date": "2025-12-22",
+    "final_date": "2026-01-15",
+    "lon": -82.9989,
+    "lat": 39.9654
+  },
+  {
+    "external_id": "permit-202",
+    "address": "145 N High St",
+    "permit_type": "Interior Remodel",
+    "permit_subtype": "Kitchen",
+    "status": "issued",
+    "applied_date": "2026-01-18",
+    "issued_date": "2026-01-23",
+    "final_date": null,
+    "lon": -82.9987,
+    "lat": 39.9651
+  },
+  {
+    "external_id": "permit-203",
+    "address": "722 Neil Ave",
+    "permit_type": "Plumbing",
+    "permit_subtype": "Fixture",
+    "status": "finaled",
+    "applied_date": "2025-11-02",
+    "issued_date": "2025-11-05",
+    "final_date": "2025-11-19",
+    "lon": -83.0096,
+    "lat": 39.9751
+  },
+  {
+    "external_id": "permit-204",
+    "address": "3508 Indianola Ave",
+    "permit_type": "Interior Remodel",
+    "permit_subtype": "Bathroom",
+    "status": "issued",
+    "applied_date": "2026-02-03",
+    "issued_date": "2026-02-10",
+    "final_date": null,
+    "lon": -82.9831,
+    "lat": 40.0391
+  },
+  {
+    "external_id": "permit-205",
+    "address": "3508 Indianola Ave",
+    "permit_type": "Roof",
+    "permit_subtype": "Replacement",
+    "status": "finaled",
+    "applied_date": "2025-10-06",
+    "issued_date": "2025-10-11",
+    "final_date": "2025-10-30",
+    "lon": -82.9834,
+    "lat": 40.0392
+  }
+]

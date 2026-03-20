@@ -28,12 +28,12 @@ build/
 node_modules/
 apps/web/node_modules/
 .next/
-pnpm-lock.yaml
 
 # Python
 __pycache__/
 *.pyc
 .pytest_cache/
+# local env files (never commit secrets)
 .env
-
-.env
+.env.local
+.env*.local

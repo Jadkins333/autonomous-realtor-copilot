@@ -9,6 +9,15 @@ const nextConfig = {
   experimental: {
     typedRoutes: false
   },
+<<<<<<< HEAD
+=======
+  eslint: {
+    ignoreDuringBuilds: true
+  },
+  typescript: {
+    ignoreBuildErrors: false
+  },
+>>>>>>> origin/codex/phase2-sources-ui-tests
   webpack: (config) => {
     config.resolve.alias = {
       ...(config.resolve.alias || {}),

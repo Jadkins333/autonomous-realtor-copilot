@@ -38,9 +38,11 @@ export const authOptions = {
           cache: "no-store"
         });
 
-        if (!response.ok) {
-          return null;
-        }
+interface AppUser extends User {
+ apiToken?: string
+ role?: string
+ tenantId?: string
+}
 
         const payload = await response.json();
         return {

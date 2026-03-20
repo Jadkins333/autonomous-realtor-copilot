@@ -38,8 +38,8 @@ async def custom_swagger_ui_html():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=cors_allow_origins,
+    allow_credentials=cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -69,3 +69,4 @@ async def request_context_middleware(request: Request, call_next: Callable) -> R
 
 
 app.include_router(api_router)
+

@@ -33,6 +33,27 @@ from app.services.disclosures import evaluate_disclosure_gate, record_blocked_di
 from app.services.providers import ProviderResult, get_email_provider, get_sms_provider
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
+
+
+def _message_meta(message: Message, **updates):
+    return {**(message.meta_json or {}), **updates}
+
+
+def _safe_pack_status(db: Session, pack_id):
+    if pack_id is None:
+        return None
+    try:
+        return _refresh_pack_rollup_status(db, pack_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "outreach_pack_status_refresh_failed",
+            extra={
+                "pack_id": str(pack_id),
+                "error": str(exc),
+            },
+        )
+        return None
 
 
 def _disclosure_default() -> dict:
@@ -150,11 +171,15 @@ def _pack_status_from_drafts(pack: OutreachDraftPack, drafts: list[Message]) -> 
 
 
 def _refresh_pack_rollup_status(db: Session, pack_id: UUID) -> str:
-    pack = db.execute(select(OutreachDraftPack).where(OutreachDraftPack.id == pack_id)).scalar_one_or_none()
+    pack = db.execute(
+        select(OutreachDraftPack).where(OutreachDraftPack.id == pack_id)
+    ).scalar_one_or_none()
     if pack is None:
         return "draft"
     drafts = list(
-        db.execute(select(Message).where(Message.pack_id == pack.id).order_by(Message.created_at.asc())).scalars()
+        db.execute(
+            select(Message).where(Message.pack_id == pack.id).order_by(Message.created_at.asc())
+        ).scalars()
     )
     pack.status = _pack_status_from_drafts(pack, drafts)
     return pack.status
@@ -489,7 +514,11 @@ async def approve_and_send(
     actor_user_id: UUID | None = None,
 ) -> dict:
     message = db.execute(
-        select(Message).where(Message.id == message_id, Message.tenant_id == tenant_id)
+        select(Message).where(
+            Message.id == message_id,
+            Message.tenant_id == tenant_id,
+            Message.direction == MessageDirection.outbound,
+        )
     ).scalar_one_or_none()
     if not message:
         raise ValueError("Message not found")
@@ -512,7 +541,13 @@ async def approve_and_send(
         }
 
     if message.status != MessageStatus.draft:
-        raise ValueError("Message is not draft")
+        return {
+            "status": message.status.value,
+            "provider_message_id": message.provider_message_id,
+            "pack_id": message.pack_id,
+            "pack_status": _safe_pack_status(db, message.pack_id),
+            "idempotent": True,
+        }
 
     pack = None
     if message.pack_id is not None:

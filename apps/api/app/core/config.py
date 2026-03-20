@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
 
     default_tenant_name: str = "Demo Realty Columbus"
+    default_tenant_slug: str = "demo-realty"
     default_locale: str = "columbus_oh"
     test_parcel_missing_signals_id: str = "11111111-1111-1111-1111-111111111111"
     demo_user_email: str = "agent@demo.local"

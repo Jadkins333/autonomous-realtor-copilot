@@ -1,13 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import {
-  Alert,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View
-} from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { acknowledgeDisclosure, approveDraft, listOutreachDrafts } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth-context";
@@ -16,23 +8,23 @@ import { summarizeDisclosureBlock, summarizeFairHousing, summarizePolicyState } 
 import type { OutreachDraft } from "../../../lib/types";
 
 export default function OutreachScreen() {
-  const { token } = useAuth();
-  const [rows, setRows] = useState<OutreachDraft[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
+ const { token } = useAuth();
+ const [packs, setPacks] = useState([] as DraftPack[]);
+ const [actionBusy, setActionBusy] = useState(false);
+ const [selectedPackId, setSelectedPackId] = useState("");
+ const [refreshing, setRefreshing] = useState(false);
+ const [actionResult, setActionResult] = useState("");
 
-  const load = useCallback(async () => {
-    if (!token) return;
-    setRefreshing(true);
-    try {
-      setRows(await listOutreachDrafts(token));
-    } finally {
-      setRefreshing(false);
-    }
-  }, [token]);
+ const load = useCallback(async function () {
+ if (!token) {
+ return;
+ }
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+ setRefreshing(true);
+ try {
+ const response = (await listDraftPacks(token, 20)) as DraftPacksResponse;
+ const next = Array.isArray(response.items) ? response.items : [];
+ setPacks(next);
 
   const approve = async (id: string) => {
     if (!token) return;
@@ -172,3 +164,8 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   }
 });
+
+
+
+
+

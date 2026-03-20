@@ -35,20 +35,30 @@ type PropertyResult = {
   };
 };
 
+type ParcelRow = {
+  id: string;
+  address: string;
+  parcel_number: string;
+  city: string;
+  updated_at: string;
+};
+
 export default function PropertiesPage() {
   const { status } = useRequireAuth();
   const { data: session } = useSession();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PropertyResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   async function handleSearch() {
     if (!session || !query.trim()) return;
     setLoading(true);
+    setSearchError(null);
     try {
       const data = await apiFetch<PropertyResult[]>(
         `/parcels/search?query=${encodeURIComponent(query)}`,
-        (session as any).apiToken
+        token,
       );
       setResults(data);
     } catch {

@@ -1,7 +1,7 @@
 "use client";
 
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Zap, TrendingUp, AlertTriangle, ArrowRight, Filter, RefreshCw } from "lucide-react";
 

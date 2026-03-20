@@ -13,8 +13,8 @@ import { COPILOT_COMMANDS } from "@/lib/commands";
 type CopilotResponse = {
   status: string;
   text: string;
-  data?: any;
-  trace?: any;
+  data?: unknown;
+  trace?: unknown;
   missing_inputs?: string[];
 };
 
@@ -57,9 +57,9 @@ export default function CopilotPage() {
     setQuery("");
     setLoading(true);
     try {
-      const result = await apiFetch<CopilotResponse>("/copilot/chat", (session as any).apiToken, {
+      const result = await apiFetch<CopilotResponse>("/copilot/chat", session?.apiToken, {
         method: "POST",
-        body: JSON.stringify({ message })
+        body: JSON.stringify({ message }),
       });
       setMessages((prev) => [...prev, { role: "assistant", text: result.text, payload: result }]);
     } catch (error) {
@@ -81,7 +81,7 @@ export default function CopilotPage() {
 
   useEffect(() => {
     if (!session) return;
-    apiFetch<AgentRow[]>("/copilot/agents", (session as any).apiToken)
+    apiFetch<AgentRow[]>("/copilot/agents", session?.apiToken)
       .then(setAgents)
       .catch(() => setAgents([]));
   }, [session]);

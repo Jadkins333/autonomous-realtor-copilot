@@ -2,6 +2,7 @@ from pydantic import BaseModel
 
 
 class LoginRequest(BaseModel):
+    tenant_slug: str
     email: str
     password: str
 

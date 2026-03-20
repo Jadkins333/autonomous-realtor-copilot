@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import uuid
 from datetime import UTC, date, datetime
@@ -43,6 +44,7 @@ from app.utils.hash import stable_hash
 from app.utils.security import get_password_hash
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 def _truthy_env(name: str, default: bool = False) -> bool:
@@ -62,11 +64,15 @@ def _parse_date(value: str | None) -> date | None:
 
 
 def _ensure_tenant_and_user(db):
-    tenant = db.execute(select(Tenant).where(Tenant.name == settings.default_tenant_name)).scalar_one_or_none()
+    tenant = db.execute(select(Tenant).where(Tenant.slug == settings.default_tenant_slug)).scalar_one_or_none()
     if not tenant:
-        tenant = Tenant(name=settings.default_tenant_name)
+        tenant = db.execute(select(Tenant).where(Tenant.name == settings.default_tenant_name)).scalar_one_or_none()
+    if not tenant:
+        tenant = Tenant(name=settings.default_tenant_name, slug=settings.default_tenant_slug)
         db.add(tenant)
         db.flush()
+    elif tenant.slug != settings.default_tenant_slug:
+        tenant.slug = settings.default_tenant_slug
 
     user = db.execute(
         select(User).where(User.tenant_id == tenant.id, User.email == settings.demo_user_email)
@@ -564,8 +570,10 @@ def _seed_flood_zones(db, tenant_id, source: Source) -> None:
                 continue
             try:
                 polygons.append(Polygon([(float(x), float(y)) for x, y in outer]))
-            except Exception:
+            except Exception as exc: # noqa: BLE001
+                logger.warning("seed flood zone ring parse failed for %s: %s", external_id, exc)
                 continue
+
         if not polygons:
             continue
 
@@ -803,3 +811,6 @@ def bootstrap_seed() -> None:
 
 if __name__ == "__main__":
     bootstrap_seed()
+
+
+

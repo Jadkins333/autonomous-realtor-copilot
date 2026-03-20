@@ -1,4 +1,4 @@
-"use client";
+'use client'
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
@@ -257,7 +257,7 @@ export default function OutreachPage() {
         </div>
       </div>
     </SiteShell>
-  );
+  )
 }
 
 function DraftCard({

@@ -12,7 +12,9 @@ import type {
 
 declare const process: { env: Record<string, string | undefined> };
 
-const BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+const BASE_URL = (
+  process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:8000"
+).replace(/\/$/, "");
 
 type RequestOptions = {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -21,9 +23,12 @@ type RequestOptions = {
   headers?: Record<string, string>;
 };
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
   const headers: Record<string, string> = {
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
   };
 
   if (options.token) {
@@ -34,7 +39,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const response = await fetch(`${BASE_URL}${path}`, {
     method: options.method || "GET",
     headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
 
   if (!response.ok) {
@@ -49,15 +54,19 @@ export function getApiBaseUrl() {
   return BASE_URL;
 }
 
-export function login(email: string, password: string) {
+export function login(tenantSlug: string, email: string, password: string) {
   return request<AuthResponse>("/auth/login", {
     method: "POST",
-    body: { email, password }
+    body: { tenant_slug: tenantSlug, email, password },
   });
 }
 
 export function getMetrics(token: string) {
   return request<Record<string, unknown>>("/metrics", { token });
+}
+
+export function getSourcesStatus(token: string): Promise<SourceStatusResponse> {
+  return request("/sources/status", { token });
 }
 
 export function getCitySnapshot(token: string) {
@@ -88,24 +97,36 @@ export function listContacts(token: string) {
 
 export function createContact(
   token: string,
-  payload: { name: string; email?: string | null; phone?: string | null; tags_json?: string[]; notes?: string | null }
+  payload: {
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    tags_json?: string[];
+    notes?: string | null;
+  },
 ) {
   return request<Contact>("/contacts", {
     method: "POST",
     token,
-    body: payload
+    body: payload,
   });
 }
 
 export function updateContact(
   token: string,
   id: string,
-  payload: { name?: string; email?: string | null; phone?: string | null; tags_json?: string[]; notes?: string | null }
+  payload: {
+    name?: string;
+    email?: string | null;
+    phone?: string | null;
+    tags_json?: string[];
+    notes?: string | null;
+  },
 ) {
   return request<Contact>(`/contacts/${id}`, {
     method: "PUT",
     token,
-    body: payload
+    body: payload,
   });
 }
 
@@ -160,12 +181,51 @@ export function copilotChat(token: string, message: string) {
   return request<any>("/copilot/chat", {
     method: "POST",
     token,
-    body: { message }
+    body: { message },
   });
 }
 
 export function getCopilotAgents(token: string) {
-  return request<Array<{ key: string; name: string; description: string }>>("/copilot/agents", {
-    token
+  return request<Array<{ key: string; name: string; description: string }>>(
+    "/copilot/agents",
+    {
+      token,
+    },
+  );
+}
+
+export function listDraftPacks(token: string, limit = 20) {
+  const safeLimit = encodeURIComponent(String(limit));
+  return request<DraftPacksResponse>(
+    `/outreach/draft-packs?limit=${safeLimit}`,
+    { token },
+  );
+}
+
+export function getDraftPack(token: string, packId: string) {
+  return request<DraftPack>(`/outreach/draft-pack/${packId}`, { token });
+}
+
+export function submitDraftPack(token: string, packId: string) {
+  return request<DraftPackSubmitResponse>(
+    `/outreach/draft-pack/${packId}/submit`,
+    {
+      method: "POST",
+      token,
+    },
+  );
+}
+
+export function approvePackDraft(token: string, messageId: string) {
+  return request<DraftActionResponse>(`/outreach/drafts/${messageId}/approve`, {
+    method: "POST",
+    token,
+  });
+}
+
+export function rejectPackDraft(token: string, messageId: string) {
+  return request<DraftActionResponse>(`/outreach/drafts/${messageId}/reject`, {
+    method: "POST",
+    token,
   });
 }

@@ -1,4 +1,4 @@
-"use client";
+'use client'
 
 import { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
@@ -184,5 +184,5 @@ export default function ContactsPage() {
         </div>
       )}
     </SiteShell>
-  );
+  )
 }
