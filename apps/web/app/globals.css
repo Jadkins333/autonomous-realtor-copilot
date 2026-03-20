@@ -1,20 +1,20 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: 35 45% 96%;
-  --foreground: 215 30% 14%;
-  --card: 0 0% 100%;
-  --card-foreground: 215 30% 14%;
-  --muted: 40 35% 90%;
-  --muted-foreground: 214 16% 36%;
-  --border: 34 30% 80%;
-  --primary: 17 88% 45%;
+  --background: 222 18% 7%;
+  --foreground: 210 20% 92%;
+  --card: 222 16% 11%;
+  --card-foreground: 210 20% 92%;
+  --muted: 222 14% 16%;
+  --muted-foreground: 215 12% 55%;
+  --border: 222 14% 18%;
+  --primary: 22 95% 52%;
   --primary-foreground: 0 0% 100%;
-  --accent: 194 79% 33%;
+  --accent: 248 80% 65%;
   --accent-foreground: 0 0% 100%;
 }
 
@@ -23,12 +23,11 @@
 }
 
 body {
-  background:
-    radial-gradient(circle at 15% 20%, rgba(251, 146, 60, 0.22), transparent 28%),
-    radial-gradient(circle at 82% 0%, rgba(14, 116, 144, 0.15), transparent 22%),
-    hsl(var(--background));
+  background: #0f1117;
   color: hsl(var(--foreground));
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1,
@@ -36,4 +35,25 @@ h2,
 h3,
 h4 {
   font-family: "Space Grotesk", sans-serif;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+/* Selection */
+::selection {
+  background: rgba(249, 115, 22, 0.3);
 }

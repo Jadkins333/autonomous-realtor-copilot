@@ -66,7 +66,12 @@ async function networkFirst(request, cacheName, fallbackRequest) {
   try {
     const response = await fetch(request);
     if (response && response.ok) {
-      cache.put(request, response.clone());
+      const allowOfflineCache = response.headers.get("x-offline-cache-allowed") === "true";
+      if (allowOfflineCache || cacheName !== API_CACHE) {
+        cache.put(request, response.clone());
+      } else {
+        cache.delete(request);
+      }
     }
     return response;
   } catch (_error) {

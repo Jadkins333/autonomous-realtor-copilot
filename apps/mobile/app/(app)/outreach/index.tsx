@@ -9,8 +9,10 @@ import {
   View
 } from "react-native";
 
-import { approveDraft, listOutreachDrafts } from "../../../lib/api";
+import { acknowledgeDisclosure, approveDraft, listOutreachDrafts } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth-context";
+import { summarizeDisclosureStatus } from "../../../lib/compliance-ui";
+import { summarizeDisclosureBlock, summarizeFairHousing, summarizePolicyState } from "../../../lib/policy-presenter";
 import type { OutreachDraft } from "../../../lib/types";
 
 export default function OutreachScreen() {
@@ -35,13 +37,34 @@ export default function OutreachScreen() {
   const approve = async (id: string) => {
     if (!token) return;
     const result = await approveDraft(token, id);
-    Alert.alert("Approve Result", JSON.stringify(result));
+    const reasons = result.explanations?.join("\n") || result.reason || result.status;
+    Alert.alert(
+      "Compliance Result",
+      `Status: ${result.status}\nMode: ${result.policy_snapshot?.delivery_mode || "unknown"}\n${reasons}`
+    );
+    await load();
+  };
+
+  const acknowledge = async (row: OutreachDraft, disclosureVersionId: string) => {
+    if (!token) return;
+    await acknowledgeDisclosure(token, {
+      action: "outreach_approve",
+      disclosure_version_id: disclosureVersionId,
+      contact_id: row.contact_id,
+      property_id: row.property_id,
+      source: "mobile_outreach",
+      checkbox_acknowledged: true
+    });
     await load();
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Drafted Outreach (Sandbox Default)</Text>
+      <Text style={styles.subtitle}>
+        Live sends require current consent evidence, fair-housing-safe content, recipient-local quiet-hours clearance,
+        and a passing policy snapshot.
+      </Text>
       <FlatList
         data={rows}
         keyExtractor={(item) => item.id}
@@ -52,6 +75,27 @@ export default function OutreachScreen() {
             <Text style={styles.subject}>{item.subject || "(No subject)"}</Text>
             <Text style={styles.body}>{item.body}</Text>
             <Text style={styles.status}>Status: {item.status}</Text>
+            <Text style={styles.mode}>Delivery Mode: {item.sandbox_indicator || "unknown"}</Text>
+            {summarizeDisclosureStatus(item.disclosure_status).blocked ? (
+              <Text style={styles.warning}>{summarizeDisclosureStatus(item.disclosure_status).title}</Text>
+            ) : null}
+            {item.compliance_snapshot ? (
+              <Text style={styles.compliance}>Compliance: {summarizePolicyState(item.compliance_snapshot)}</Text>
+            ) : null}
+            {summarizeFairHousing(item.fair_housing_scan || item.compliance_snapshot?.fair_housing_scan) ? (
+              <Text style={styles.warning}>
+                Fair housing review required:{" "}
+                {summarizeFairHousing(item.fair_housing_scan || item.compliance_snapshot?.fair_housing_scan)}
+              </Text>
+            ) : null}
+            {summarizeDisclosureBlock(item.compliance_snapshot) ? (
+              <Text style={styles.warning}>Disclosure gate: {summarizeDisclosureBlock(item.compliance_snapshot)}</Text>
+            ) : null}
+            {item.disclosure_status?.blocking_disclosures.map((blocking) => (
+              <Pressable key={blocking.disclosure_version_id} onPress={() => void acknowledge(item, blocking.disclosure_version_id)} style={styles.button}>
+                <Text style={styles.buttonText}>Acknowledge {blocking.title}</Text>
+              </Pressable>
+            ))}
             <Pressable onPress={() => void approve(item.id)} style={styles.button}>
               <Text style={styles.buttonText}>Approve</Text>
             </Pressable>
@@ -72,6 +116,10 @@ const styles = StyleSheet.create({
     color: "#f8fafc",
     fontWeight: "700",
     marginBottom: 10
+  },
+  subtitle: {
+    color: "#94a3b8",
+    marginBottom: 12
   },
   row: {
     backgroundColor: "#111827",
@@ -97,6 +145,18 @@ const styles = StyleSheet.create({
   },
   status: {
     color: "#94a3b8",
+    marginBottom: 4
+  },
+  mode: {
+    color: "#cbd5e1",
+    marginBottom: 4
+  },
+  compliance: {
+    color: "#f8fafc",
+    marginBottom: 4
+  },
+  warning: {
+    color: "#fbbf24",
     marginBottom: 8
   },
   button: {

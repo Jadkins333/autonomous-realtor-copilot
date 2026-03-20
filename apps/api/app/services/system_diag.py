@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 import httpx
 from redis import Redis
-from sqlalchemy import text, select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings

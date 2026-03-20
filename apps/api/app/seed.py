@@ -28,7 +28,15 @@ from app.models.entities import (
     TransitStop,
     User,
 )
-from app.models.enums import Channel, ConsentStatus, MessageDirection, MessageStatus, UserRole
+from app.models.enums import (
+    Channel,
+    ConsentStatus,
+    MessageDirection,
+    MessageStatus,
+    SourceOrigin,
+    UserRole,
+)
+from app.services.disclosures import ensure_disclosure_configuration
 from app.services.ingestion import run_ingestion
 from app.services.seed_loader import load_seed_json
 from app.utils.hash import stable_hash
@@ -73,6 +81,7 @@ def _ensure_tenant_and_user(db):
         )
         db.add(user)
 
+    ensure_disclosure_configuration(db, tenant.id, "OH")
     return tenant, user
 
 
@@ -170,6 +179,7 @@ def _ensure_contacts_and_consents(db, tenant_id):
             "name": "Ava Thompson",
             "email": "ava@example.com",
             "phone": "+16145550101",
+            "timezone": "America/New_York",
             "tags_json": ["buyer", "north_columbus"],
             "notes": "Prefers SMS updates",
         },
@@ -177,6 +187,7 @@ def _ensure_contacts_and_consents(db, tenant_id):
             "name": "Noah Patel",
             "email": "noah@example.com",
             "phone": "+16145550102",
+            "timezone": "America/New_York",
             "tags_json": ["seller", "clintonville"],
             "notes": "Considering listing this spring",
         },
@@ -184,6 +195,7 @@ def _ensure_contacts_and_consents(db, tenant_id):
             "name": "Mia Chen",
             "email": "mia@example.com",
             "phone": "+16145550103",
+            "timezone": "America/New_York",
             "tags_json": ["investor"],
             "notes": "Interested in rehab opportunities",
         },
@@ -197,6 +209,8 @@ def _ensure_contacts_and_consents(db, tenant_id):
             contact = Contact(tenant_id=tenant_id, **payload)
             db.add(contact)
             db.flush()
+        elif not contact.timezone and payload.get("timezone"):
+            contact.timezone = payload["timezone"]
 
         has_sms_opt_in = db.execute(
             select(ConsentEvent).where(
@@ -215,6 +229,35 @@ def _ensure_contacts_and_consents(db, tenant_id):
                     status=ConsentStatus.opt_in,
                     consent_text="I agree to receive SMS updates.",
                     source="seed",
+                    capture_method="seed_demo",
+                    policy_text_version="demo-sms-consent-v1",
+                    proof_artifact_ref=f"seed://consent/{contact.id}/sms",
+                    jurisdiction_assumptions_json={"state": "OH"},
+                    ip_address="127.0.0.1",
+                    user_agent="seed-script",
+                )
+            )
+        has_email_opt_in = db.execute(
+            select(ConsentEvent).where(
+                ConsentEvent.tenant_id == tenant_id,
+                ConsentEvent.contact_id == contact.id,
+                ConsentEvent.channel == Channel.email,
+                ConsentEvent.status == ConsentStatus.opt_in,
+            )
+        ).scalar_one_or_none()
+        if not has_email_opt_in:
+            db.add(
+                ConsentEvent(
+                    tenant_id=tenant_id,
+                    contact_id=contact.id,
+                    channel=Channel.email,
+                    status=ConsentStatus.opt_in,
+                    consent_text="I agree to receive email updates.",
+                    source="seed",
+                    capture_method="seed_demo",
+                    policy_text_version="demo-email-consent-v1",
+                    proof_artifact_ref=f"seed://consent/{contact.id}/email",
+                    jurisdiction_assumptions_json={"state": "OH"},
                     ip_address="127.0.0.1",
                     user_agent="seed-script",
                 )
@@ -413,6 +456,12 @@ def _seed_parcels(db, tenant_id, source: Source) -> None:
                 geom=parcel_geom,
                 centroid=centroid_geom,
                 attributes_json=row.get("attributes_json") or {},
+                source_origin=SourceOrigin.public_record,
+                source_origin_details_json={
+                    "field_origin_mode": "record_level",
+                    "market": settings.default_locale,
+                    "rules_configured": True,
+                },
                 provenance_id=provenance.id,
                 updated_at=datetime.now(tz=UTC),
             )
@@ -426,6 +475,12 @@ def _seed_parcels(db, tenant_id, source: Source) -> None:
         parcel.geom = parcel_geom
         parcel.centroid = centroid_geom
         parcel.attributes_json = row.get("attributes_json") or {}
+        parcel.source_origin = SourceOrigin.public_record
+        parcel.source_origin_details_json = {
+            "field_origin_mode": "record_level",
+            "market": settings.default_locale,
+            "rules_configured": True,
+        }
         parcel.provenance_id = provenance.id
         parcel.updated_at = datetime.now(tz=UTC)
 
@@ -695,6 +750,12 @@ def _ensure_missing_signals_parcel(db, tenant_id, source: Source) -> None:
             geom=geom,
             centroid=point,
             attributes_json=raw["attributes_json"],
+            source_origin=SourceOrigin.public_record,
+            source_origin_details_json={
+                "field_origin_mode": "record_level",
+                "market": settings.default_locale,
+                "rules_configured": True,
+            },
             provenance_id=provenance.id,
             updated_at=datetime.now(tz=UTC),
         )
@@ -709,6 +770,12 @@ def _ensure_missing_signals_parcel(db, tenant_id, source: Source) -> None:
     parcel.geom = geom
     parcel.centroid = point
     parcel.attributes_json = raw["attributes_json"]
+    parcel.source_origin = SourceOrigin.public_record
+    parcel.source_origin_details_json = {
+        "field_origin_mode": "record_level",
+        "market": settings.default_locale,
+        "rules_configured": True,
+    }
     parcel.provenance_id = provenance.id
     parcel.updated_at = datetime.now(tz=UTC)
 

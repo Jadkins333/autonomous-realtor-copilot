@@ -25,9 +25,11 @@ from app.models.enums import (
     MessageDirection,
     MessageStatus,
     SourceMode,
+    SourceOrigin,
     SourceRunStatus,
     SourceState,
     UserRole,
+    VowVerificationState,
 )
 
 
@@ -153,6 +155,12 @@ class Parcel(Base):
     geom = mapped_column(Geometry("MULTIPOLYGON", srid=4326), nullable=True)
     centroid = mapped_column(Geometry("POINT", srid=4326), nullable=True)
     attributes_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    source_origin: Mapped[SourceOrigin] = mapped_column(
+        Enum(SourceOrigin, name="source_origin"),
+        nullable=False,
+        default=SourceOrigin.public_record,
+    )
+    source_origin_details_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     provenance_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("provenance_records.id"), nullable=True
     )
@@ -230,9 +238,42 @@ class Contact(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str | None] = mapped_column(String(255))
     phone: Mapped[str | None] = mapped_column(String(64))
+    timezone: Mapped[str | None] = mapped_column(String(64))
     tags_json: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class VowAccessProfile(Base):
+    __tablename__ = "vow_access_profiles"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "user_id",
+            "market",
+            "source_name",
+            name="uq_vow_access_profiles_scope",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    market: Mapped[str] = mapped_column(String(128), nullable=False)
+    source_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    registrant_name: Mapped[str | None] = mapped_column(String(255))
+    registrant_email: Mapped[str | None] = mapped_column(String(255))
+    valid_email: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    terms_of_use_acknowledged: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    verification_state: Mapped[VowVerificationState] = mapped_column(
+        Enum(VowVerificationState, name="vow_verification_state"),
+        nullable=False,
+        default=VowVerificationState.not_started,
+    )
+    terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    acceptance_record_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
 
 
 class ConsentEvent(Base):
@@ -245,9 +286,102 @@ class ConsentEvent(Base):
     status: Mapped[ConsentStatus] = mapped_column(Enum(ConsentStatus, name="consent_status"), nullable=False)
     consent_text: Mapped[str | None] = mapped_column(Text)
     source: Mapped[str | None] = mapped_column(String(255))
+    capture_method: Mapped[str | None] = mapped_column(String(255))
+    policy_text_version: Mapped[str | None] = mapped_column(String(128))
+    proof_artifact_ref: Mapped[str | None] = mapped_column(String(1024))
+    jurisdiction_assumptions_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     ip_address: Mapped[str | None] = mapped_column(String(64))
     user_agent: Mapped[str | None] = mapped_column(String(255))
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_reason: Mapped[str | None] = mapped_column(String(255))
+
+
+class DisclosureDefinition(Base):
+    __tablename__ = "disclosure_definitions"
+    __table_args__ = (UniqueConstraint("tenant_id", "key", name="uq_disclosure_definitions_tenant_key"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    key: Mapped[str] = mapped_column(String(128), nullable=False)
+    jurisdiction: Mapped[str] = mapped_column(String(16), nullable=False)
+    disclosure_type: Mapped[str] = mapped_column(String(128), nullable=False)
+    acknowledgement_mode: Mapped[str] = mapped_column(String(64), nullable=False)
+    record_retention_metadata_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class DisclosureVersion(Base):
+    __tablename__ = "disclosure_versions"
+    __table_args__ = (
+        UniqueConstraint(
+            "disclosure_definition_id",
+            "version",
+            name="uq_disclosure_versions_definition_version",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    disclosure_definition_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("disclosure_definitions.id"), nullable=False
+    )
+    version: Mapped[str] = mapped_column(String(64), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    body_markdown: Mapped[str] = mapped_column(Text, nullable=False)
+    effective_date: Mapped[date] = mapped_column(Date, nullable=False)
+    typed_ack_text: Mapped[str | None] = mapped_column(String(255))
+    metadata_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    record_retention_metadata_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class DisclosureGate(Base):
+    __tablename__ = "disclosure_gates"
+    __table_args__ = (UniqueConstraint("tenant_id", "gate_key", name="uq_disclosure_gates_tenant_gate_key"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    disclosure_definition_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("disclosure_definitions.id"), nullable=False
+    )
+    gate_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    jurisdiction: Mapped[str] = mapped_column(String(16), nullable=False)
+    trigger_event: Mapped[str] = mapped_column(String(128), nullable=False)
+    required_before_action: Mapped[str] = mapped_column(String(128), nullable=False)
+    scope_entity_type: Mapped[str] = mapped_column(String(64), nullable=False, default="global")
+    conditions_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class DisclosureAcknowledgement(Base):
+    __tablename__ = "disclosure_acknowledgements"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    contact_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("contacts.id"))
+    client_id: Mapped[str | None] = mapped_column(String(255))
+    parcel_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("parcels.id"))
+    listing_id: Mapped[str | None] = mapped_column(String(255))
+    disclosure_version_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("disclosure_versions.id"), nullable=False
+    )
+    workflow_action: Mapped[str] = mapped_column(String(128), nullable=False)
+    acknowledgement_mode: Mapped[str] = mapped_column(String(64), nullable=False)
+    acknowledgement_artifact_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    signature_payload_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    device_metadata_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    actor_source_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    record_retention_metadata_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    ip_address: Mapped[str | None] = mapped_column(String(64))
+    user_agent: Mapped[str | None] = mapped_column(String(255))
+    acknowledged_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
 
 
 class SuppressionList(Base):
@@ -305,6 +439,41 @@ class Message(Base):
     meta_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class OutreachSendAttempt(Base):
+    __tablename__ = "outreach_send_attempts"
+    __table_args__ = (UniqueConstraint("idempotency_key", name="uq_outreach_send_attempts_idempotency_key"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    message_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("messages.id"), nullable=False)
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    sandbox: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    provider_selected: Mapped[str | None] = mapped_column(String(255))
+    provider_request_payload_hash: Mapped[str | None] = mapped_column(String(64))
+    provider_response_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    normalized_result_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    policy_snapshot_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    provider_message_id: Mapped[str | None] = mapped_column(String(255))
+    final_status: Mapped[str] = mapped_column(String(64), nullable=False, default="pending")
+    error_text: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ActivityEvent(Base):
+    __tablename__ = "activity_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    entity_type: Mapped[str] = mapped_column(String(128), nullable=False)
+    entity_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(128), nullable=False)
+    metadata_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
 
 
 class Sequence(Base):

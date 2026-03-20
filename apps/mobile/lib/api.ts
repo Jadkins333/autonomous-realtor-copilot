@@ -2,8 +2,11 @@ import type {
   AuthResponse,
   CitySnapshot,
   Contact,
+  DisclosureStatus,
+  DraftActionResult,
   OpportunitiesResponse,
   OutreachDraft,
+  ParcelDetail,
   ParcelSummary
 } from "./types";
 
@@ -15,6 +18,7 @@ type RequestOptions = {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   token?: string | null;
   body?: unknown;
+  headers?: Record<string, string>;
 };
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -25,6 +29,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   if (options.token) {
     headers.Authorization = `Bearer ${options.token}`;
   }
+  Object.assign(headers, options.headers || {});
 
   const response = await fetch(`${BASE_URL}${path}`, {
     method: options.method || "GET",
@@ -64,11 +69,17 @@ export function listOpportunities(token: string) {
 }
 
 export function searchParcels(token: string, query: string) {
-  return request<ParcelSummary[]>(`/parcels/search?query=${encodeURIComponent(query)}`, { token });
+  return request<ParcelSummary[]>(`/parcels/search?query=${encodeURIComponent(query)}`, {
+    token,
+    headers: { "x-client-surface": "mobile" }
+  });
 }
 
 export function getParcelDetail(token: string, parcelId: string) {
-  return request<any>(`/parcels/${parcelId}`, { token });
+  return request<ParcelDetail>(`/parcels/${parcelId}`, {
+    token,
+    headers: { "x-client-surface": "mobile" }
+  });
 }
 
 export function listContacts(token: string) {
@@ -103,9 +114,45 @@ export function listOutreachDrafts(token: string) {
 }
 
 export function approveDraft(token: string, messageId: string) {
-  return request<Record<string, unknown>>(`/outreach/${messageId}/approve_and_send`, {
+  return request<DraftActionResult>(`/outreach/drafts/${messageId}/approve`, {
     method: "POST",
     token
+  });
+}
+
+export function evaluateDisclosures(
+  token: string,
+  payload: {
+    action: string;
+    contact_id?: string | null;
+    property_id?: string | null;
+    source?: string;
+    log_presentation?: boolean;
+  }
+) {
+  return request<DisclosureStatus>("/disclosures/evaluate", {
+    method: "POST",
+    token,
+    body: payload
+  });
+}
+
+export function acknowledgeDisclosure(
+  token: string,
+  payload: {
+    action: string;
+    disclosure_version_id: string;
+    contact_id?: string | null;
+    property_id?: string | null;
+    source?: string;
+    checkbox_acknowledged?: boolean;
+    typed_acknowledgement?: string;
+  }
+) {
+  return request<{ disclosure_status: DisclosureStatus }>("/disclosures/acknowledge", {
+    method: "POST",
+    token,
+    body: payload
   });
 }
 

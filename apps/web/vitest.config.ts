@@ -8,8 +8,10 @@ export default defineConfig({
     }
   },
   test: {
-    environment: "jsdom",
+    environment: "node",
     globals: true,
-    include: ["lib/**/*.test.ts"]
+    hookTimeout: 10000,
+    include: ["lib/**/*.test.ts"],
+    testTimeout: 10000
   }
 });

@@ -24,6 +24,22 @@ class SourceState(str, enum.Enum):
     paused = "paused"
 
 
+class SourceOrigin(str, enum.Enum):
+    public_record = "public_record"
+    broker_owned = "broker_owned"
+    idx = "idx"
+    vow = "vow"
+    licensed_feed_other = "licensed_feed_other"
+    unknown_restricted = "unknown_restricted"
+
+
+class VowVerificationState(str, enum.Enum):
+    not_started = "not_started"
+    pending = "pending"
+    verified = "verified"
+    rejected = "rejected"
+
+
 class Channel(str, enum.Enum):
     email = "email"
     sms = "sms"

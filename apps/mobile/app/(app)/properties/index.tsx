@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 
 import { searchParcels } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth-context";
+import { buildMobilePropertyView } from "../../../lib/property-access";
 import type { ParcelSummary } from "../../../lib/types";
 
 export default function PropertiesScreen() {
@@ -55,15 +56,20 @@ export default function PropertiesScreen() {
         data={rows}
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl tintColor="#f97316" refreshing={loading} onRefresh={runSearch} />}
-        renderItem={({ item }) => (
-          <Pressable onPress={() => router.push(`/(app)/properties/${item.id}`)} style={styles.row}>
-            <Text style={styles.address}>{item.address}</Text>
-            <Text style={styles.meta}>{item.parcel_number}</Text>
-            <Text style={styles.meta}>
-              {item.city}, {item.state} {item.zip}
-            </Text>
-          </Pressable>
-        )}
+        renderItem={({ item }) => {
+          const view = buildMobilePropertyView(item);
+          return (
+            <Pressable onPress={() => router.push(`/(app)/properties/${item.id}`)} style={styles.row}>
+              <Text style={styles.address}>{item.address}</Text>
+              <Text style={styles.badge}>{view.originBadgeLabel}</Text>
+              <Text style={styles.meta}>{item.parcel_number}</Text>
+              <Text style={styles.meta}>
+                {item.city}, {item.state} {item.zip}
+              </Text>
+              {view.blocked ? <Text style={styles.blocked}>{view.blockedMessage}</Text> : null}
+            </Pressable>
+          );
+        }}
       />
     </View>
   );
@@ -115,5 +121,19 @@ const styles = StyleSheet.create({
   },
   meta: {
     color: "#94a3b8"
+  },
+  badge: {
+    alignSelf: "flex-start",
+    color: "#fde68a",
+    backgroundColor: "#2b2a1f",
+    borderRadius: 999,
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 6
+  },
+  blocked: {
+    color: "#fca5a5",
+    marginTop: 6
   }
 });

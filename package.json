@@ -14,6 +14,12 @@
     "smoke": "bash scripts/smoke.sh",
     "build:web": "pnpm --filter web build",
     "lint:web": "pnpm --filter web lint",
-    "test:web": "pnpm --filter web test"
+    "typecheck:web": "pnpm --filter web typecheck",
+    "test:web": "pnpm --filter web test",
+    "typecheck:mobile": "pnpm --filter mobile typecheck",
+    "validate:api": "node scripts/validate.mjs api",
+    "validate:web": "node scripts/validate.mjs web",
+    "validate:mobile": "node scripts/validate.mjs mobile",
+    "validate:all": "node scripts/validate.mjs all"
   }
 }

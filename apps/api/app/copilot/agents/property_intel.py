@@ -45,9 +45,34 @@ class PropertyIntelAgent(CopilotAgent):
                 tools_used=["parcels.search"],
             )
 
-        detail = get_parcel_detail(context.db, context.tenant_id, parcel.id)
+        detail = get_parcel_detail(
+            context.db,
+            context.tenant_id,
+            parcel.id,
+            user_id=context.user_id,
+            surface="ai_summary",
+        )
         prov = detail.get("provenance", {})
         freshness = prov.get("freshness", {}) if isinstance(prov, dict) else {}
+        restricted = detail.get("restricted_content", {}) if isinstance(detail, dict) else {}
+        if restricted.get("blocked"):
+            reason_codes = ", ".join(restricted.get("reason_codes", [])) or "source restrictions"
+            return AgentResult(
+                text=f"AI summary blocked for this property: {restricted.get('message') or reason_codes}",
+                status="blocked",
+                data={
+                    "source_origin": detail.get("source_origin"),
+                    "display_policy": detail.get("display_policy"),
+                    "restricted_content": restricted,
+                },
+                tools_used=["parcels.search", "parcels.detail"],
+                trace_refs={
+                    "provenance_record_ids": [str(prov.get("provenance_record_id"))]
+                    if prov.get("provenance_record_id")
+                    else [],
+                    "freshness": [freshness] if freshness else [],
+                },
+            )
 
         return AgentResult(
             text=f"Property profile for {detail.get('address', parcel.address)} is ready.",

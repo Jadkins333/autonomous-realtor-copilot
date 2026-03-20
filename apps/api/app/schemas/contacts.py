@@ -8,6 +8,7 @@ class ContactCreate(BaseModel):
     name: str
     email: str | None = None
     phone: str | None = None
+    timezone: str | None = None
     tags_json: list[str] = Field(default_factory=list)
     notes: str | None = None
 
@@ -16,6 +17,7 @@ class ContactUpdate(BaseModel):
     name: str | None = None
     email: str | None = None
     phone: str | None = None
+    timezone: str | None = None
     tags_json: list[str] | None = None
     notes: str | None = None
 
@@ -25,6 +27,7 @@ class ContactOut(BaseModel):
     name: str
     email: str | None = None
     phone: str | None = None
+    timezone: str | None = None
     tags_json: list[str]
     notes: str | None = None
     created_at: datetime

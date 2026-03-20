@@ -5,8 +5,8 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from app.api.deps import AuthContext, get_auth_context
-from app.copilot.agents.base import AgentContext, AgentMatch, AgentResult
 from app.copilot import router as copilot_router
+from app.copilot.agents.base import AgentContext, AgentMatch, AgentResult
 from app.copilot.router import route_message
 from app.db.session import get_db
 from app.main import app

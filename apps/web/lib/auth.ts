@@ -1,6 +1,20 @@
+import type { Session } from "next-auth";
+import type { JWT } from "next-auth/jwt";
 import CredentialsProvider from "next-auth/providers/credentials";
 
-import { APP_BASE_URL } from "@/lib/env";
+import { API_INTERNAL_URL } from "@/lib/env";
+
+type AuthUser = {
+  apiToken?: string;
+  role?: string;
+  tenantId?: string;
+};
+
+type AuthToken = JWT & {
+  apiToken?: string;
+  role?: string;
+  tenantId?: string;
+};
 
 export const authOptions = {
   session: {
@@ -14,7 +28,7 @@ export const authOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        const response = await fetch(`${APP_BASE_URL}/api/proxy/auth/login`, {
+        const response = await fetch(`${API_INTERNAL_URL}/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -41,18 +55,18 @@ export const authOptions = {
     })
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: { token: AuthToken; user?: AuthUser }) {
       if (user) {
-        token.apiToken = (user as any).apiToken;
-        token.role = (user as any).role;
-        token.tenantId = (user as any).tenantId;
+        token.apiToken = user.apiToken;
+        token.role = user.role;
+        token.tenantId = user.tenantId;
       }
       return token;
     },
-    async session({ session, token }) {
-      (session as any).apiToken = token.apiToken;
-      (session.user as any).role = token.role;
-      (session.user as any).tenantId = token.tenantId;
+    async session({ session, token }: { session: Session; token: AuthToken }) {
+      session.apiToken = token.apiToken;
+      session.user.role = token.role;
+      session.user.tenantId = token.tenantId;
       return session;
     }
   },

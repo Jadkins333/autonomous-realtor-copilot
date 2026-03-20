@@ -9,6 +9,9 @@
     "lon": -82.9989,
     "lat": 39.9654,
     "attributes_json": {
+      "owner": "HIGH STREET VENTURES LLC",
+      "land_use": "COMMERCIAL VACANT",
+      "total_value": 845000,
       "property_type": "single_family",
       "year_built": 1988,
       "beds": 3,
@@ -28,6 +31,9 @@
     "lon": -83.0097,
     "lat": 39.9752,
     "attributes_json": {
+      "owner": "NEIL AVE HOLDINGS",
+      "land_use": "RESIDENTIAL CONDO",
+      "total_value": 412000,
       "property_type": "condo",
       "year_built": 2007,
       "beds": 2,
@@ -47,6 +53,9 @@
     "lon": -82.9832,
     "lat": 40.0393,
     "attributes_json": {
+      "owner": "INDIANOLA REALTY TRUST",
+      "land_use": "SINGLE FAMILY RES",
+      "total_value": 289000,
       "property_type": "single_family",
       "year_built": 1957,
       "beds": 4,

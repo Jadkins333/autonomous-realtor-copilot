@@ -9,12 +9,6 @@ const nextConfig = {
   experimental: {
     typedRoutes: false
   },
-  eslint: {
-    ignoreDuringBuilds: true
-  },
-  typescript: {
-    ignoreBuildErrors: true
-  },
   webpack: (config) => {
     config.resolve.alias = {
       ...(config.resolve.alias || {}),

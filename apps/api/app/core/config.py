@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     quiet_hours_end: int = Field(default=21, ge=0, le=23)
     frequency_cap_per_day: int = 3
     enforce_global_revocation: bool = False
+    consent_max_age_days: int = 365
+    proxy_timeout_seconds: int = 15
+    ohio_market_enabled: bool = True
+    ohio_website_update_window_days: int = 14
+    ohio_public_update_window_days: int = 14
 
 
 @lru_cache(maxsize=1)
