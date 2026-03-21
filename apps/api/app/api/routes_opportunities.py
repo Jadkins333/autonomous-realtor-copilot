@@ -1,12 +1,16 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import AuthContext, get_auth_context
 from app.db.session import get_db
 from app.schemas.opportunities import OpportunityStatusUpdateRequest
-from app.services.opportunities import list_opportunities, list_opportunity_events, set_opportunity_status
+from app.services.opportunities import (
+    list_opportunities,
+    list_opportunity_events,
+    set_opportunity_status,
+)
 
 router = APIRouter(prefix="/opportunities", tags=["opportunities"])
 
@@ -45,7 +49,7 @@ def update_opportunity_status(
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ) -> dict:
-    return set_opportunity_status(
+    result = set_opportunity_status(
         db,
         auth.tenant_id,
         parcel_id,
@@ -53,3 +57,6 @@ def update_opportunity_status(
         actor_user_id=auth.user_id,
         reason=payload.reason,
     )
+    if result.get("blocked"):
+        raise HTTPException(status_code=409, detail=result)
+    return result

@@ -1,13 +1,23 @@
-"use client";
+'use client'
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSession } from "next-auth/react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Database,
+  Info,
+  Pause,
+  Play,
+  RefreshCw,
+  RotateCcw,
+  ShieldOff,
+  XCircle,
+} from "lucide-react";
 
 import { useRequireAuth } from "@/components/auth-guard";
 import { SiteShell } from "@/components/site-shell";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { apiFetch } from "@/lib/api";
 
 type SourceStatusItem = {
@@ -35,34 +45,56 @@ type ReplayResponse = {
   message: string;
 };
 
-function StateBadge({ state }: { state: SourceStatusItem["state"] }) {
-  const className =
-    state === "ok"
-      ? "bg-green-500/20 text-green-200"
-      : state === "partial"
-        ? "bg-amber-500/20 text-amber-200"
-        : state === "paused"
-          ? "bg-blue-500/20 text-blue-200"
-          : "bg-red-500/20 text-red-200";
-  return <Badge className={className}>{state}</Badge>;
+const STATE_CONFIG: Record<
+  SourceStatusItem["state"],
+  { color: string; bg: string; border: string; icon: typeof CheckCircle2 }
+> = {
+  ok: { icon: CheckCircle2, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
+  partial: { icon: AlertTriangle, color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" },
+  paused: { icon: Pause, color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
+  failed: { icon: XCircle, color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20" },
+};
+
+const SOURCE_DISPLAY: Record<string, { label: string; description: string }> = {
+  franklin_auditor: { label: "Franklin County Auditor", description: "Parcel ownership, valuations, sales history" },
+  arcgis_permits: { label: "ArcGIS Permits", description: "Building permits, code violations, inspections" },
+  fema_nfhl: { label: "FEMA NFHL", description: "National Flood Hazard Layer zone data" },
+  osm_gtfs: { label: "OSM / GTFS Transit", description: "OpenStreetMap + COTA bus/rail proximity" },
+};
+
+function formatTimestamp(value: string | null) {
+  if (!value) {
+    return "—";
+  }
+
+  return new Date(value).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 export default function SourcesPage() {
   const { status } = useRequireAuth();
   const { data: session } = useSession();
+  const apiToken = (session as { apiToken?: string; user?: { role?: string } } | null)?.apiToken;
+  const isAdmin = ((session as { user?: { role?: string } } | null)?.user?.role || "") === "admin";
 
   const [items, setItems] = useState<SourceStatusItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [acting, setActing] = useState<string | null>(null);
 
-  const isAdmin = useMemo(() => (session?.user as any)?.role === "admin", [session]);
+  const load = useCallback(async () => {
+    if (!apiToken) {
+      return;
+    }
 
-  const load = async () => {
-    if (!session) return;
     setLoading(true);
     try {
-      const response = await apiFetch<SourceStatusResponse>("/sources/status", (session as any).apiToken);
+      const response = await apiFetch<SourceStatusResponse>("/sources/status", apiToken);
       setItems(response.items || []);
       setError(null);
     } catch (err) {
@@ -70,43 +102,47 @@ export default function SourcesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiToken]);
 
   useEffect(() => {
     void load();
-  }, [session]);
+  }, [load]);
 
-  const runAction = async (sourceName: string, action: "pause" | "resume" | "replay") => {
-    if (!session || !isAdmin) return;
-    setActionMessage(null);
-
-    try {
-      if (action === "pause") {
-        const reason = window.prompt("Pause reason", "Manual pause from web admin") || "Manual pause from web admin";
-        await apiFetch(`/sources/${sourceName}/pause`, (session as any).apiToken, {
-          method: "POST",
-          body: JSON.stringify({ reason }),
-        });
-        setActionMessage(`${sourceName} paused`);
-      } else if (action === "resume") {
-        await apiFetch(`/sources/${sourceName}/resume`, (session as any).apiToken, {
-          method: "POST",
-        });
-        setActionMessage(`${sourceName} resumed`);
-      } else {
-        const replay = await apiFetch<ReplayResponse>(`/sources/${sourceName}/dlq/replay`, (session as any).apiToken, {
-          method: "POST",
-        });
-        setActionMessage(
-          `${sourceName} replay: attempted=${replay.attempted} succeeded=${replay.succeeded} failed=${replay.failed}`
-        );
+  const runAction = useCallback(
+    async (name: string, action: "pause" | "resume" | "replay") => {
+      if (!apiToken || !isAdmin) {
+        return;
       }
-    } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : `Failed ${action} for ${sourceName}`);
-    } finally {
-      await load();
-    }
-  };
+
+      setActing(`${name}-${action}`);
+      setActionMsg(null);
+
+      try {
+        if (action === "pause") {
+          const reason = window.prompt("Pause reason", "Manual pause from web admin") || "Manual pause from web admin";
+          await apiFetch(`/sources/${name}/pause`, apiToken, {
+            method: "POST",
+            body: JSON.stringify({ reason })
+          });
+          setActionMsg(`✓ ${name} paused`);
+        } else if (action === "resume") {
+          await apiFetch(`/sources/${name}/resume`, apiToken, { method: "POST" });
+          setActionMsg(`✓ ${name} resumed`);
+        } else {
+          const replay = await apiFetch<ReplayResponse>(`/sources/${name}/dlq/replay`, apiToken, { method: "POST" });
+          setActionMsg(`✓ ${name} DLQ replay: ${replay.succeeded}/${replay.attempted} succeeded`);
+        }
+      } catch (err) {
+        setActionMsg(`✗ ${err instanceof Error ? err.message : `Failed ${action}`}`);
+      } finally {
+        setActing(null);
+        await load();
+      }
+    },
+    [apiToken, isAdmin, load]
+  );
+
+  const driftCount = useMemo(() => items.filter((item) => item.drift_detected).length, [items]);
 
   if (status !== "authenticated") {
     return null;
@@ -114,64 +150,231 @@ export default function SourcesPage() {
 
   return (
     <SiteShell>
-      <Card className="mb-4">
-        <CardTitle>Sources Admin</CardTitle>
-        <CardDescription>
-          Live ingestion source status with pause/resume/replay controls. Auth required; actions are admin-only.
-        </CardDescription>
-        <div className="mt-3 flex gap-2">
-          <Button variant="outline" onClick={() => void load()}>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="flex items-center gap-2 text-xl font-bold text-white">
+            <Database className="h-5 w-5 text-orange-400" />
+            Data Sources
+          </h1>
+          <p className="mt-0.5 text-sm text-white/40">
+            Ingestion status, drift flags, and operator controls
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {isAdmin ? (
+            <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[10px] text-emerald-400">
+              <CheckCircle2 className="h-3 w-3" />
+              Admin controls enabled
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[10px] text-white/40">
+              <ShieldOff className="h-3 w-3" />
+              Read-only
+            </span>
+          )}
+          <button
+            onClick={() => void load()}
+            disabled={loading}
+            className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs text-white/60 transition-all hover:bg-white/[0.08] hover:text-white/85 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
             Refresh
-          </Button>
-          {!isAdmin ? <Badge>read-only (agent role)</Badge> : <Badge>admin controls enabled</Badge>}
+          </button>
         </div>
-        {actionMessage ? <p className="mt-3 text-sm text-muted-foreground">{actionMessage}</p> : null}
-      </Card>
+      </div>
 
-      {loading ? <Card>Loading sources...</Card> : null}
-      {error ? (
-        <Card>
-          <p className="text-sm text-red-400">{error}</p>
-        </Card>
-      ) : null}
+      {(actionMsg || error) && (
+        <div
+          className={`mb-4 flex items-center gap-2 rounded-lg border px-4 py-2.5 text-xs ${
+            error || actionMsg?.startsWith("✗")
+              ? "border-red-500/20 bg-red-500/8 text-red-300"
+              : "border-emerald-500/20 bg-emerald-500/8 text-emerald-300"
+          }`}
+        >
+          <Info className="h-3.5 w-3.5 flex-shrink-0" />
+          {error || actionMsg}
+        </div>
+      )}
 
-      {!loading && !error ? (
+      <div className="mb-4 grid gap-3 md:grid-cols-3">
+        <MetricCard label="Sources" value={String(items.length)} />
+        <MetricCard label="Drift Flags" value={String(driftCount)} warn={driftCount > 0} />
+        <MetricCard label="DLQ Total" value={String(items.reduce((sum, item) => sum + item.dlq_count, 0))} />
+      </div>
+
+      {loading ? (
         <div className="space-y-3">
-          {items.map((item) => (
-            <Card key={item.source_name}>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="font-semibold">{item.source_name}</p>
-                  <p className="text-xs text-muted-foreground">mode={item.mode}</p>
-                </div>
-                <StateBadge state={item.state} />
-              </div>
-
-              <div className="mt-3 grid gap-2 text-xs text-muted-foreground md:grid-cols-2">
-                <p>last_run_finished_at: {item.last_run_finished_at || "-"}</p>
-                <p>last_success_at: {item.last_success_at || "-"}</p>
-                <p>drift_detected: {String(item.drift_detected)}</p>
-                <p>dlq_count: {item.dlq_count}</p>
-                {item.paused_reason ? <p>paused_reason: {item.paused_reason}</p> : null}
-                {item.last_error ? <p className="text-red-300">last_error: {item.last_error}</p> : null}
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button disabled={!isAdmin} variant="outline" onClick={() => void runAction(item.source_name, "pause")}>
-                  Pause
-                </Button>
-                <Button disabled={!isAdmin} variant="outline" onClick={() => void runAction(item.source_name, "resume")}>
-                  Resume
-                </Button>
-                <Button disabled={!isAdmin} variant="outline" onClick={() => void runAction(item.source_name, "replay")}>
-                  Replay DLQ
-                </Button>
-              </div>
-            </Card>
+          {[1, 2, 3, 4].map((item) => (
+            <div key={item} className="h-24 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.02]" />
           ))}
-          {items.length === 0 ? <Card>No sources found.</Card> : null}
         </div>
-      ) : null}
+      ) : (
+        <div className="space-y-3">
+          {items.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/[0.06] py-16 text-center">
+              <Database className="mx-auto mb-3 h-10 w-10 text-white/15" />
+              <p className="text-sm text-white/40">No sources found</p>
+            </div>
+          ) : (
+            items.map((item) => {
+              const stateConfig = STATE_CONFIG[item.state];
+              const StateIcon = stateConfig.icon;
+              const display = SOURCE_DISPLAY[item.source_name] || {
+                label: item.source_name,
+                description: "Ingestion source"
+              };
+
+              return (
+                <div key={item.source_name} className="rounded-xl border border-white/[0.08] bg-[#13161f] p-5">
+                  <div className="mb-4 flex items-start justify-between gap-4">
+                    <div>
+                      <div className="mb-1 flex items-center gap-2.5">
+                        <p className="text-sm font-semibold text-white">{display.label}</p>
+                        <span className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${stateConfig.bg} ${stateConfig.color} ${stateConfig.border}`}>
+                          <StateIcon className="h-2.5 w-2.5" />
+                          {item.state}
+                        </span>
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[10px] ${
+                            item.mode === "live"
+                              ? "border-green-500/20 bg-green-500/10 text-green-400"
+                              : "border-amber-500/20 bg-amber-500/10 text-amber-400"
+                          }`}
+                        >
+                          {item.mode}
+                        </span>
+                      </div>
+                      <p className="text-xs text-white/35">{display.description}</p>
+                    </div>
+                    {item.dlq_count > 0 && (
+                      <span className="rounded-full border border-red-500/25 bg-red-500/15 px-2.5 py-1 text-[10px] font-bold text-red-300">
+                        {item.dlq_count} in DLQ
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mb-4 grid grid-cols-2 gap-x-6 gap-y-1.5 text-[11px] sm:grid-cols-3">
+                    <MetaLine icon={<Clock className="h-3 w-3" />}>
+                      Last run: {formatTimestamp(item.last_run_finished_at)}
+                    </MetaLine>
+                    <MetaLine icon={<CheckCircle2 className="h-3 w-3" />}>
+                      Last success: {formatTimestamp(item.last_success_at)}
+                    </MetaLine>
+                    {item.drift_detected && (
+                      <MetaLine icon={<AlertTriangle className="h-3 w-3" />} tone="warn">
+                        Drift: {item.drift_reason || "detected"}
+                      </MetaLine>
+                    )}
+                    {item.paused_reason && (
+                      <MetaLine icon={<Pause className="h-3 w-3" />} tone="info">
+                        Paused: {item.paused_reason}
+                      </MetaLine>
+                    )}
+                    {item.last_error && (
+                      <MetaLine icon={<XCircle className="h-3 w-3" />} tone="error" fullWidth>
+                        Error: {item.last_error}
+                      </MetaLine>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <ActionButton
+                      label="Pause"
+                      icon={<Pause className="h-3 w-3" />}
+                      disabled={!isAdmin || item.state === "paused" || Boolean(acting)}
+                      loading={acting === `${item.source_name}-pause`}
+                      onClick={() => void runAction(item.source_name, "pause")}
+                    />
+                    <ActionButton
+                      label="Resume"
+                      icon={<Play className="h-3 w-3" />}
+                      disabled={!isAdmin || item.state !== "paused" || Boolean(acting)}
+                      loading={acting === `${item.source_name}-resume`}
+                      onClick={() => void runAction(item.source_name, "resume")}
+                    />
+                    <ActionButton
+                      label="Replay DLQ"
+                      icon={<RotateCcw className="h-3 w-3" />}
+                      disabled={!isAdmin || item.dlq_count === 0 || Boolean(acting)}
+                      loading={acting === `${item.source_name}-replay`}
+                      onClick={() => void runAction(item.source_name, "replay")}
+                      warn
+                    />
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
     </SiteShell>
+  );
+}
+
+function MetricCard({ label, value, warn = false }: { label: string; value: string; warn?: boolean }) {
+  return (
+    <div className="rounded-xl border border-white/[0.08] bg-[#13161f] p-4">
+      <p className="text-[10px] uppercase tracking-wider text-white/35">{label}</p>
+      <p className={`mt-2 text-2xl font-semibold ${warn ? "text-amber-400" : "text-white"}`}>{value}</p>
+    </div>
+  );
+}
+
+function MetaLine({
+  children,
+  fullWidth = false,
+  icon,
+  tone = "muted"
+}: {
+  children: ReactNode;
+  fullWidth?: boolean;
+  icon: ReactNode;
+  tone?: "muted" | "warn" | "info" | "error";
+}) {
+  const className =
+    tone === "warn"
+      ? "text-amber-400/70"
+      : tone === "info"
+        ? "text-blue-400/70"
+        : tone === "error"
+          ? "text-red-400/70"
+          : "text-white/35";
+
+  return (
+    <div className={`flex items-center gap-1.5 ${className} ${fullWidth ? "col-span-full" : ""}`}>
+      {icon}
+      <span className={fullWidth ? "truncate" : ""}>{children}</span>
+    </div>
+  );
+}
+
+function ActionButton({
+  label,
+  icon,
+  disabled,
+  loading,
+  onClick,
+  warn = false
+}: {
+  label: string;
+  icon: ReactNode;
+  disabled: boolean;
+  loading: boolean;
+  onClick: () => void;
+  warn?: boolean;
+}) {
+  return (
+    <button
+      disabled={disabled}
+      onClick={onClick}
+      className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-all disabled:cursor-not-allowed disabled:opacity-30 ${
+        warn
+          ? "border-amber-500/20 bg-amber-500/8 text-amber-400 hover:border-amber-500/30 hover:bg-amber-500/15"
+          : "border-white/[0.08] bg-white/[0.03] text-white/50 hover:bg-white/[0.07] hover:text-white/80"
+      }`}
+    >
+      {loading ? <span className="h-3 w-3 animate-spin rounded-full border border-white/20 border-t-current" /> : icon}
+      {label}
+    </button>
   );
 }

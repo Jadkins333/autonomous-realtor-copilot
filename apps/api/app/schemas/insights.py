@@ -1,7 +1,10 @@
+from uuid import UUID
+
 from pydantic import BaseModel, Field
 
 
 class MarketingPackageInput(BaseModel):
+    parcel_id: UUID | None = None
     photo_count: int = Field(ge=0)
     min_resolution_short_side: int = Field(ge=0)
     rooms_covered: list[str]

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { listOpportunities } from "../../lib/api";
@@ -30,15 +30,14 @@ export default function OpportunitiesScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Opportunity Feed</Text>
-      <FlatList
-        data={rows}
-        keyExtractor={(item) => item.parcel_id}
+      <ScrollView
         refreshControl={<RefreshControl tintColor="#f97316" refreshing={loading} onRefresh={load} />}
-        renderItem={({ item }) => {
+      >
+        {rows.map((item) => {
           const heat = Number(item.neighborhood_heat?.value?.score_0_100 || 0);
           const distress = Number(item.distress_likelihood?.value?.score_0_1 || 0);
           return (
-            <Pressable onPress={() => router.push(`/(app)/properties/${item.parcel_id}`)} style={styles.row}>
+            <Pressable key={item.parcel_id} onPress={() => router.push(`/(app)/properties/${item.parcel_id}`)} style={styles.row}>
               <Text style={styles.address}>{item.address}</Text>
               <Text style={styles.meta}>Heat {Math.round(heat)} • Distress {(distress * 100).toFixed(0)}%</Text>
               <Text style={styles.meta}>{item.opportunity_flags.join(", ") || "no active flags"}</Text>
@@ -54,9 +53,9 @@ export default function OpportunitiesScreen() {
               ) : null}
             </Pressable>
           );
-        }}
-        ListEmptyComponent={!loading ? <Text style={styles.empty}>No opportunities available.</Text> : null}
-      />
+        })}
+        {!loading && rows.length === 0 ? <Text style={styles.empty}>No opportunities available.</Text> : null}
+      </ScrollView>
     </View>
   );
 }

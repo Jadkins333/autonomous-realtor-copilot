@@ -2,9 +2,10 @@
 set -euo pipefail
 
 API_BASE="${API_BASE:-http://localhost:8000}"
-WEB_BASE="${WEB_BASE:-http://localhost:3000}"
+WEB_BASE="${WEB_BASE:-http://localhost:3001}"
 EMAIL="${DEMO_USER_EMAIL:-agent@demo.local}"
 PASSWORD="${DEMO_USER_PASSWORD:-demo123}"
+TENANT_SLUG="${DEFAULT_TENANT_SLUG:-demo-realty}"
 MISSING_PARCEL_ID="${TEST_PARCEL_MISSING_SIGNALS_ID:-11111111-1111-1111-1111-111111111111}"
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
 POSTGRES_DB="${POSTGRES_DB:-realtor_copilot}"
@@ -33,7 +34,7 @@ echo "web route check: ${WEB_BASE}/login -> ${web_login_status}"
 
 login_response="$(curl -fsS -X POST "${API_BASE}/auth/login" \
   -H 'Content-Type: application/json' \
-  -d "{\"email\":\"${EMAIL}\",\"password\":\"${PASSWORD}\"}")"
+  -d "{\"tenant_slug\":\"${TENANT_SLUG}\",\"email\":\"${EMAIL}\",\"password\":\"${PASSWORD}\"}")"
 
 token="$(python3 - <<'PY' "${login_response}"
 import json,sys
@@ -44,6 +45,20 @@ if not token:
 print(token)
 PY
 )"
+
+echo "Waiting for ${API_BASE}/sources/status ..."
+sources_status_code=""
+for _ in {1..30}; do
+  sources_status_code="$(curl -sS -o /tmp/sources_status_ready.json -w '%{http_code}' "${API_BASE}/sources/status" -H "Authorization: Bearer ${token}" || true)"
+  if [ "${sources_status_code}" = "200" ]; then
+    break
+  fi
+  sleep 1
+done
+if [ "${sources_status_code}" != "200" ]; then
+  echo "sources status check failed: ${API_BASE}/sources/status returned ${sources_status_code}"
+  exit 1
+fi
 
 contacts_response="$(curl -fsS "${API_BASE}/contacts" -H "Authorization: Bearer ${token}")"
 sandbox_contact_id="$(python3 - <<'PY' "${contacts_response}"

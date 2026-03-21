@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
 
     default_tenant_name: str = "Demo Realty Columbus"
+    default_tenant_slug: str = "demo-realty"
     default_locale: str = "columbus_oh"
     test_parcel_missing_signals_id: str = "11111111-1111-1111-1111-111111111111"
     demo_user_email: str = "agent@demo.local"
@@ -52,6 +53,11 @@ class Settings(BaseSettings):
     quiet_hours_end: int = Field(default=21, ge=0, le=23)
     frequency_cap_per_day: int = 3
     enforce_global_revocation: bool = False
+    consent_max_age_days: int = 365
+    proxy_timeout_seconds: int = 15
+    ohio_market_enabled: bool = True
+    ohio_website_update_window_days: int = 14
+    ohio_public_update_window_days: int = 14
 
 
 @lru_cache(maxsize=1)

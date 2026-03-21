@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import logging
-from hashlib import sha256
+from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
-from typing import Any, Callable
+from hashlib import sha256
+from typing import Any
 
 from geoalchemy2.shape import from_shape
 from pydantic import BaseModel, ValidationError
@@ -27,7 +28,7 @@ from app.models.entities import (
     SourceRun,
     TransitStop,
 )
-from app.models.enums import SourceMode, SourceRunStatus, SourceState
+from app.models.enums import SourceMode, SourceOrigin, SourceRunStatus, SourceState
 from app.services.seed_loader import load_seed_json
 from app.services.source_ops import (
     ensure_source_status_defaults,
@@ -135,7 +136,7 @@ def _finish_source_run(db: Session, run: SourceRun, status: SourceRunStatus, err
 
 def _dlq_dedupe_key(source_name: str, external_id: str, event_type: str, payload_version: str) -> str:
     # Dedupe policy during drift: source + external id + event type + normalized payload version.
-    packed = f"{source_name}|{external_id}|{event_type}|{payload_version}".encode("utf-8")
+    packed = f"{source_name}|{external_id}|{event_type}|{payload_version}".encode()
     return sha256(packed).hexdigest()
 
 
@@ -224,6 +225,12 @@ def _upsert_parcel(db: Session, tenant_id, item: ParcelPayload, provenance_id) -
             zip=item.zip,
             centroid=geom_point,
             attributes_json=item.attributes_json,
+            source_origin=SourceOrigin.public_record,
+            source_origin_details_json={
+                "field_origin_mode": "record_level",
+                "market": settings.default_locale,
+                "rules_configured": True,
+            },
             provenance_id=provenance_id,
             updated_at=datetime.now(tz=UTC),
         )
@@ -236,6 +243,12 @@ def _upsert_parcel(db: Session, tenant_id, item: ParcelPayload, provenance_id) -
     row.zip = item.zip
     row.centroid = geom_point
     row.attributes_json = item.attributes_json
+    row.source_origin = SourceOrigin.public_record
+    row.source_origin_details_json = {
+        "field_origin_mode": "record_level",
+        "market": settings.default_locale,
+        "rules_configured": True,
+    }
     row.provenance_id = provenance_id
     row.updated_at = datetime.now(tz=UTC)
 

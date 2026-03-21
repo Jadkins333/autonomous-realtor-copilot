@@ -4,16 +4,20 @@ from app.api import (
     routes_auth,
     routes_contacts,
     routes_copilot,
+    routes_deals,
+    routes_disclosures,
     routes_health,
     routes_ingest,
     routes_insights,
-    routes_outreach,
     routes_opportunities,
+    routes_outreach,
     routes_parcels,
-    routes_sources,
     routes_sequences,
+    routes_sources,
     routes_system,
+    routes_tasks,
     routes_webhooks,
+    routes_workspace,
 )
 
 api_router = APIRouter()
@@ -24,9 +28,13 @@ api_router.include_router(routes_opportunities.router)
 api_router.include_router(routes_ingest.router)
 api_router.include_router(routes_insights.router)
 api_router.include_router(routes_contacts.router)
+api_router.include_router(routes_deals.router)
+api_router.include_router(routes_disclosures.router)
 api_router.include_router(routes_sequences.router)
 api_router.include_router(routes_outreach.router)
+api_router.include_router(routes_tasks.router)
 api_router.include_router(routes_webhooks.router)
 api_router.include_router(routes_copilot.router)
 api_router.include_router(routes_sources.router)
 api_router.include_router(routes_system.router)
+api_router.include_router(routes_workspace.router)

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.compliance.registry import COMPLIANCE_RULE_REGISTRY
-from app.db.session import SessionLocal
-from app.models.entities import ComplianceEvent
+from app.models.entities import ComplianceEvent, Tenant
+
 
 def _resolve_repo_root() -> Path:
     current = Path(__file__).resolve()
@@ -55,11 +57,30 @@ def test_registry_docs_exist_and_have_authoritative_links() -> None:
 
 
 def test_recorded_compliance_events_reference_registered_rule_keys() -> None:
-    db = SessionLocal()
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Tenant.__table__.create(bind=engine)
+    ComplianceEvent.__table__.create(bind=engine)
+    factory = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
+    db: Session = factory()
     try:
+        tenant = Tenant(id=uuid4(), name="Registry Test Tenant")
+        db.add(tenant)
+        db.flush()
+        db.add(
+            ComplianceEvent(
+                tenant_id=tenant.id,
+                event_type="blocked",
+                subject_type="message",
+                subject_id="message-1",
+                rule_key="sandbox_default",
+                details_json={"source": "pytest"},
+            )
+        )
+        db.commit()
         rows = db.execute(select(ComplianceEvent.rule_key).distinct()).scalars().all()
     finally:
         db.close()
+        engine.dispose()
 
     unknown = sorted({row for row in rows if row and row not in COMPLIANCE_RULE_REGISTRY})
     assert not unknown, f"Compliance events have unknown rule_key values: {unknown}"

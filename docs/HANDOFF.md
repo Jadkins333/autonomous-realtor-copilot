@@ -438,30 +438,60 @@ Asserts include:
 - forced source unreachable -> source marked stale while core parcel/insight calls still work.
 
 ### Commands validated during this handoff
-- `docker compose ps` (all services up).
-- `curl http://localhost:8000/healthz` -> `{"ok":true}`.
-- `curl http://localhost:8000/metrics` -> JSON counts.
-- `pnpm run project:doctor` -> all checks passed.
-- `pnpm smoke` -> passed.
-- `pnpm --filter web build` -> passed (Docker Node20 wrapper path).
-- `pnpm --filter web test` -> passed (vitest via Docker wrapper).
-- `docker compose exec -T api pytest -q` -> `34 passed`.
+- Authoritative repo-wide gate: `pnpm validate:all`
+  - Runs `validate:api`, `validate:web`, and `validate:mobile` sequentially via `scripts/validate.mjs`.
+  - Each step reports the exact suite name and duration.
+  - Timeouts are enforced per step so failures surface as explicit `suite/step` errors instead of hanging indefinitely.
+- `pnpm validate:all` on 2026-03-19: passed
+  - `api/pytest`: passed, `54 passed, 7 warnings`
+  - `web/lint`: passed
+  - `web/typecheck`: passed
+  - `web/test`: passed, `23 passed`
+  - `web/build`: passed
+  - `mobile/typecheck`: passed
+- Surface-specific entrypoints:
+  - `pnpm validate:api`
+  - `pnpm validate:web`
+  - `pnpm validate:mobile`
+
+Compliance-critical coverage now present:
+- `apps/api/tests/test_outreach_validation_scenarios.py`
+  - sandbox draft creation -> submit -> approval -> sandbox-staged send attempt
+  - live send blocked when provider configuration is missing
+  - STOP/suppression block
+  - quiet-hours block using recipient timezone
+  - fair-housing block
+  - disclosure-required block
+  - idempotent retry returning the existing send attempt without duplicates
+- `apps/api/tests/test_disclosures.py`
+  - disclosure block -> acknowledgement -> allowed sandbox stage -> superseded version re-block
+- `apps/web/lib/policy-parity.test.ts`
+  - parity assertions for sandbox/live, allow/block state, fair-housing reasons, disclosure indicators, and source/freshness rendering inputs
+
+Environment prerequisites for the authoritative validators:
+- Install API dependencies: `python3 -m pip install --user -r apps/api/requirements.txt`
+- Install workspace dependencies: `pnpm install`
+- Web validation requires Node 20 because the host machine currently has Node 25
+  - Web scripts automatically re-exec through `apps/web/scripts/run-with-supported-node.cjs`
+  - Expected local Node 20 path in this environment: `/opt/homebrew/opt/node@20/bin/node`
 
 Coverage gaps observed:
 - No dedicated web integration test for API proxy route behavior under header/body edge cases.
-- No mobile automated test suite (UI/API interactions are runtime-only).
-- Mobile `tsc --noEmit` command did not complete within 45s in this environment (see Known Issues).
+- No dedicated mobile UI/integration test runner is configured yet; the authoritative mobile gate is TypeScript typecheck plus shared policy-contract parity coverage.
 
 ## M) Known Issues / Footguns
-1. Mobile TS typecheck hangs in this environment:
-- Command `pnpm --filter mobile exec tsc --noEmit` timed out at 45s during this handoff.
-- `tsc --showConfig` works; full noEmit run appears to stall.
+1. API validation still emits dependency deprecation warnings:
+- `passlib` warns that Python's `crypt` module is deprecated.
+- `python-jose` still calls `datetime.utcnow()` in JWT paths.
+- These do not fail the current validation path, but they should be cleaned up before production hardening is considered complete.
 
-2. Outreach provider send path likely contains unreachable provider branch:
-- In `apps/api/app/services/outreach.py` (`approve_and_send`), email/sms blocks include unconditional `return {\"status\":\"failed\", ...}` directly after missing-contact guard block, which appears to bypass provider send path even when contact data exists.
+2. Mobile verification is now deterministic but still narrow:
+- `pnpm validate:mobile` is a truthful typecheck gate.
+- There is still no configured mobile UI or device-level automated test suite.
 
-3. Next build skips strict type/lint checks by config:
-- `apps/web/next.config.mjs` sets `typescript.ignoreBuildErrors=true` and `eslint.ignoreDuringBuilds=true`.
+3. MLS/source-origin runtime remains feature-flagged:
+- Source-origin indicators and parity coverage exist where the slice is implemented.
+- Live MLS/RESO sync remains disabled by default and still requires separate operational validation before production use.
 
 4. Reserved pnpm script-name caveat:
 - Project intentionally uses `project:setup`/`project:doctor` to avoid pnpm builtin collisions (`README.md`, `DEV.md`).

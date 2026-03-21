@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import AuthContext, get_admin_auth_context, get_auth_context
 from app.core.config import get_settings
 from app.db.session import get_db
+from app.schemas.sources import SourceStatusOut
 from app.services.ingestion import (
     get_sources_status,
     replay_source_dlq,
@@ -29,13 +30,13 @@ class DebugDriftRequest(BaseModel):
     reason: str | None = Field(default=None, max_length=512)
 
 
-@router.get("/status")
+@router.get("/status", response_model=SourceStatusOut)
 def source_status(
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
-) -> dict:
+) -> SourceStatusOut:
     _ = auth
-    return {"items": get_sources_status(db)}
+    return SourceStatusOut(items=get_sources_status(db))
 
 
 @router.post("/{source_name}/pause")

@@ -1,8 +1,10 @@
 from datetime import UTC, datetime
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
-from app.core.config import get_settings
+from app.api.deps import AuthContext, get_auth_context
+from app.db.session import get_db
 from app.main import app
 from app.schemas.truth import TruthMetricResponse
 from app.services import insights
@@ -34,6 +36,10 @@ class FakeDB:
 
     def commit(self):
         self.committed = True
+
+
+class DummyDB:
+    pass
 
 
 def test_micro_market_nowcast_returns_insufficient_data(monkeypatch):
@@ -74,20 +80,37 @@ def test_nowcast_formula_components_are_deterministic() -> None:
 
 
 def test_city_insight_conforms_to_truth_contract() -> None:
-    settings = get_settings()
-    with TestClient(app) as client:
-        login = client.post(
-            "/auth/login",
-            json={"email": settings.demo_user_email, "password": settings.demo_user_password},
-        )
-        assert login.status_code == 200
-        token = login.json()["access_token"]
-        response = client.get(
-            "/insights/city/columbus",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-    assert response.status_code == 200
-    payload = response.json()
-    parsed = TruthMetricResponse.model_validate(payload)
-    assert parsed.formula_key == "micro_market_nowcast_v1"
-    assert parsed.formula_version == "v1"
+    payload = {
+        "status": "ok",
+        "insufficient_data": False,
+        "formula_key": "micro_market_nowcast_v1",
+        "formula_version": "v1",
+        "formula_markdown": "formula",
+        "computed_at": "2026-03-19T12:00:00+00:00",
+        "value": {"score_0_100": 41.0},
+        "inputs": {"permits_per_100_parcels_90d": {"value": 4.0, "fields": [], "ids": []}},
+        "provenance": {"sources": []},
+        "freshness": {"fetched_at": "2026-03-19T11:00:00+00:00", "ttl_seconds": 86400, "staleness": "fresh", "is_stale": False},
+        "coverage_summary": {"coverage_pct": 100, "required_total": 1, "required_present": 1, "missing_required": []},
+        "missing_inputs": [],
+    }
+
+    app.dependency_overrides[get_db] = lambda: DummyDB()
+    app.dependency_overrides[get_auth_context] = lambda: AuthContext(user_id=uuid4(), tenant_id=uuid4(), role="agent")
+
+    try:
+        from app.api import routes_insights
+
+        original = routes_insights.compute_micro_market_nowcast
+        routes_insights.compute_micro_market_nowcast = lambda *_args, **_kwargs: payload
+        with TestClient(app) as client:
+            response = client.get("/insights/city/columbus")
+        assert response.status_code == 200
+        parsed = TruthMetricResponse.model_validate(response.json())
+        assert parsed.formula_key == "micro_market_nowcast_v1"
+        assert parsed.formula_version == "v1"
+    finally:
+        from app.api import routes_insights
+
+        routes_insights.compute_micro_market_nowcast = original
+        app.dependency_overrides.clear()

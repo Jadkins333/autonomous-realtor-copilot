@@ -1,0 +1,17 @@
+appId: com.anonymous.mobile
+---
+- launchApp
+- assertVisible: "Email"
+- tapOn: "Email"
+- inputText: "agent@demo.local"
+- tapOn: "Password"
+- inputText: "password"
+- tapOn: "Login"
+- assertVisible: "Properties"
+- tapOn: "Properties"
+- tapOn:
+    point: 50%, 30% # Fallback tap on the first item in the list if no text matches
+- scroll
+- assertVisible: "Acknowledge Disclosure"
+- tapOn: "Acknowledge Disclosure"
+- assertVisible: "Export"

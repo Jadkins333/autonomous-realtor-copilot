@@ -3,6 +3,12 @@
   "private": true,
   "version": "1.0.0",
   "packageManager": "pnpm@9.12.2",
+  "pnpm": {
+    "peerDependencyRules": {
+      "ignoreMissing": ["@playwright/test"]
+    },
+    "ignoredOptionalDependencies": ["@playwright/test"]
+  },
   "scripts": {
     "project:setup": "bash scripts/setup.sh",
     "project:doctor": "bash scripts/doctor.sh",
@@ -14,6 +20,12 @@
     "smoke": "bash scripts/smoke.sh",
     "build:web": "pnpm --filter web build",
     "lint:web": "pnpm --filter web lint",
-    "test:web": "pnpm --filter web test"
+    "typecheck:web": "pnpm --filter web typecheck",
+    "test:web": "pnpm --filter web test",
+    "typecheck:mobile": "pnpm --filter mobile typecheck",
+    "validate:api": "node scripts/validate.mjs api",
+    "validate:web": "node scripts/validate.mjs web",
+    "validate:mobile": "node scripts/validate.mjs mobile",
+    "validate:all": "node scripts/validate.mjs all"
   }
 }

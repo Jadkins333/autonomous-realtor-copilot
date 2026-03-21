@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from hashlib import sha256
 from datetime import UTC, datetime, timedelta
+from hashlib import sha256
 from uuid import UUID
 
 from sqlalchemy import case, func, select, text
@@ -16,6 +16,7 @@ from app.models.entities import (
     Permit,
     ProvenanceRecord,
 )
+from app.services.disclosures import evaluate_disclosure_gate, record_blocked_disclosure_workflow
 from app.services.provenance import freshness
 
 
@@ -68,7 +69,7 @@ def _store_metric_value(
 
 
 def _event_dedupe_key(*, tenant_id: UUID, parcel_id: UUID, event_type: str, day: str) -> str:
-    packed = f"{tenant_id}|{parcel_id}|{event_type}|{day}".encode("utf-8")
+    packed = f"{tenant_id}|{parcel_id}|{event_type}|{day}".encode()
     return sha256(packed).hexdigest()
 
 
@@ -118,7 +119,7 @@ def _record_status_change_event(
     occurred_at: datetime,
 ) -> None:
     dedupe_key = sha256(
-        f"{tenant_id}|{parcel_id}|status_change|{from_status}|{to_status}|{occurred_at.isoformat()}".encode("utf-8")
+        f"{tenant_id}|{parcel_id}|status_change|{from_status}|{to_status}|{occurred_at.isoformat()}".encode()
     ).hexdigest()
     db.add(
         OpportunityEvent(
@@ -457,6 +458,33 @@ def set_opportunity_status(
     parcel = db.execute(select(Parcel).where(Parcel.id == parcel_id, Parcel.tenant_id == tenant_id)).scalar_one_or_none()
     if parcel is None:
         raise ValueError("Parcel not found")
+    if status == "active":
+        disclosure_status = evaluate_disclosure_gate(
+            db,
+            tenant_id=tenant_id,
+            user_id=actor_user_id,
+            action="opportunity_activate",
+            property_id=parcel.id,
+            jurisdiction=parcel.state,
+            log_presentation=False,
+        )
+        if not disclosure_status["allowed"]:
+            record_blocked_disclosure_workflow(
+                db,
+                tenant_id=tenant_id,
+                user_id=actor_user_id,
+                action="opportunity_activate",
+                subject_type="opportunity_state",
+                subject_id=str(parcel.id),
+                decision=disclosure_status,
+            )
+            db.commit()
+            return {
+                "parcel_id": str(parcel.id),
+                "status": "blocked",
+                "blocked": True,
+                "disclosure_status": disclosure_status,
+            }
 
     existing = db.execute(
         select(OpportunityState).where(
@@ -500,6 +528,8 @@ def set_opportunity_status(
         "previous_status": prior_status,
         "changed": changed,
         "updated_at": existing.updated_at.isoformat(),
+        "blocked": False,
+        "disclosure_status": {"allowed": True, "blocking_disclosures": [], "reason_codes": [], "human_readable_messages": [], "jurisdiction": None},
     }
 
 
