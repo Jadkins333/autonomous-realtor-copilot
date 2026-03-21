@@ -1,23 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useSession } from "next-auth/react";
-import {
-  Search,
-  Building2,
-  ChevronRight,
-  TrendingUp,
-  MapPin,
-  AlertTriangle,
-  Zap,
-  Filter,
-  ArrowUpRight,
-} from "lucide-react";
-import Link from "next/link";
+import { Building2, Search } from "lucide-react";
 
-import { useRequireAuth } from "../../components/auth-guard";
-import { SiteShell } from "../../components/site-shell";
-import { apiFetch } from "../../lib/api";
+import { useRequireAuth } from "@/components/auth-guard";
+import { SiteShell } from "@/components/site-shell";
+import { Button } from "@/components/ui/button";
+import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { apiFetch } from "@/lib/api";
 
 type PropertyResult = {
   id: string;
@@ -27,20 +20,7 @@ type PropertyResult = {
   state: string;
   zip: string;
   source_origin: string;
-  freshness: {
-    staleness: string;
-  };
-  disclosure_status: {
-    allowed: boolean;
-  };
-};
-
-type ParcelRow = {
-  id: string;
-  address: string;
-  parcel_number: string;
-  city: string;
-  updated_at: string;
+  freshness?: { staleness?: string };
 };
 
 export default function PropertiesPage() {
@@ -48,23 +28,24 @@ export default function PropertiesPage() {
   const { data: session } = useSession();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PropertyResult[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSearch() {
-    if (!session || !query.trim()) return;
-    setLoading(true);
-    setSearchError(null);
+    if (!session?.apiToken || !query.trim()) return;
+    setSearching(true);
+    setError(null);
     try {
       const data = await apiFetch<PropertyResult[]>(
-        `/parcels/search?query=${encodeURIComponent(query)}`,
-        token,
+        `/parcels/search?q=${encodeURIComponent(query.trim())}`,
+        session.apiToken,
       );
       setResults(data);
-    } catch {
+    } catch (err) {
       setResults([]);
+      setError(err instanceof Error ? err.message : "Search failed");
     } finally {
-      setLoading(false);
+      setSearching(false);
     }
   }
 
@@ -72,119 +53,60 @@ export default function PropertiesPage() {
 
   return (
     <SiteShell>
-      {/* Search Header Area */}
-      <div className="mb-10">
-        <h1 className="text-3xl font-bold text-white mb-6 flex items-center gap-3">
-          <Building2 className="w-8 h-8 text-orange-400" />
-          Property Surveillance
-        </h1>
-
-        <div className="relative group max-w-2xl">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20 group-focus-within:text-orange-400 transition-colors" />
-          <input
-            placeholder="Search address, zip, or parcel ID..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            className="w-full bg-[#13161f] border border-white/[0.08] rounded-2xl pl-14 pr-32 py-5 text-lg text-white placeholder-white/20 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/40 transition-all shadow-2xl shadow-black/50"
-          />
-          <button
-            onClick={handleSearch}
-            disabled={loading}
-            className="absolute right-3 top-1/2 -translate-y-1/2 bg-orange-600 hover:bg-orange-500 text-white font-bold text-sm px-6 py-3 rounded-xl transition-all disabled:opacity-50"
-          >
-            {loading ? "Searching..." : "SURVEIL"}
-          </button>
-        </div>
-
-        {/* Filters / Quick Suggestions */}
-        <div className="flex gap-2 mt-4">
-           <FilterPill label="High Distress" active />
-           <FilterPill label="Zone AE (Flood)" />
-           <FilterPill label="Transit +80" />
-           <FilterPill label="Auditor Verified" />
-        </div>
+      <div className="mb-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-400/80">Property Search</p>
+        <h1 className="mt-2 text-3xl font-bold text-white">Find the property, then push the workflow forward.</h1>
+        <p className="mt-2 max-w-3xl text-sm text-white/45">
+          Search public-record properties, inspect the profile, and capture the lead into your pipeline with tasks.
+        </p>
       </div>
 
-      {loading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-44 rounded-2xl border border-white/[0.06] bg-[#13161f] animate-pulse" />
-          ))}
+      <Card className="border-white/[0.08] bg-[#13161f] text-white">
+        <div className="flex flex-col gap-3 md:flex-row">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/25" />
+            <Input
+              className="border-white/10 bg-white/[0.03] pl-10 text-white placeholder:text-white/25"
+              placeholder="Search by address or parcel number"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            />
+          </div>
+          <Button className="bg-orange-500 text-white hover:bg-orange-400" disabled={searching} onClick={handleSearch}>
+            {searching ? "Searching..." : "Search"}
+          </Button>
         </div>
-      ) : results.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {results.map((prop) => (
-            <Link key={prop.id} href={`/properties/${prop.id}`} className="group">
-              <div className="rounded-2xl border border-white/[0.08] bg-[#13161f] p-5 hover:bg-white/[0.02] hover:border-orange-500/30 transition-all flex flex-col h-full shadow-lg">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] text-orange-400 font-bold uppercase tracking-widest flex items-center gap-1">
-                      <Zap className="w-2.5 h-2.5 fill-orange-400/20" /> DISTRESS LEVEL
-                    </span>
-                    <p className="text-base font-bold text-white group-hover:text-orange-400 transition-colors leading-tight">
-                      {prop.address}
-                    </p>
-                  </div>
-                  <ArrowUpRight className="w-4 h-4 text-white/20 group-hover:text-white/60 transition-colors" />
-                </div>
+        {error ? <p className="mt-3 text-sm text-red-300">{error}</p> : null}
+      </Card>
 
-                {/* Distress Gauge */}
-                <div className="mb-4">
-                  <div className="flex justify-between text-[10px] font-bold text-white/30 uppercase tracking-tighter mb-1.5">
-                    <span>Low Exposure</span>
-                    <span className="text-orange-500/80">Critical</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-white/[0.05] flex gap-1 items-stretch p-[2px]">
-                    {[...Array(10)].map((_, i) => (
-                      <div
-                        key={i}
-                        className={`flex-1 rounded-[1px] transition-all duration-500 delay-[${i * 50}ms] ${
-                          i < (0.5) * 10
-                            ? i > 7 ? "bg-orange-500" : "bg-orange-600/60"
-                            : "bg-white/5"
-                        }`}
-                      />
-                    ))}
-                  </div>
+      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {results.map((property) => (
+          <Link key={property.id} href={`/properties/${property.id}`}>
+            <Card className="h-full border-white/[0.08] bg-[#13161f] text-white transition hover:border-orange-500/30 hover:bg-white/[0.03]">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <CardTitle className="text-white">{property.address}</CardTitle>
+                  <CardDescription className="mt-2 text-white/45">
+                    #{property.parcel_number} · {property.city}, {property.state} {property.zip}
+                  </CardDescription>
                 </div>
-
-                <div className="mt-auto flex flex-wrap gap-1.5">
-                  {[prop.source_origin, prop.freshness?.staleness].filter(Boolean).map((tag) => (
-                    <span
-                      key={tag}
-                      className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/[0.04] text-white/40 border border-white/[0.06] uppercase tracking-wider"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                  <span className="ml-auto text-[10px] text-white/20 font-mono">#{prop.parcel_number}</span>
-                </div>
+                <Building2 className="h-5 w-5 text-orange-300" />
               </div>
-            </Link>
-          ))}
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-white/[0.06] rounded-3xl">
-          <Building2 className="w-12 h-12 text-white/10 mb-4" />
-          <h3 className="text-white font-bold text-lg">Initialize Search</h3>
-          <p className="text-white/30 text-sm max-w-xs mt-1">
-            Search 10,000+ Franklin County records to identify high-distress investment opportunities.
-          </p>
-        </div>
-      )}
-    </SiteShell>
-  );
-}
+              <div className="mt-4 flex items-center justify-between text-xs uppercase tracking-[0.18em]">
+                <span className="text-white/35">{property.source_origin.replace(/_/g, " ")}</span>
+                <span className="text-orange-300">{property.freshness?.staleness || "unknown"}</span>
+              </div>
+            </Card>
+          </Link>
+        ))}
+      </div>
 
-function FilterPill({ label, active }: any) {
-  return (
-    <button className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all border ${
-      active
-        ? "bg-orange-500/10 text-orange-400 border-orange-500/20"
-        : "bg-white/[0.03] text-white/30 border-white/[0.06] hover:text-white/50 hover:border-white/20"
-    }`}>
-      {label}
-    </button>
+      {!searching && !results.length ? (
+        <Card className="mt-6 border-dashed border-white/[0.08] bg-transparent text-white/35">
+          Search a property to open the profile, review negotiation/context signals, and capture it into the pipeline.
+        </Card>
+      ) : null}
+    </SiteShell>
   );
 }

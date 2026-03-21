@@ -51,6 +51,7 @@ const REQUIRED_ENV_KEYS = [
 export default function SetupPage() {
   const { status } = useRequireAuth();
   const { data: session } = useSession();
+  const apiToken = (session as { apiToken?: string } | null)?.apiToken;
   const [diagnostics, setDiagnostics] = useState<Record<string, unknown> | null>(null);
   const [sources, setSources] = useState<SourceStatusItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -58,16 +59,16 @@ export default function SetupPage() {
   const [diagOpen, setDiagOpen] = useState(false);
 
   useEffect(() => {
-    if (!session) return;
+    if (!apiToken) return;
     let mounted = true;
     (async () => {
       try {
         setError(null);
         const [diag, sourcePayload] = await Promise.all([
-          apiFetch<Record<string, unknown>>("/system/diagnostics", session?.apiToken),
-          apiFetch<SourceStatusResponse>("/sources/status", session?.apiToken),
+          apiFetch<Record<string, unknown>>("/system/diagnostics", apiToken),
+          apiFetch<SourceStatusResponse>("/sources/status", apiToken),
         ]);
-        if (!active) return;
+        if (!mounted) return;
         setDiagnostics(diag);
         setSources(sourcePayload.items || []);
       } catch (err) {
@@ -76,7 +77,7 @@ export default function SetupPage() {
       }
     })();
     return () => { mounted = false; };
-  }, [session]);
+  }, [apiToken]);
 
   const copyCommand = async (cmd: string) => {
     try {

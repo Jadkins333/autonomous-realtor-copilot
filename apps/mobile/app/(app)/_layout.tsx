@@ -6,6 +6,11 @@ import { StyleSheet, View } from "react-native";
 import { FixtureModeBanner } from "../../components/fixture-mode-banner";
 import { useAuth } from "../../lib/auth-context";
 
+type TabIconProps = {
+ color: string;
+ size: number;
+};
+
 export default function AppTabsLayout() {
  const { signOut } = useAuth();
 
@@ -26,7 +31,7 @@ export default function AppTabsLayout() {
  name="dashboard"
  options={{
  title: "Dashboard",
- tabBarIcon: ({ color, size }) => <Ionicons color={color} name="speedometer-outline" size={size} />,
+ tabBarIcon: ({ color, size }: TabIconProps) => <Ionicons color={color} name="speedometer-outline" size={size} />,
  headerRight: () => (
  <Ionicons
  color="#f8fafc"
@@ -42,35 +47,35 @@ export default function AppTabsLayout() {
  name="opportunities"
  options={{
  title: "Opportunities",
- tabBarIcon: ({ color, size }) => <Ionicons color={color} name="flash-outline" size={size} />
+ tabBarIcon: ({ color, size }: TabIconProps) => <Ionicons color={color} name="flash-outline" size={size} />
  }}
  />
  <Tabs.Screen
  name="properties"
  options={{
  title: "Properties",
- tabBarIcon: ({ color, size }) => <Ionicons color={color} name="home-outline" size={size} />
+ tabBarIcon: ({ color, size }: TabIconProps) => <Ionicons color={color} name="home-outline" size={size} />
  }}
  />
  <Tabs.Screen
  name="contacts"
  options={{
  title: "Contacts",
- tabBarIcon: ({ color, size }) => <Ionicons color={color} name="people-outline" size={size} />
+ tabBarIcon: ({ color, size }: TabIconProps) => <Ionicons color={color} name="people-outline" size={size} />
  }}
  />
  <Tabs.Screen
  name="outreach"
  options={{
  title: "Outreach",
- tabBarIcon: ({ color, size }) => <Ionicons color={color} name="paper-plane-outline" size={size} />
+ tabBarIcon: ({ color, size }: TabIconProps) => <Ionicons color={color} name="paper-plane-outline" size={size} />
  }}
  />
  <Tabs.Screen
  name="copilot"
  options={{
  title: "Copilot",
- tabBarIcon: ({ color, size }) => <Ionicons color={color} name="chatbox-ellipses-outline" size={size} />
+ tabBarIcon: ({ color, size }: TabIconProps) => <Ionicons color={color} name="chatbox-ellipses-outline" size={size} />
  }}
  />
  </Tabs>
@@ -88,4 +93,3 @@ const styles = StyleSheet.create({
  flex: 1
  }
 });
-

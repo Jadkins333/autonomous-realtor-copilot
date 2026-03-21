@@ -7,6 +7,7 @@ __all__ = [
     "ComplianceEvent",
     "ConsentEvent",
     "Contact",
+    "ContactEvent",
     "Conversation",
     "DisclosureAcknowledgement",
     "DisclosureDefinition",

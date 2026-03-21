@@ -234,6 +234,36 @@ export type OpportunitiesResponse = {
   items: OpportunityItem[];
 };
 
+export type TodayWorkspace = {
+  summary: {
+    open_tasks: number;
+    overdue_tasks: number;
+    due_today: number;
+    active_deals: number;
+    deals_at_risk: number;
+    follow_ups_due: number;
+  };
+  coach_alerts: Array<{
+    id: string;
+    title: string;
+    detail: string;
+    href: string;
+    cta_label: string;
+    tone: string;
+  }>;
+  follow_ups: Array<{
+    id: string;
+    name: string;
+    stage: string;
+    next_step_note?: string | null;
+  }>;
+  deals_at_risk: Array<{
+    id: string;
+    title: string;
+    stage: string;
+  }>;
+};
+
 export type SourceStatusItem = {
  source_name: string;
  mode: string;
@@ -252,6 +282,9 @@ export type DraftPackDraft = {
  body: string;
  status: string;
  created_at: string;
+ compliance_snapshot?: PolicyDecision | null;
+ disclosure_status?: DisclosureStatus | null;
+ fair_housing_scan?: FairHousingScan | null;
 };
 
 export type DraftPack = {
@@ -285,4 +318,3 @@ export type DraftActionResponse = {
  pack_status?: string;
  reason?: string;
 };
-

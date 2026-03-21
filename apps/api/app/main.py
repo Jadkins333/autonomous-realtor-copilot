@@ -19,6 +19,15 @@ settings = get_settings()
 configure_logging(settings.log_level)
 logger = logging.getLogger(__name__)
 
+cors_allow_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8081",
+    "http://127.0.0.1:8081",
+    "exp://127.0.0.1:8081",
+]
+cors_allow_credentials = True
+
 app = FastAPI(
     title=settings.app_name, 
     version="1.0.0",
@@ -69,4 +78,3 @@ async def request_context_middleware(request: Request, call_next: Callable) -> R
 
 
 app.include_router(api_router)
-

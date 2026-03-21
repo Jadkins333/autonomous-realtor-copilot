@@ -3,11 +3,17 @@ import type {
   CitySnapshot,
   Contact,
   DisclosureStatus,
+  DraftActionResponse,
   DraftActionResult,
+  DraftPack,
+  DraftPacksResponse,
+  DraftPackSubmitResponse,
   OpportunitiesResponse,
   OutreachDraft,
   ParcelDetail,
-  ParcelSummary
+  ParcelSummary,
+  SourceStatusResponse,
+  TodayWorkspace
 } from "./types";
 
 declare const process: { env: Record<string, string | undefined> };
@@ -73,12 +79,16 @@ export function getCitySnapshot(token: string) {
   return request<CitySnapshot>("/insights/city/columbus", { token });
 }
 
+export function getTodayWorkspace(token: string) {
+  return request<TodayWorkspace>("/workspace/today", { token });
+}
+
 export function listOpportunities(token: string) {
   return request<OpportunitiesResponse>("/opportunities", { token });
 }
 
 export function searchParcels(token: string, query: string) {
-  return request<ParcelSummary[]>(`/parcels/search?query=${encodeURIComponent(query)}`, {
+  return request<ParcelSummary[]>(`/parcels/search?q=${encodeURIComponent(query)}`, {
     token,
     headers: { "x-client-surface": "mobile" }
   });

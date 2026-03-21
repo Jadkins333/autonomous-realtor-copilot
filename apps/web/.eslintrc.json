@@ -1,12 +1,5 @@
 {
-<<<<<<< HEAD
+  "root": true,
   "extends": ["next/core-web-vitals"],
-  "ignorePatterns": [".next/", "node_modules/"]
-=======
-  "extends": ["next/core-web-vitals", "next/typescript"],
-  "rules": {
-    "@next/next/no-img-element": "off",
-    "@typescript-eslint/no-explicit-any": "warn"
-  }
->>>>>>> origin/codex/phase2-sources-ui-tests
+  "ignorePatterns": [".next/", "node_modules/", "**/* 2.*"]
 }

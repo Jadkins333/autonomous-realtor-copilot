@@ -1,278 +1,530 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import type { ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import {
-  Activity,
-  Zap,
-  Target,
-  ArrowUpRight,
+  AlertTriangle,
+  ArrowRight,
+  BriefcaseBusiness,
+  CalendarClock,
+  CheckCircle2,
+  Clock3,
+  PhoneCall,
   TrendingUp,
-  Map,
-  ShieldCheck,
-  Building2,
-  Clock,
-  ChevronRight,
-  FileSearch,
 } from "lucide-react";
-import Link from "next/link";
 
 import { useRequireAuth } from "@/components/auth-guard";
 import { SiteShell } from "@/components/site-shell";
+import { Button } from "@/components/ui/button";
+import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { apiFetch } from "@/lib/api";
 
-type MetricGroup = {
-  parcels: number;
-  opportunities: number;
-  outreach: number;
-  events: number;
+type TaskRow = {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  due_at?: string | null;
+  contact_name?: string | null;
+  deal_title?: string | null;
+  parcel_address?: string | null;
 };
 
-type PriorityLead = {
+type FollowUpRow = {
   id: string;
-  address: string;
-  distress: number;
-  roi: string;
-  verdict: string;
-  tag: string;
+  name: string;
+  stage: string;
+  priority: string;
+  next_step_due_at?: string | null;
+  next_step_note?: string | null;
+  last_contact_at?: string | null;
+  preferred_channel?: string | null;
 };
+
+type DealRow = {
+  id: string;
+  title: string;
+  stage: string;
+  priority: string;
+  contact_name?: string | null;
+  parcel_address?: string | null;
+  next_milestone_at?: string | null;
+  overdue_task_count: number;
+};
+
+type CoachAlertRow = {
+  id: string;
+  title: string;
+  detail: string;
+  href: string;
+  cta_label: string;
+  tone: string;
+};
+
+type ReengageRow = {
+  id: string;
+  name: string;
+  stage: string;
+  priority: string;
+  preferred_channel?: string | null;
+  last_event_at?: string | null;
+  trigger: string;
+  trigger_date?: string | null;
+  detail: string;
+};
+
+type ComingUpRow = {
+  id: string;
+  name: string;
+  stage: string;
+  priority: string;
+  preferred_channel?: string | null;
+  last_event_at?: string | null;
+  occasion: string;
+  occasion_date: string;
+  detail: string;
+};
+
+type TodayPayload = {
+  summary: {
+    open_tasks: number;
+    overdue_tasks: number;
+    due_today: number;
+    active_deals: number;
+    deals_at_risk: number;
+    follow_ups_due: number;
+  };
+  coach_alerts: CoachAlertRow[];
+  urgent_tasks: TaskRow[];
+  due_today_tasks: TaskRow[];
+  follow_ups: FollowUpRow[];
+  reengage: ReengageRow[];
+  coming_up: ComingUpRow[];
+  deals_at_risk: DealRow[];
+  pipeline: Array<{ stage: string; count: number }>;
+};
+
+function fmtDate(value?: string | null) {
+  if (!value) return "No date";
+  return new Date(value).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function stageLabel(value: string) {
+  return value.replace(/_/g, " ");
+}
+
+function occasionLabel(value: string) {
+  return value.replace(/_/g, " ");
+}
 
 export default function DashboardPage() {
   const { status } = useRequireAuth();
   const { data: session } = useSession();
-  const [metrics, setMetrics] = useState<MetricGroup | null>(null);
+  const apiToken = (session as { apiToken?: string } | null)?.apiToken;
+  const [payload, setPayload] = useState<TodayPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
 
-  // Real Database IDs for the "Wow" Tour
-  const priorityLeads: PriorityLead[] = [
-    { id: "cf3c5097-51dd-4270-b8fd-7c48d7bb9afd", address: "145 N High St", distress: 0.85, roi: "12.4%", verdict: "Stalled Renovation / High Distress", tag: "Hot" },
-    { id: "1a4aefb6-d731-4fe6-a046-ff02b21c2809", address: "3508 Indianola Ave", distress: 0.65, roi: "8.1%", verdict: "Permit Expired / Flood Zone Risk", tag: "Review" },
-    { id: "11111111-1111-1111-1111-111111111111", address: "999 Missing Signal Ln", distress: 0.42, roi: "15.2%", verdict: "High Transit / Undervalued Asset", tag: "Value" },
-  ];
+  const load = useCallback(async () => {
+    if (!apiToken) return;
+    setLoading(true);
+    try {
+      const data = await apiFetch<TodayPayload>("/workspace/today", apiToken);
+      setPayload(data);
+    } finally {
+      setLoading(false);
+    }
+  }, [apiToken]);
 
   useEffect(() => {
-    if (!session) return;
-    apiFetch<MetricGroup>("/system/metrics", (session as any).apiToken)
-      .then(setMetrics)
-      .catch(() => setMetrics({ parcels: 0, opportunities: 0, outreach: 0, events: 0 }))
-      .finally(() => setLoading(false));
-  }, [session]);
+    void load();
+  }, [load]);
+
+  async function completeTask(taskId: string) {
+    if (!apiToken) return;
+    setSavingTaskId(taskId);
+    try {
+      await apiFetch(`/tasks/${taskId}`, apiToken, {
+        method: "PUT",
+        body: JSON.stringify({ status: "completed" }),
+      });
+      await load();
+    } finally {
+      setSavingTaskId(null);
+    }
+  }
 
   if (status !== "authenticated") return null;
 
-  const driftSources = sources?.filter((s) => s.drift_detected) ?? [];
-  const staleSources = sources?.filter((s) => s.is_stale) ?? [];
-  const okCount = sources?.filter((s) => s.state === "ok").length ?? 0;
-  const partialCount = sources?.filter((s) => s.state === "partial").length ?? 0;
-  const failedCount = sources?.filter((s) => s.state === "failed").length ?? 0;
+  const summary = payload?.summary;
 
   return (
     <SiteShell>
-      {/* Welcome Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400 border border-orange-500/25 uppercase tracking-wider">
-            Columbus, OH · Live Intelligence
-          </span>
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-400/80">Today</p>
+          <h1 className="mt-2 text-3xl font-bold text-white">Run the business, not just the intel.</h1>
+          <p className="mt-2 max-w-3xl text-sm text-white/45">
+            This is the agent operating screen: overdue tasks, follow-ups due, pipeline risk, and what needs a human touch next.
+          </p>
         </div>
-        <h1 className="text-3xl font-bold text-white tracking-tight" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-          Good morning, {session?.user?.name || "Agent"}
-        </h1>
-        <p className="text-white/40 text-sm mt-1">
-          The copilot is online. We found <span className="text-white/70 font-bold">{metrics?.events || 0} intelligence events</span> in the last 24h.
-        </p>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/pipeline">
+            <Button variant="outline" className="border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.06]">
+              Open Pipeline
+            </Button>
+          </Link>
+          <Link href="/contacts">
+            <Button className="bg-orange-500 text-white hover:bg-orange-400">Open CRM</Button>
+          </Link>
+        </div>
       </div>
 
-      {/* Primary Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard
-          label="Cataloged Parcels"
-          value={metrics?.parcels?.toLocaleString() || "0"}
-          subValue="Franklin County Auditor"
-          icon={<Building2 className="w-4 h-4" />}
-          color="blue"
-        />
-        <StatCard
-          label="Active Distressed"
-          value={metrics?.opportunities?.toLocaleString() || "0"}
-          subValue="Priority Targets"
-          icon={<Target className="w-4 h-4" />}
-          color="orange"
-        />
-        <StatCard
-          label="Outreach Drafts"
-          value={metrics?.outreach?.toLocaleString() || "0"}
-          subValue="Awaiting Review"
-          icon={<Zap className="w-4 h-4" />}
-          color="pink"
-        />
-        <StatCard
-          label="Pipeline Events"
-          value={metrics?.events?.toLocaleString() || "0"}
-          subValue="Live Monitoring"
-          icon={<Activity className="w-4 h-4" />}
-          color="emerald"
-        />
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+        <SummaryCard label="Open Tasks" value={summary?.open_tasks ?? 0} icon={<Clock3 className="h-4 w-4" />} />
+        <SummaryCard label="Overdue" value={summary?.overdue_tasks ?? 0} icon={<AlertTriangle className="h-4 w-4" />} tone="danger" />
+        <SummaryCard label="Due Today" value={summary?.due_today ?? 0} icon={<CalendarClock className="h-4 w-4" />} tone="warn" />
+        <SummaryCard label="Active Deals" value={summary?.active_deals ?? 0} icon={<BriefcaseBusiness className="h-4 w-4" />} />
+        <SummaryCard label="Deals At Risk" value={summary?.deals_at_risk ?? 0} icon={<TrendingUp className="h-4 w-4" />} tone="warn" />
+        <SummaryCard label="Follow-Ups Due" value={summary?.follow_ups_due ?? 0} icon={<PhoneCall className="h-4 w-4" />} tone="danger" />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Priority Pipeline - THE WOW WIDGET */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between px-2">
-            <h2 className="text-sm font-bold text-white/50 uppercase tracking-widest flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-orange-400" />
-              High-Conviction Leads
-            </h2>
-            <Link href="/opportunities" className="text-xs text-orange-400 hover:text-orange-300 transition-colors flex items-center gap-1">
-              View All Pipeline <ChevronRight className="w-3 h-3" />
+      <Card className="mb-6 border-white/[0.08] bg-[#13161f] text-white">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <CardTitle className="text-white">Coach Alerts</CardTitle>
+            <CardDescription className="text-white/40">
+              Proactive signals from your actual pipeline, not generic market chatter.
+            </CardDescription>
+          </div>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-3">
+          {(payload?.coach_alerts || []).length === 0 ? (
+            <EmptyState text="No proactive coach alerts are surfaced yet." />
+          ) : (
+            payload?.coach_alerts.map((alert) => (
+              <Link
+                key={alert.id}
+                href={alert.href}
+                className="block rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 transition hover:border-orange-500/30 hover:bg-white/[0.05]"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-white">{alert.title}</p>
+                    <p className="mt-2 text-sm text-white/60">{alert.detail}</p>
+                  </div>
+                  <span className="rounded-full border border-orange-500/25 bg-orange-500/10 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-orange-300">
+                    {alert.tone}
+                  </span>
+                </div>
+                <p className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-orange-300">
+                  {alert.cta_label} <ArrowRight className="h-3 w-3" />
+                </p>
+              </Link>
+            ))
+          )}
+        </div>
+      </Card>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card className="border-white/[0.08] bg-[#13161f] text-white">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <CardTitle className="text-white">Overdue Tasks</CardTitle>
+              <CardDescription className="text-white/40">These are already late and need attention first.</CardDescription>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {(payload?.urgent_tasks || []).length === 0 ? (
+              <EmptyState text="No overdue tasks. This is the calmest part of your board right now." />
+            ) : (
+              payload?.urgent_tasks.map((task) => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  savingTaskId={savingTaskId}
+                  onComplete={completeTask}
+                />
+              ))
+            )}
+          </div>
+        </Card>
+
+        <Card className="border-white/[0.08] bg-[#13161f] text-white">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <CardTitle className="text-white">Due Today</CardTitle>
+              <CardDescription className="text-white/40">Work that should move before the day ends.</CardDescription>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {(payload?.due_today_tasks || []).length === 0 ? (
+              <EmptyState text="Nothing is due today. Add tasks from a deal or contact to keep this useful." />
+            ) : (
+              payload?.due_today_tasks.map((task) => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  savingTaskId={savingTaskId}
+                  onComplete={completeTask}
+                />
+              ))
+            )}
+          </div>
+        </Card>
+
+        <Card className="border-white/[0.08] bg-[#13161f] text-white">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <CardTitle className="text-white">Follow-Up Queue</CardTitle>
+              <CardDescription className="text-white/40">Who needs a call, text, or update now.</CardDescription>
+            </div>
+            <Link href="/contacts" className="text-xs text-orange-300 hover:text-orange-200">
+              Open CRM
             </Link>
           </div>
-
-          <div className="grid gap-3">
-            {loading ? (
-              [1, 2, 3].map(i => <div key={i} className="h-24 rounded-2xl border border-white/[0.06] bg-white/[0.02] animate-pulse" />)
+          <div className="space-y-3">
+            {(payload?.follow_ups || []).length === 0 ? (
+              <EmptyState text="No follow-ups are due yet. Contact next-step dates will surface here." />
             ) : (
-              priorityLeads.map(lead => (
-                <Link key={lead.id} href={`/properties/${lead.id}`} className="block group">
-                  <div className="rounded-2xl border border-white/[0.08] bg-[#13161f] p-4 group-hover:bg-white/[0.02] group-hover:border-orange-500/30 transition-all">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <p className="text-white text-base font-semibold">{lead.address}</p>
-                        <p className="text-white/30 text-xs mt-0.5">{lead.verdict}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                          lead.id.startsWith('cf3c') ? "bg-orange-500/15 text-orange-400 border-orange-500/25" :
-                          lead.id.startsWith('1111') ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/25" :
-                          "bg-blue-500/15 text-blue-400 border-blue-500/25"
-                        }`}>
-                          {lead.tag}
-                        </span>
-                        <div className="flex flex-col items-end">
-                           <p className="text-xs text-white/30 font-medium">ROI</p>
-                           <p className="text-sm font-bold text-white leading-none">{lead.roi}</p>
-                        </div>
-                      </div>
+              payload?.follow_ups.map((contact) => (
+                <Link
+                  key={contact.id}
+                  href={`/contacts/${contact.id}`}
+                  className="block rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 transition hover:border-orange-500/30 hover:bg-white/[0.05]"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-white">{contact.name}</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.18em] text-white/35">{stageLabel(contact.stage)}</p>
+                      <p className="mt-2 text-sm text-white/60">{contact.next_step_note || "No next-step note recorded."}</p>
                     </div>
-                    {/* Heat bar visualization */}
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-orange-600 to-orange-400"
-                          style={{ width: `${lead.distress * 100}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] font-bold text-white/40 uppercase tracking-tighter w-12 text-right">
-                        {(lead.distress * 100).toFixed(0)}% Heat
-                      </span>
+                    <div className="text-right">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-300">
+                        {contact.preferred_channel || "follow up"}
+                      </p>
+                      <p className="mt-2 text-xs text-white/50">{fmtDate(contact.next_step_due_at || contact.last_contact_at)}</p>
                     </div>
                   </div>
                 </Link>
               ))
             )}
           </div>
-        </div>
+        </Card>
 
-        {/* Intelligence Actions & Capabilities */}
-        <div className="space-y-4">
-          <h2 className="text-sm font-bold text-white/50 uppercase tracking-widest px-2">
-            Intelligence Hub
-          </h2>
-
-          <div className="grid gap-3">
-            <HubCard
-              href="/copilot"
-              title="Launch AI Copilot"
-              desc="Deep-dive into parcel histories, ownership traces, and market ROI analysis."
-              icon={<ShieldCheck className="w-5 h-5 text-indigo-400" />}
-            />
-            <HubCard
-              href="/outreach"
-              title="Generate Campaigns"
-              desc="Draft compliant outreach for distressed leads automatically."
-              icon={<Zap className="w-5 h-5 text-pink-400" />}
-            />
-            <HubCard
-              href="/properties"
-              title="Property Explorer"
-              desc="Geospatial search across Franklin County public records."
-              icon={<Map className="w-5 h-5 text-blue-400" />}
-            />
-            <HubCard
-              href="/setup"
-              title="Truth Layer Health"
-              desc="Audit system diagnostics & live ingestion feeds."
-              icon={<FileSearch className="w-5 h-5 text-amber-400" />}
-            />
-          </div>
-
-          {/* Activity Strip */}
-          <div className="rounded-2xl border border-white/[0.08] bg-[#13161f] p-5">
-            <p className="text-xs font-bold text-white/30 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <Clock className="w-3.5 h-3.5" /> Recent Intel
-            </p>
-            <div className="space-y-4">
-               <ActivityItem msg="New Permit: 145 N High St (Roofing)" time="2m ago" />
-               <ActivityItem msg="Heat Alert: 43215 Neighborhood heating up" time="15m ago" />
-               <ActivityItem msg="Audit Complete: F.C. Auditor Ingestion" time="1h ago" />
+        <Card className="border-white/[0.08] bg-[#13161f] text-white">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <CardTitle className="text-white">Deals At Risk</CardTitle>
+              <CardDescription className="text-white/40">Milestones coming up or unresolved overdue work.</CardDescription>
             </div>
+            <Link href="/pipeline" className="text-xs text-orange-300 hover:text-orange-200">
+              Open Pipeline
+            </Link>
           </div>
-        </div>
+          <div className="space-y-3">
+            {(payload?.deals_at_risk || []).length === 0 ? (
+              <EmptyState text="No deals are currently flagged at risk." />
+            ) : (
+              payload?.deals_at_risk.map((deal) => (
+                <Link
+                  key={deal.id}
+                  href={`/deals/${deal.id}`}
+                  className="block rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 transition hover:border-orange-500/30 hover:bg-white/[0.05]"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-white">{deal.title}</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.18em] text-white/35">{stageLabel(deal.stage)}</p>
+                      <p className="mt-2 text-sm text-white/60">{deal.contact_name || deal.parcel_address || "Deal needs context"}</p>
+                    </div>
+                    <div className="text-right text-xs text-white/45">
+                      <p>{deal.overdue_task_count} overdue task{deal.overdue_task_count === 1 ? "" : "s"}</p>
+                      <p className="mt-2">{fmtDate(deal.next_milestone_at)}</p>
+                    </div>
+                  </div>
+                </Link>
+              ))
+            )}
+          </div>
+        </Card>
       </div>
+
+      <div className="mt-6 grid gap-6 xl:grid-cols-2">
+        <Card className="border-white/[0.08] bg-[#13161f] text-white">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <CardTitle className="text-white">Re-Engage</CardTitle>
+              <CardDescription className="text-white/40">Contacts with 60+ days of silence who need a warm restart.</CardDescription>
+            </div>
+            <Link href="/contacts" className="text-xs text-orange-300 hover:text-orange-200">
+              Open CRM
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {(payload?.reengage || []).length === 0 ? (
+              <EmptyState text="No dormant sphere contacts are currently flagged." />
+            ) : (
+              payload?.reengage.map((contact) => (
+                <Link
+                  key={contact.id}
+                  href={`/contacts/${contact.id}`}
+                  className="block rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 transition hover:border-orange-500/30 hover:bg-white/[0.05]"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-white">{contact.name}</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.18em] text-white/35">{stageLabel(contact.stage)}</p>
+                      <p className="mt-2 text-sm text-white/60">{contact.detail}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-300">
+                        {contact.preferred_channel || "re-engage"}
+                      </p>
+                      <p className="mt-2 text-xs text-white/45">{fmtDate(contact.last_event_at)}</p>
+                    </div>
+                  </div>
+                </Link>
+              ))
+            )}
+          </div>
+        </Card>
+
+        <Card className="border-white/[0.08] bg-[#13161f] text-white">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <CardTitle className="text-white">Coming Up</CardTitle>
+              <CardDescription className="text-white/40">Birthdays and home anniversaries inside the next two weeks.</CardDescription>
+            </div>
+            <Link href="/contacts" className="text-xs text-orange-300 hover:text-orange-200">
+              Open CRM
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {(payload?.coming_up || []).length === 0 ? (
+              <EmptyState text="No birthdays or anniversaries are coming up yet." />
+            ) : (
+              payload?.coming_up.map((contact) => (
+                <Link
+                  key={`${contact.id}-${contact.occasion}-${contact.occasion_date}`}
+                  href={`/contacts/${contact.id}`}
+                  className="block rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 transition hover:border-orange-500/30 hover:bg-white/[0.05]"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-white">{contact.name}</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.18em] text-white/35">{occasionLabel(contact.occasion)}</p>
+                      <p className="mt-2 text-sm text-white/60">{contact.detail}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-300">
+                        {contact.preferred_channel || "check in"}
+                      </p>
+                      <p className="mt-2 text-xs text-white/45">{fmtDate(contact.occasion_date)}</p>
+                    </div>
+                  </div>
+                </Link>
+              ))
+            )}
+          </div>
+        </Card>
+      </div>
+
+      <Card className="mt-6 border-white/[0.08] bg-[#13161f] text-white">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <CardTitle className="text-white">Pipeline Snapshot</CardTitle>
+            <CardDescription className="text-white/40">Current board distribution across active stages.</CardDescription>
+          </div>
+          <Link href="/pipeline" className="inline-flex items-center gap-1 text-xs text-orange-300 hover:text-orange-200">
+            Open board <ArrowRight className="h-3 w-3" />
+          </Link>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+          {(payload?.pipeline || []).map((item) => (
+            <div key={item.stage} className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-white/35">{stageLabel(item.stage)}</p>
+              <p className="mt-2 text-2xl font-bold text-white">{item.count}</p>
+            </div>
+          ))}
+          {!loading && (payload?.pipeline || []).length === 0 ? <EmptyState text="No active deals yet." /> : null}
+        </div>
+      </Card>
     </SiteShell>
   );
 }
 
-function StatCard({ label, value, subValue, icon, color }: any) {
-  const colors: any = {
-    blue: "text-blue-400 bg-blue-500/10 border-blue-500/20",
-    orange: "text-orange-400 bg-orange-500/10 border-orange-500/20",
-    pink: "text-pink-400 bg-pink-500/10 border-pink-500/20",
-    emerald: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-  };
+function SummaryCard({
+  label,
+  value,
+  icon,
+  tone = "default",
+}: {
+  label: string;
+  value: number;
+  icon: ReactNode;
+  tone?: "default" | "warn" | "danger";
+}) {
+  const toneClass =
+    tone === "danger"
+      ? "border-red-500/20 bg-red-500/8 text-red-200"
+      : tone === "warn"
+        ? "border-amber-500/20 bg-amber-500/8 text-amber-100"
+        : "border-white/[0.08] bg-[#13161f] text-white";
+
   return (
-    <div className="rounded-2xl border border-white/[0.08] bg-[#13161f] p-5 flex flex-col justify-between hover:border-white/20 transition-all group">
-      <div className="flex items-center justify-between mb-4">
-        <div className={`p-2 rounded-xl border ${colors[color]}`}>
-          {icon}
-        </div>
-        <ArrowUpRight className="w-3.5 h-3.5 text-white/20 group-hover:text-white/40 transition-colors" />
+    <div className={`rounded-2xl border p-4 ${toneClass}`}>
+      <div className="flex items-center justify-between">
+        <p className="text-xs uppercase tracking-[0.18em] text-white/45">{label}</p>
+        <div className="text-white/60">{icon}</div>
       </div>
-      <div>
-        <p className="text-2xl font-bold text-white tracking-tight">{value}</p>
-        <p className="text-xs font-medium text-white/40 mt-1">{label}</p>
-        <div className="h-px bg-white/[0.05] my-2" />
-        <p className="text-[10px] text-white/25 truncate">{subValue}</p>
+      <p className="mt-3 text-3xl font-bold">{value}</p>
+    </div>
+  );
+}
+
+function TaskItem({
+  task,
+  savingTaskId,
+  onComplete,
+}: {
+  task: TaskRow;
+  savingTaskId: string | null;
+  onComplete: (taskId: string) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-white">{task.title}</p>
+          <p className="mt-1 text-sm text-white/55">{task.contact_name || task.deal_title || task.parcel_address || "General task"}</p>
+          <p className="mt-2 text-xs uppercase tracking-[0.18em] text-orange-300">{task.priority} priority</p>
+          <p className="mt-1 text-xs text-white/40">{fmtDate(task.due_at)}</p>
+        </div>
+        <Button
+          size="sm"
+          className="bg-emerald-500 text-white hover:bg-emerald-400"
+          disabled={savingTaskId === task.id}
+          onClick={() => onComplete(task.id)}
+        >
+          {savingTaskId === task.id ? "Saving..." : <><CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />Done</>}
+        </Button>
       </div>
     </div>
   );
 }
 
-function HubCard({ href, title, desc, icon }: any) {
+function EmptyState({ text }: { text: string }) {
   return (
-    <Link href={href} className="block group">
-      <div className="rounded-2xl border border-white/[0.08] bg-[#13161f] p-4 flex gap-4 items-center group-hover:bg-white/[0.02] group-hover:border-white/20 transition-all">
-        <div className="flex-shrink-0 p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] group-hover:scale-110 transition-transform">
-          {icon}
-        </div>
-        <div>
-          <h3 className="text-sm font-bold text-white group-hover:text-orange-400 transition-colors">{title}</h3>
-          <p className="text-xs text-white/30 mt-0.5 leading-relaxed">{desc}</p>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function ActivityItem({ msg, time }: any) {
-  return (
-    <div className="flex items-center justify-between gap-3 group">
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="w-1 h-1 rounded-full bg-orange-500/50 group-hover:scale-150 transition-transform" />
-        <p className="text-[11px] text-white/50 truncate pr-2 group-hover:text-white/70 transition-colors">{msg}</p>
-      </div>
-      <span className="text-[10px] text-white/20 font-mono flex-shrink-0">{time}</span>
+    <div className="rounded-2xl border border-dashed border-white/[0.08] p-5 text-sm text-white/35">
+      {text}
     </div>
   );
 }

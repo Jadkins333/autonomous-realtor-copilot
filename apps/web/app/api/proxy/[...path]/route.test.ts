@@ -135,7 +135,7 @@ describe("api proxy route", function () {
       method: "GET"
     });
 
-    await mod.GET(req, { params: { path: undefined } });
+    await mod.GET(req, { params: { path: undefined as unknown as string[] } });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe("http://api.internal/?x=1");

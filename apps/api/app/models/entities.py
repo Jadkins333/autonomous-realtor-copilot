@@ -9,6 +9,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -242,6 +243,19 @@ class Contact(Base):
     timezone: Mapped[str | None] = mapped_column(String(64))
     tags_json: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     notes: Mapped[str | None] = mapped_column(Text)
+    stage: Mapped[str] = mapped_column(String(64), nullable=False, default="sphere")
+    lead_source: Mapped[str | None] = mapped_column(String(128))
+    household_name: Mapped[str | None] = mapped_column(String(255))
+    birthday: Mapped[date | None] = mapped_column(Date)
+    home_anniversary: Mapped[date | None] = mapped_column(Date)
+    referral_source: Mapped[str | None] = mapped_column(String(255))
+    preferred_channel: Mapped[str | None] = mapped_column(String(32))
+    client_summary: Mapped[str | None] = mapped_column(Text)
+    assigned_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    last_contact_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_step_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_step_note: Mapped[str | None] = mapped_column(Text)
+    priority: Mapped[str] = mapped_column(String(32), nullable=False, default="normal")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
 
 
@@ -462,6 +476,69 @@ class OutreachSendAttempt(Base):
     error_text: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Deal(Base):
+    __tablename__ = "deals"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    deal_type: Mapped[str] = mapped_column(String(64), nullable=False, default="seller")
+    stage: Mapped[str] = mapped_column(String(64), nullable=False, default="new_lead")
+    priority: Mapped[str] = mapped_column(String(32), nullable=False, default="normal")
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="open")
+    contact_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("contacts.id"))
+    parcel_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("parcels.id"))
+    primary_agent_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    list_price: Mapped[int | None] = mapped_column(Integer)
+    target_price: Mapped[int | None] = mapped_column(Integer)
+    target_close_date: Mapped[date | None] = mapped_column(Date)
+    next_milestone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class Task(Base):
+    __tablename__ = "tasks"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="open")
+    priority: Mapped[str] = mapped_column(String(32), nullable=False, default="normal")
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    contact_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("contacts.id"))
+    parcel_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("parcels.id"))
+    deal_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("deals.id"))
+    assigned_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class ContactEvent(Base):
+    __tablename__ = "contact_events"
+    __table_args__ = (
+        Index("ix_contact_events_tenant_contact_created_at", "tenant_id", "contact_id", "created_at"),
+        Index("ix_contact_events_contact_created_at", "contact_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    contact_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("contacts.id", ondelete="CASCADE"), nullable=False
+    )
+    deal_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("deals.id", ondelete="SET NULL")
+    )
+    event_type: Mapped[str] = mapped_column(String(128), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
 
 
 class ActivityEvent(Base):

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
-  FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -117,18 +117,17 @@ export default function ContactsScreen() {
         </View>
       </View>
 
-      <FlatList
-        data={rows}
-        keyExtractor={(item) => item.id}
+      <ScrollView
         refreshControl={<RefreshControl tintColor="#f97316" refreshing={refreshing} onRefresh={load} />}
-        renderItem={({ item }) => (
-          <Pressable onPress={() => startEdit(item)} style={styles.row}>
+      >
+        {rows.map((item) => (
+          <Pressable key={item.id} onPress={() => startEdit(item)} style={styles.row}>
             <Text style={styles.name}>{item.name}</Text>
             <Text style={styles.meta}>{item.email || "No email"}</Text>
             <Text style={styles.meta}>{item.phone || "No phone"}</Text>
           </Pressable>
-        )}
-      />
+        ))}
+      </ScrollView>
     </View>
   );
 }

@@ -4,7 +4,7 @@ import asyncio
 import logging
 import os
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from geoalchemy2.shape import from_shape
 from shapely.geometry import MultiPolygon, Point, Polygon
@@ -15,6 +15,8 @@ from app.db.session import SessionLocal
 from app.models.entities import (
     ConsentEvent,
     Contact,
+    ContactEvent,
+    Deal,
     FloodZone,
     Message,
     MetricDefinition,
@@ -25,6 +27,7 @@ from app.models.entities import (
     Sequence,
     SequenceStep,
     Source,
+    Task,
     Tenant,
     TransitStop,
     User,
@@ -37,6 +40,7 @@ from app.models.enums import (
     SourceOrigin,
     UserRole,
 )
+from app.services.contact_events import log_contact_event
 from app.services.disclosures import ensure_disclosure_configuration
 from app.services.ingestion import run_ingestion
 from app.services.seed_loader import load_seed_json
@@ -188,6 +192,11 @@ def _ensure_contacts_and_consents(db, tenant_id):
             "timezone": "America/New_York",
             "tags_json": ["buyer", "north_columbus"],
             "notes": "Prefers SMS updates",
+            "stage": "active_buyer",
+            "lead_source": "sphere",
+            "preferred_channel": "sms",
+            "client_summary": "Repeat client looking to upsize before school enrollment.",
+            "priority": "high",
         },
         {
             "name": "Noah Patel",
@@ -196,6 +205,11 @@ def _ensure_contacts_and_consents(db, tenant_id):
             "timezone": "America/New_York",
             "tags_json": ["seller", "clintonville"],
             "notes": "Considering listing this spring",
+            "stage": "listing_prep",
+            "lead_source": "past_client",
+            "preferred_channel": "email",
+            "client_summary": "Long-time owner weighing prep budget and timing for a spring listing.",
+            "priority": "high",
         },
         {
             "name": "Mia Chen",
@@ -204,6 +218,11 @@ def _ensure_contacts_and_consents(db, tenant_id):
             "timezone": "America/New_York",
             "tags_json": ["investor"],
             "notes": "Interested in rehab opportunities",
+            "stage": "sphere",
+            "lead_source": "referral",
+            "preferred_channel": "email",
+            "client_summary": "Investor contact who wants quick rehab opportunities with clean follow-up.",
+            "priority": "normal",
         },
     ]
 
@@ -215,8 +234,31 @@ def _ensure_contacts_and_consents(db, tenant_id):
             contact = Contact(tenant_id=tenant_id, **payload)
             db.add(contact)
             db.flush()
-        elif not contact.timezone and payload.get("timezone"):
-            contact.timezone = payload["timezone"]
+        else:
+            for key, value in payload.items():
+                if getattr(contact, key, None) in (None, "", []) and value not in (None, "", []):
+                    setattr(contact, key, value)
+
+        if contact.email == "ava@example.com":
+            contact.stage = "active_buyer"
+            contact.priority = "high"
+            contact.birthday = date.today() + timedelta(days=7)
+            contact.last_contact_at = datetime.now(tz=UTC) - timedelta(days=2)
+            contact.next_step_due_at = datetime.now(tz=UTC) + timedelta(hours=6)
+            contact.next_step_note = "Send tour shortlist and lock Saturday showings."
+        elif contact.email == "noah@example.com":
+            contact.stage = "listing_prep"
+            contact.priority = "high"
+            contact.home_anniversary = date.today() + timedelta(days=10)
+            contact.last_contact_at = datetime.now(tz=UTC) - timedelta(days=4)
+            contact.next_step_due_at = datetime.now(tz=UTC) + timedelta(hours=20)
+            contact.next_step_note = "Review prep bids and draft listing launch timeline."
+        elif contact.email == "mia@example.com":
+            contact.stage = "sphere"
+            contact.priority = "normal"
+            contact.last_contact_at = datetime.now(tz=UTC) - timedelta(days=70)
+            contact.next_step_due_at = datetime.now(tz=UTC) - timedelta(hours=3)
+            contact.next_step_note = "Call with two off-market style public-record opportunities."
 
         has_sms_opt_in = db.execute(
             select(ConsentEvent).where(
@@ -268,6 +310,183 @@ def _ensure_contacts_and_consents(db, tenant_id):
                     user_agent="seed-script",
                 )
             )
+
+
+def _ensure_agent_workflow_seed(db, tenant_id, user_id):
+    contacts = list(
+        db.execute(select(Contact).where(Contact.tenant_id == tenant_id).order_by(Contact.created_at.asc())).scalars()
+    )
+    parcels = list(
+        db.execute(select(Parcel).where(Parcel.tenant_id == tenant_id).order_by(Parcel.updated_at.desc())).scalars()
+    )
+    if not contacts:
+        return
+
+    contact_by_email = {contact.email: contact for contact in contacts if contact.email}
+    parcel_by_address = {parcel.address: parcel for parcel in parcels}
+
+    deal_templates = [
+        {
+            "title": "Ava Thompson purchase - Upper Arlington move-up",
+            "deal_type": "buyer",
+            "stage": "active_buyer",
+            "priority": "high",
+            "contact": "ava@example.com",
+            "notes": "Need shortlist, lender refresh, and tour plan before the weekend.",
+            "next_milestone_at": datetime.now(tz=UTC) + timedelta(days=1),
+        },
+        {
+            "title": "Noah Patel listing launch - Clintonville",
+            "deal_type": "seller",
+            "stage": "listing_prep",
+            "priority": "high",
+            "contact": "noah@example.com",
+            "parcel_address": "3508 Indianola Ave",
+            "notes": "Prep bids, photo plan, and pricing conversation still outstanding.",
+            "next_milestone_at": datetime.now(tz=UTC) + timedelta(days=2),
+        },
+        {
+            "title": "145 N High St seller opportunity",
+            "deal_type": "seller",
+            "stage": "new_lead",
+            "priority": "medium",
+            "parcel_address": "145 N High St",
+            "notes": "Public-record trigger suggests potential outreach opportunity.",
+            "next_milestone_at": datetime.now(tz=UTC) + timedelta(days=3),
+        },
+    ]
+
+    deal_lookup = {}
+    for item in deal_templates:
+        deal = db.execute(
+            select(Deal).where(Deal.tenant_id == tenant_id, Deal.title == item["title"])
+        ).scalar_one_or_none()
+        if not deal:
+            deal = Deal(
+                tenant_id=tenant_id,
+                title=item["title"],
+                deal_type=item["deal_type"],
+                stage=item["stage"],
+                priority=item["priority"],
+                status="open",
+                contact_id=contact_by_email.get(item.get("contact")).id if item.get("contact") in contact_by_email else None,
+                parcel_id=parcel_by_address.get(item.get("parcel_address")).id if item.get("parcel_address") in parcel_by_address else None,
+                primary_agent_user_id=user_id,
+                notes=item["notes"],
+                next_milestone_at=item["next_milestone_at"],
+                updated_at=datetime.now(tz=UTC),
+            )
+            db.add(deal)
+            db.flush()
+        deal_lookup[item["title"]] = deal
+
+    task_templates = [
+        {
+            "title": "Confirm Ava's Saturday tour window",
+            "priority": "high",
+            "due_at": datetime.now(tz=UTC) + timedelta(hours=4),
+            "contact": "ava@example.com",
+            "deal_title": "Ava Thompson purchase - Upper Arlington move-up",
+        },
+        {
+            "title": "Review Noah's prep bids",
+            "priority": "high",
+            "due_at": datetime.now(tz=UTC) + timedelta(hours=22),
+            "contact": "noah@example.com",
+            "deal_title": "Noah Patel listing launch - Clintonville",
+        },
+        {
+            "title": "Draft seller pricing conversation",
+            "priority": "medium",
+            "due_at": datetime.now(tz=UTC) + timedelta(days=2),
+            "contact": "noah@example.com",
+            "deal_title": "Noah Patel listing launch - Clintonville",
+        },
+        {
+            "title": "Call owner at 145 N High St",
+            "priority": "high",
+            "due_at": datetime.now(tz=UTC) - timedelta(hours=2),
+            "deal_title": "145 N High St seller opportunity",
+            "parcel_address": "145 N High St",
+        },
+    ]
+
+    for item in task_templates:
+        exists = db.execute(
+            select(Task).where(Task.tenant_id == tenant_id, Task.title == item["title"])
+        ).scalar_one_or_none()
+        if exists:
+            continue
+        db.add(
+            Task(
+                tenant_id=tenant_id,
+                title=item["title"],
+                description=item.get("description"),
+                status="open",
+                priority=item["priority"],
+                due_at=item["due_at"],
+                contact_id=contact_by_email.get(item.get("contact")).id if item.get("contact") in contact_by_email else None,
+                parcel_id=parcel_by_address.get(item.get("parcel_address")).id if item.get("parcel_address") in parcel_by_address else None,
+                deal_id=deal_lookup[item["deal_title"]].id if item.get("deal_title") in deal_lookup else None,
+                assigned_user_id=user_id,
+                created_by_user_id=user_id,
+            )
+        )
+
+    timeline_seed = [
+        {
+            "contact_email": "ava@example.com",
+            "deal_title": "Ava Thompson purchase - Upper Arlington move-up",
+            "event_type": "call",
+            "body": "Call note: wants Saturday tour options narrowed to the top three homes.",
+            "created_at": datetime.now(tz=UTC) - timedelta(days=2, hours=1),
+        },
+        {
+            "contact_email": "ava@example.com",
+            "deal_title": "Ava Thompson purchase - Upper Arlington move-up",
+            "event_type": "task_complete",
+            "body": 'Completed task: "Refresh lender letter before weekend showings."',
+            "created_at": datetime.now(tz=UTC) - timedelta(days=1, hours=4),
+        },
+        {
+            "contact_email": "noah@example.com",
+            "deal_title": "Noah Patel listing launch - Clintonville",
+            "event_type": "outreach",
+            "body": "EMAIL outreach sent with prep checklist and staging notes.",
+            "created_at": datetime.now(tz=UTC) - timedelta(days=5),
+        },
+        {
+            "contact_email": "noah@example.com",
+            "deal_title": "Noah Patel listing launch - Clintonville",
+            "event_type": "deal_milestone",
+            "body": "Deal moved from sphere to listing prep.",
+            "created_at": datetime.now(tz=UTC) - timedelta(days=3),
+        },
+    ]
+    for item in timeline_seed:
+        contact = contact_by_email.get(item["contact_email"])
+        if contact is None:
+            continue
+        deal = deal_lookup.get(item["deal_title"])
+        exists = db.execute(
+            select(ContactEvent).where(
+                ContactEvent.tenant_id == tenant_id,
+                ContactEvent.contact_id == contact.id,
+                ContactEvent.body == item["body"],
+            )
+        ).scalar_one_or_none()
+        if exists:
+            continue
+        log_contact_event(
+            db,
+            tenant_id=tenant_id,
+            contact_id=contact.id,
+            deal_id=deal.id if deal else None,
+            event_type=item["event_type"],
+            body=item["body"],
+            created_at=item["created_at"],
+            touch_last_contact=item["event_type"] in {"call", "note", "outreach"},
+        )
 
 
 def _ensure_sequences(db, tenant_id):
@@ -366,6 +585,68 @@ def _ensure_demo_drafts(db, tenant_id):
             meta_json={"seeded": True, "created_at": datetime.now(tz=UTC).isoformat()},
         )
     )
+
+
+def _ensure_demo_thread_messages(db, tenant_id):
+    contact = db.execute(
+        select(Contact)
+        .where(Contact.tenant_id == tenant_id, Contact.email == "ava@example.com")
+        .order_by(Contact.created_at.asc())
+        .limit(1)
+    ).scalar_one_or_none()
+    if not contact:
+        return
+
+    seeded_messages = [
+        {
+            "direction": MessageDirection.outbound,
+            "status": MessageStatus.delivered,
+            "subject": "Saturday tour shortlist",
+            "body": (
+                "Hi Ava, I narrowed Saturday's options to three homes that match the school and commute goals. "
+                "If you want, I can text over the route and timing next."
+            ),
+            "created_at": datetime.now(tz=UTC) - timedelta(days=1, hours=2),
+            "sent_at": datetime.now(tz=UTC) - timedelta(days=1, hours=2),
+        },
+        {
+            "direction": MessageDirection.inbound,
+            "status": MessageStatus.delivered,
+            "subject": "Re: Saturday tour shortlist",
+            "body": (
+                "That works for me. Please include anything with a first-floor office and let's keep the drive under 20 minutes."
+            ),
+            "created_at": datetime.now(tz=UTC) - timedelta(days=1, hours=1, minutes=35),
+            "sent_at": datetime.now(tz=UTC) - timedelta(days=1, hours=1, minutes=35),
+        },
+    ]
+
+    for item in seeded_messages:
+        exists = db.execute(
+            select(Message).where(
+                Message.tenant_id == tenant_id,
+                Message.contact_id == contact.id,
+                Message.subject == item["subject"],
+                Message.direction == item["direction"],
+            )
+        ).scalar_one_or_none()
+        if exists:
+            continue
+
+        db.add(
+            Message(
+                tenant_id=tenant_id,
+                contact_id=contact.id,
+                channel=Channel.email,
+                direction=item["direction"],
+                status=item["status"],
+                subject=item["subject"],
+                body=item["body"],
+                created_at=item["created_at"],
+                sent_at=item["sent_at"],
+                meta_json={"seeded": True},
+            )
+        )
 
 
 def _ensure_seed_source(db) -> Source:
@@ -793,17 +1074,19 @@ def bootstrap_seed() -> None:
 
     db = SessionLocal()
     try:
-        tenant, _ = _ensure_tenant_and_user(db)
+        tenant, user = _ensure_tenant_and_user(db)
         _ensure_metric_definitions(db)
         _ensure_contacts_and_consents(db, tenant.id)
         _ensure_sequences(db, tenant.id)
         _seed_public_demo_data(db, tenant.id)
+        _ensure_agent_workflow_seed(db, tenant.id, user.id)
         db.commit()
 
         if not deterministic_only:
             asyncio.run(run_ingestion(db, tenant.id))
 
         _ensure_demo_drafts(db, tenant.id)
+        _ensure_demo_thread_messages(db, tenant.id)
         db.commit()
     finally:
         db.close()
@@ -811,6 +1094,3 @@ def bootstrap_seed() -> None:
 
 if __name__ == "__main__":
     bootstrap_seed()
-
-
-

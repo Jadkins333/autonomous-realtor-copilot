@@ -1,7 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "moduleResolution": "bundler",
     "noEmit": true,
+    "preserveSymlinks": true,
     "skipLibCheck": true
   },
   "include": [
@@ -11,10 +13,10 @@
     "components/**/*.tsx",
     "lib/**/*.ts",
     "lib/**/*.tsx",
+    ".expo/types/**/*.ts",
     "expo-env.d.ts"
   ],
   "exclude": [
-    "node_modules",
-    ".expo"
+    "node_modules"
   ]
 }

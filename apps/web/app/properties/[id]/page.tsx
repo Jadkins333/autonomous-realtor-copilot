@@ -1,545 +1,320 @@
 "use client";
 
-<<<<<<< HEAD
 import Link from "next/link";
-=======
-import React, { useEffect, useMemo, useState } from "react";
->>>>>>> origin/codex/phase2-sources-ui-tests
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import {
-  ArrowLeft,
-  MapPin,
-  Building2,
-  Activity,
-  Droplets,
-  Bus,
-  Clock,
-  ExternalLink,
-  Share2,
-  FileCheck2,
-  TrendingUp,
-  AlertTriangle,
-  Info,
-  ShieldCheck,
-  ChevronRight,
-  Zap,
-} from "lucide-react";
+import { ArrowLeft, BriefcaseBusiness, MapPin, ShieldCheck } from "lucide-react";
 
+import { PropertyMap } from "@/components/property-map";
+import { ProvenanceDrawer } from "@/components/provenance-drawer";
 import { useRequireAuth } from "@/components/auth-guard";
 import { SiteShell } from "@/components/site-shell";
+import { Button } from "@/components/ui/button";
+import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { apiFetch } from "@/lib/api";
 
-<<<<<<< HEAD
-type PropertyDetail = {
-  id: string;
-  address: string;
-  parcel_number: string;
-  city: string;
-  state: string;
-  zip: string;
-  updated_at: string;
-  source_origin: string;
-  freshness: {
-    fetched_at: string;
-    is_stale: boolean;
-    staleness: string;
-  };
-  permits_summary: {
-    last_12_months_count: number;
-    top_types: Record<string, number>;
-  };
-  flood_zone: {
-    intersects: boolean;
-    zone_code: string | null;
-  };
-  nearby_pois: Array<{
-    category: string;
-    name: string;
-    distance_meters: number;
-  }>;
-  transit_proximity: {
-    nearest_stop: string | null;
-    distance_meters: number | null;
-    score_0_100: number;
-  };
-  timeline: Array<{
-    event_type: string;
-    occurred_at: string;
-    title: string;
-    details: any;
-  }>;
-  insights: {
-    renovation_roi?: {
-      value: {
-        roi_band: string;
-        guidance: string;
-      };
-    };
-    insurance_pressure?: {
-      value: {
-        pressure_level: string;
-        note: string;
-      };
-    };
-    intelligence_verdict: string;
-    truth_layer: {
-      ingestion_sources: Array<{
-        name: string;
-        status: string;
-        last_sync: string | null;
-      }>;
-      logic_proof: string;
-    };
-  };
-  attributes_json: Record<string, any>;
-=======
 type NearbyPoi = {
   name: string;
   category: string;
   distance_meters: number;
 };
 
-type InsightValue = {
-  roi_band?: string;
-  guidance?: string;
-  pressure_level?: string;
-  note?: string;
+type TimelineEvent = {
+  event_type: string;
+  occurred_at: string;
+  title: string;
 };
 
 type Insight = {
-  value?: InsightValue;
+  value?: {
+    roi_band?: string;
+    guidance?: string;
+    pressure_level?: string;
+    note?: string;
+  };
   formula_markdown?: string;
   inputs?: Record<string, unknown>;
   provenance?: Record<string, unknown>;
 };
 
 type ParcelDetail = {
-  address?: string;
-  parcel_number?: string;
-  city?: string;
-  state?: string;
-  zip?: string;
-  attributes_json?: { coordinates?: unknown[] };
-  timeline?: TimelineEvent[];
-  nearby_pois?: NearbyPoi[];
+  id: string;
+  address: string;
+  parcel_number: string;
+  city: string;
+  state: string;
+  zip: string;
+  attributes_json?: Record<string, unknown> | null;
   permits_summary?: { last_12_months_count?: number };
-  flood_zone?: { intersects?: boolean; zone_code?: string };
+  flood_zone?: { intersects?: boolean; zone_code?: string | null };
   transit_proximity?: { score_0_100?: number };
+  nearby_pois?: NearbyPoi[];
+  timeline?: TimelineEvent[];
   insights?: {
     renovation_roi?: Insight;
     insurance_pressure?: Insight;
   };
+  provenance?: {
+    formula_markdown?: string;
+    inputs?: Record<string, unknown>;
+    freshness?: Record<string, unknown>;
+    metric_provenance?: Record<string, unknown>;
+  };
 };
 
-type TimelineEvent = {
-  event_type: string;
-  occurred_at: string;
-  title: string;
-  details: Record<string, unknown>;
->>>>>>> origin/codex/phase2-sources-ui-tests
+type NegotiationPayload = {
+  status: string;
+  motivation_score?: number | null;
+  missing_inputs?: string[];
+  freshness?: { staleness?: string };
+  signals_used?: Array<{ signal: string; raw_value: unknown; rule_hits: string[] }>;
+  formula_markdown?: string;
+  inputs?: Record<string, unknown>;
+  provenance?: Record<string, unknown>;
 };
+
+type CapturePayload = {
+  deal_id: string;
+  task_id: string;
+  deal_title: string;
+  task_title: string;
+};
+
+function fmtDate(value?: string | null) {
+  if (!value) return "Unknown";
+  return new Date(value).toLocaleDateString();
+}
 
 export default function PropertyDetailPage() {
   const { status } = useRequireAuth();
   const { data: session } = useSession();
-<<<<<<< HEAD
-  const { id } = useParams();
-  const [prop, setProp] = useState<PropertyDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [showTruth, setShowTruth] = useState(false);
-
-  useEffect(() => {
-    if (!session || !id) return;
-    setLoading(true);
-    apiFetch<PropertyDetail>(`/parcels/${id}`, (session as any).apiToken)
-      .then(setProp)
-      .catch(() => setProp(null))
-      .finally(() => setLoading(false));
-  }, [session, id]);
-=======
+  const params = useParams<{ id: string }>();
   const [data, setData] = useState<ParcelDetail | null>(null);
+  const [negotiation, setNegotiation] = useState<NegotiationPayload | null>(null);
+  const [captureResult, setCaptureResult] = useState<CapturePayload | null>(null);
+  const [capturePending, setCapturePending] = useState(false);
 
   useEffect(() => {
-    if (!session || !params.id) return;
-    apiFetch<ParcelDetail>(`/parcels/${params.id}`, session?.apiToken)
-      .then(setData)
-      .catch(() => setData(null));
-  }, [session, params.id]);
->>>>>>> origin/codex/phase2-sources-ui-tests
+    if (!session?.apiToken || !params.id) return;
+    Promise.all([
+      apiFetch<ParcelDetail>(`/parcels/${params.id}`, session.apiToken),
+      apiFetch<NegotiationPayload>(`/parcels/${params.id}/negotiation`, session.apiToken).catch(() => null),
+    ]).then(([parcel, negotiationPayload]) => {
+      setData(parcel);
+      setNegotiation(negotiationPayload);
+    });
+  }, [params.id, session?.apiToken]);
+
+  async function captureProperty() {
+    if (!session?.apiToken || !params.id) return;
+    setCapturePending(true);
+    try {
+      const result = await apiFetch<CapturePayload>(
+        `/workspace/capture/opportunity/${params.id}`,
+        session.apiToken,
+        { method: "POST" },
+      );
+      setCaptureResult(result);
+    } finally {
+      setCapturePending(false);
+    }
+  }
+
+  const coordinates = useMemo(() => {
+    const raw = data?.attributes_json?.coordinates;
+    if (Array.isArray(raw) && raw.length >= 2) {
+      const [lon, lat] = raw.map(Number);
+      if (Number.isFinite(lon) && Number.isFinite(lat)) {
+        return { lon, lat };
+      }
+    }
+    return { lon: -82.9988, lat: 39.9612 };
+  }, [data?.attributes_json]);
 
   if (status !== "authenticated") return null;
 
   return (
     <SiteShell>
-<<<<<<< HEAD
-      {/* Back button & Actions */}
-      <div className="flex items-center justify-between mb-6">
-        <Link
-          href="/properties"
-          className="inline-flex items-center gap-2 text-xs font-semibold text-white/40 hover:text-white/70 transition-colors uppercase tracking-widest"
-        >
-          <ArrowLeft className="w-4 h-4" /> Properties
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <Link href="/properties" className="inline-flex items-center gap-2 text-sm text-white/50 hover:text-white">
+          <ArrowLeft className="h-4 w-4" /> Back to properties
         </Link>
-        <div className="flex gap-2">
-          <ActionIcon icon={<Share2 className="w-4 h-4" />} />
-          <ActionIcon icon={<ExternalLink className="w-4 h-4" />} />
+        <div className="flex flex-wrap gap-2">
+          <Button
+            className="bg-orange-500 text-white hover:bg-orange-400"
+            disabled={capturePending}
+            onClick={captureProperty}
+          >
+            <BriefcaseBusiness className="mr-2 h-4 w-4" />
+            {capturePending ? "Capturing..." : "Capture Seller Lead"}
+          </Button>
+          {captureResult ? (
+            <Link href={`/deals/${captureResult.deal_id}`}>
+              <Button variant="outline" className="border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.06]">
+                Open Deal
+              </Button>
+            </Link>
+          ) : null}
         </div>
       </div>
 
-      {!loading && prop ? (
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400 border border-orange-500/25 uppercase tracking-wider">
-                  Parcel #{prop.parcel_number}
-                </span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
-                  prop.freshness?.staleness === "fresh"
-                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                    : "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                }`}>
-                  <Activity className="w-2.5 h-2.5" /> {prop.freshness?.staleness.toUpperCase()} AUDITED
-                </span>
-              </div>
-              <h1 className="text-4xl font-bold text-white tracking-tight" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-                {prop.address}
-              </h1>
-              <div className="flex items-center gap-3 text-white/40 text-sm mt-3">
-                <div className="flex items-center gap-1.5 border-r border-white/10 pr-3">
-                  <span className="font-semibold text-white/60">Owner:</span> {prop.attributes_json?.owner || "N/A"}
-                </div>
-                <div className="flex items-center gap-1.5 border-r border-white/10 pr-3">
-                  <span className="font-semibold text-white/60">Use:</span> {prop.attributes_json?.land_use || "N/A"}
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-semibold text-white/60">Built:</span> {prop.attributes_json?.year_built || "N/A"}
-                </div>
-              </div>
+      <Card className="mb-6 border-white/[0.08] bg-[#13161f] text-white" data-testid="property-detail-header">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <CardTitle className="text-3xl text-white">{data?.address || "Property detail"}</CardTitle>
+            <CardDescription className="mt-2 text-white/45">
+              Parcel {data?.parcel_number} · {data?.city}, {data?.state} {data?.zip}
+            </CardDescription>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs uppercase tracking-[0.18em] text-white/45">
+              <span>{String(data?.attributes_json?.property_type || "property").replace(/_/g, " ")}</span>
+              <span>{data?.attributes_json?.year_built ? `Built ${String(data.attributes_json.year_built)}` : "Year unknown"}</span>
+              <span>{data?.attributes_json?.beds ? `${String(data.attributes_json.beds)} bd` : "Beds unknown"}</span>
+              <span>{data?.attributes_json?.baths ? `${String(data.attributes_json.baths)} ba` : "Baths unknown"}</span>
+              <span>{data?.attributes_json?.sqft ? `${String(data.attributes_json.sqft)} sqft` : "Sqft unknown"}</span>
             </div>
-            <div className="flex flex-col items-end">
-              <p className="text-xs text-white/30 font-bold uppercase tracking-widest leading-none mb-1">Estimated Value</p>
-              <p className="text-3xl font-bold text-white tracking-tight leading-none">
-                ${(prop.attributes_json?.total_value || 0).toLocaleString()}
-=======
-      <Card className="mb-4" data-testid="property-detail-header">
-        <CardTitle>{data?.address || "Property Detail"}</CardTitle>
-        <CardDescription>
-          Parcel {data?.parcel_number} • {data?.city}, {data?.state} {data?.zip}
-        </CardDescription>
-        <div className="mt-4 grid gap-2 md:grid-cols-4">
-          <Badge data-testid="permits-badge">
-            Permits 12M: {data?.permits_summary?.last_12_months_count ?? "-"}
-          </Badge>
-          <Badge data-testid="flood-intersects-badge">
-            Flood Intersects: {String(data?.flood_zone?.intersects ?? false)}
-          </Badge>
-          <Badge data-testid="flood-zone-badge">
-            Flood Zone: {data?.flood_zone?.zone_code ?? "Unknown"}
-          </Badge>
-          <Badge data-testid="transit-badge">
-            Transit Score: {Math.round(Number(data?.transit_proximity?.score_0_100 ?? 0))}
-          </Badge>
+          </div>
+          <div className="flex flex-wrap gap-3 text-sm">
+            <Badge label={`Permits 12M: ${data?.permits_summary?.last_12_months_count ?? "-"}`} testId="permits-badge" />
+            <Badge label={`Flood: ${String(data?.flood_zone?.intersects ?? false)}`} testId="flood-intersects-badge" />
+            <Badge label={`Zone: ${data?.flood_zone?.zone_code ?? "Unknown"}`} testId="flood-zone-badge" />
+            <Badge label={`Transit: ${Math.round(Number(data?.transit_proximity?.score_0_100 ?? 0))}`} testId="transit-badge" />
+          </div>
         </div>
+        {captureResult ? (
+          <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-100">
+            Captured into pipeline as <span className="font-semibold">{captureResult.deal_title}</span>. First task: {captureResult.task_title}.
+          </div>
+        ) : null}
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card data-testid="map-card">
-          <CardTitle className="mb-3">Map</CardTitle>
-          <PropertyMap lat={lonLat.lat} lon={lonLat.lon} />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="border-white/[0.08] bg-[#13161f] text-white" data-testid="map-card">
+          <CardTitle className="mb-4 text-white">Map</CardTitle>
+          <PropertyMap lat={coordinates.lat} lon={coordinates.lon} />
+          <p className="mt-3 flex items-center gap-2 text-sm text-white/45">
+            <MapPin className="h-4 w-4" />
+            Last sale: {fmtDate(String(data?.attributes_json?.last_sale_date || ""))}
+          </p>
         </Card>
 
-        <Card data-testid="pois-card">
-          <CardTitle className="mb-3">Nearby POIs</CardTitle>
-          <ul className="space-y-2 text-sm" data-testid="pois-list">
-            {(data?.nearby_pois || []).map((poi) => (
-              <li key={`${poi.name}-${poi.distance_meters}`} data-testid={`poi-item-${poi.name}`}>
-                {poi.category}: {poi.name} ({poi.distance_meters} m)
-              </li>
+        <Card className="border-white/[0.08] bg-[#13161f] text-white">
+          <CardTitle className="mb-4 text-white">Negotiation / Seller Motivation</CardTitle>
+          <p className="text-5xl font-bold text-orange-300">
+            {negotiation?.motivation_score ?? "--"}
+          </p>
+          <p className="mt-2 text-sm text-white/50">
+            {negotiation?.status === "insufficient_data"
+              ? `Partial view. Missing: ${(negotiation?.missing_inputs || []).join(", ")}`
+              : "Rule-based signal using sale recency, violations, and permit activity."}
+          </p>
+          <div className="mt-4 space-y-2">
+            {(negotiation?.signals_used || []).map((signal) => (
+              <div key={signal.signal} className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 text-sm">
+                <p className="font-medium text-white">{signal.signal.replace(/_/g, " ")}</p>
+                <p className="mt-1 text-white/45">Raw value: {String(signal.raw_value ?? "unknown")}</p>
+                {signal.rule_hits.length ? (
+                  <p className="mt-1 text-xs text-orange-300">{signal.rule_hits.join(" · ")}</p>
+                ) : null}
+              </div>
             ))}
-            {!(data?.nearby_pois || []).length ? (
-              <li className="text-muted-foreground" data-testid="pois-empty">
-                No nearby POIs available for this parcel.
-              </li>
-            ) : null}
-          </ul>
+          </div>
         </Card>
-      </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Card data-testid="insights-card">
-          <CardTitle className="mb-3">Insight Cards</CardTitle>
-          <div className="space-y-3 text-sm">
-            <div
-              className="rounded-xl border border-border p-3"
-              data-testid="insight-roi-card"
-            >
-              <p className="font-medium">Renovation ROI</p>
-              <p className="text-muted-foreground">
-                Band: {data?.insights?.renovation_roi?.value?.roi_band || "-"}
-              </p>
-              <p className="text-muted-foreground">
-                {data?.insights?.renovation_roi?.value?.guidance || "No guidance available."}
-              </p>
-            </div>
-            <div
-              className="rounded-xl border border-border p-3"
-              data-testid="insight-insurance-card"
-            >
-              <p className="font-medium">Insurance Pressure</p>
-              <p className="text-muted-foreground">
-                Level: {data?.insights?.insurance_pressure?.value?.pressure_level || "-"}
-              </p>
-              <p className="text-muted-foreground">
-                {data?.insights?.insurance_pressure?.value?.note || "No note available."}
->>>>>>> origin/codex/phase2-sources-ui-tests
-              </p>
-            </div>
-          </div>
-
-          {/* INTELLIGENCE VERDICT - THE WOW BAR */}
-          <div className="rounded-2xl border border-orange-500/30 bg-orange-500/5 overflow-hidden shadow-[0_0_20px_rgba(249,115,22,0.1)]">
-             <div className="bg-orange-500/10 px-6 py-4 border-b border-orange-500/20 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                   <Zap className="w-5 h-5 text-orange-400 fill-orange-400/20" />
-                   <h2 className="text-sm font-bold text-orange-400 uppercase tracking-widest">Autonomous Intelligence Verdict</h2>
-                </div>
-                <button
-                   onClick={() => setShowTruth(!showTruth)}
-                   className={cn(
-                     "text-[10px] font-bold transition-all flex items-center gap-1.5 px-3 py-1 rounded-full border",
-                     showTruth 
-                       ? "bg-indigo-500/20 text-indigo-400 border-indigo-500/30" 
-                       : "text-white/30 hover:text-white/60 border-white/[0.08]"
-                   )}
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" /> THE TRUTH LAYER
-                </button>
-             </div>
-             <div className="p-6">
-                <p className="text-lg text-white font-medium leading-relaxed italic">
-                  &ldquo;{prop.insights?.intelligence_verdict || "No intelligence verdict available for this parcel."}&rdquo;
-                </p>
-             </div>
-          </div>
-
-          {/* Truth Layer Modal (Dynamic) */}
-          {showTruth && (
-            <div className="rounded-2xl border border-indigo-500/30 bg-indigo-500/5 p-6 space-y-4 animate-in fade-in slide-in-from-top-4 shadow-[0_0_30px_rgba(99,102,241,0.1)]">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <FileCheck2 className="w-4 h-4 text-indigo-400" />
-                  <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-widest">Formula Provenance (Truth Layer)</h3>
-                </div>
-                <div className="text-[10px] font-mono text-indigo-400/60 uppercase">Deterministic · Verified</div>
-              </div>
-              <div className="grid md:grid-cols-2 gap-4">
-                 <div className="space-y-2">
-                    <p className="text-xs text-white/50 font-bold uppercase tracking-widest flex items-center gap-2">
-                      <Database className="w-3 h-3" /> Ingestion Sources
-                    </p>
-                    <ul className="space-y-2">
-                       {prop.insights?.truth_layer?.ingestion_sources?.map((source, i) => (
-                         <li key={i} className="flex items-center justify-between text-[11px] bg-white/[0.03] p-2.5 rounded-lg border border-white/[0.06]">
-                            <span className="text-white/70">{source.name}</span>
-                            <div className="flex flex-col items-end">
-                              <span className="text-emerald-400 font-bold">{source.status}</span>
-                              {source.last_sync && (
-                                <span className="text-[9px] text-white/20 mt-0.5">
-                                  {new Date(source.last_sync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                              )}
-                            </div>
-                         </li>
-                       ))}
-                    </ul>
-                 </div>
-                 <div className="space-y-2">
-                    <p className="text-xs text-white/50 font-bold uppercase tracking-widest flex items-center gap-2">
-                       <Cpu className="w-3 h-3" /> Logic Proof
-                    </p>
-                    <div className="font-mono text-[10px] text-white/40 bg-black/40 p-3 rounded-lg border border-white/[0.06] h-[74px] overflow-auto leading-relaxed">
-                       {prop.insights?.truth_layer?.logic_proof || "No logic proof provided."}
-                    </div>
-                 </div>
-              </div>
-            </div>
+        <Card className="border-white/[0.08] bg-[#13161f] text-white" data-testid="pois-card">
+          <CardTitle className="mb-4 text-white">Nearby Places</CardTitle>
+          {(data?.nearby_pois || []).length ? (
+            <ul className="space-y-2 text-sm" data-testid="pois-list">
+              {data?.nearby_pois?.map((poi) => (
+                <li key={`${poi.name}-${poi.distance_meters}`} data-testid={`poi-item-${poi.name}`}>
+                  {poi.category}: {poi.name} ({poi.distance_meters} m)
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-white/35" data-testid="pois-empty">No nearby place records surfaced for this parcel.</p>
           )}
-
-          {/* Quick Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatBox
-              label="Active Permits"
-              value={prop.permits_summary?.last_12_months_count || 0}
-              icon={<Building2 className="w-4 h-4" />}
-              sub="Last 12 Mos"
-            />
-            <StatBox
-              label="Flood Risk"
-              value={prop.flood_zone?.zone_code || "X"}
-              icon={<Droplets className="w-4 h-4" />}
-              sub={prop.flood_zone?.intersects ? "Intersects Zone" : "Safe Zone"}
-              trend={prop.flood_zone?.intersects ? "down" : "up"}
-            />
-            <StatBox
-              label="Transit Score"
-              value={Math.round(prop.transit_proximity?.score_0_100 || 0)}
-              icon={<Bus className="w-4 h-4" />}
-              sub="GTFS Verified"
-            />
-            <StatBox
-              label="Data Freshness"
-              value={prop.freshness?.staleness === "fresh" ? "HIGH" : "SYNC"}
-              icon={<ShieldCheck className="w-4 h-4" />}
-              sub={prop.freshness?.staleness.toUpperCase()}
-            />
-          </div>
-
-<<<<<<< HEAD
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Left Col: Map & POI */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Map Placeholder */}
-              <div className="aspect-video w-full rounded-2xl bg-black/20 border border-white/[0.08] relative overflow-hidden group">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <MapPin className="w-8 h-8 text-orange-500/50 group-hover:scale-110 transition-transform" />
-                  <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest absolute bottom-4">Interactive Parcel View</p>
-                </div>
-                {/* Visual grid overlay for map aesthetic */}
-                <div className="absolute inset-0 pointer-events-none opacity-[0.03]" style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
-              </div>
-
-              {/* Nearby POI */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {prop.nearby_pois?.map((poi, idx) => (
-                  <div key={idx} className="rounded-xl border border-white/[0.06] bg-[#13161f] p-3 flex items-center justify-between">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] text-white/30 uppercase tracking-widest truncate">{poi.category}</p>
-                      <p className="text-xs font-bold text-white truncate">{poi.name}</p>
-                    </div>
-                    <p className="text-[10px] font-mono text-white/40 whitespace-nowrap ml-2">{poi.distance_meters}m</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Right Col: Insights & Timeline */}
-            <div className="space-y-6">
-              {/* Insights */}
-              <div className="space-y-3">
-                <p className="text-xs font-bold text-white/30 uppercase tracking-widest flex items-center gap-2">
-                  <TrendingUp className="w-3.5 h-3.5" /> Intelligence Findings
-                </p>
-                
-                {prop.insights?.renovation_roi && (
-                  <div className="rounded-2xl border border-white/[0.08] bg-[#13161f] p-4 group hover:border-white/20 transition-all">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border-emerald-500/30`}>
-                        ROI POTENTIAL
-                      </span>
-                      <ChevronRight className="w-3 h-3 text-white/20 group-hover:text-white/50 transition-colors" />
-                    </div>
-                    <h4 className="text-sm font-bold text-white mb-1">Renovation Yield: {prop.insights.renovation_roi.value.roi_band.toUpperCase()}</h4>
-                    <p className="text-xs text-white/40 leading-relaxed">{prop.insights.renovation_roi.value.guidance}</p>
-                  </div>
-                )}
-
-                {prop.insights?.insurance_pressure && (
-                  <div className="rounded-2xl border border-white/[0.08] bg-[#13161f] p-4 group hover:border-white/20 transition-all">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider ${
-                        prop.insights.insurance_pressure.value.pressure_level === "elevated" ? "bg-orange-500/20 text-orange-400 border-orange-500/30" : "bg-blue-500/20 text-blue-400 border-blue-500/30"
-                      }`}>
-                        INSURANCE RISK
-                      </span>
-                    </div>
-                    <h4 className="text-sm font-bold text-white mb-1">Pressure Level: {prop.insights.insurance_pressure.value.pressure_level.toUpperCase()}</h4>
-                    <p className="text-xs text-white/40 leading-relaxed">{prop.insights.insurance_pressure.value.note}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Timeline */}
-              <div className="space-y-3">
-                <p className="text-xs font-bold text-white/30 uppercase tracking-widest flex items-center gap-2">
-                  <Clock className="w-3.5 h-3.5" /> Possession & Event Chain
-                </p>
-                <div className="relative pl-4 space-y-6 before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-px before:bg-white/[0.08]">
-                  {prop.timeline?.map((t, idx) => (
-                    <div key={idx} className="relative">
-                      <div className="absolute -left-5 w-2 h-2 rounded-full bg-white/[0.15] border-3 border-[#0f1117] z-10" />
-                      <div>
-                        <p className="text-[10px] font-mono text-white/20 tracking-tighter mb-1">
-                          {new Date(t.occurred_at).toLocaleDateString()}
-                        </p>
-                        <p className="text-xs font-bold text-white/70">{t.title}</p>
-                        <p className="text-[11px] text-white/40 mt-0.5 truncate">{t.event_type.toUpperCase()}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <Building2 className="w-12 h-12 text-white/10 mb-4" />
-          <h2 className="text-white font-bold">Property Not Found</h2>
-          <p className="text-white/30 text-sm mt-1">We couldn&apos;t retrieve intelligence records for this parcel.</p>
-        </div>
-      )}
-=======
-        <Card data-testid="timeline-card">
-          <CardTitle className="mb-3">Timeline</CardTitle>
-          <ul className="space-y-2 text-sm" data-testid="timeline-list">
-            {timeline.map((event) => (
-              <li
-                className="rounded-xl border border-border p-3"
-                key={`${event.event_type}-${event.occurred_at}-${event.title}`}
-                data-testid={`timeline-event-${event.event_type}`}
-              >
-                <p className="font-medium">{event.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(event.occurred_at).toLocaleString()}
-                </p>
-              </li>
-            ))}
-            {!timeline.length ? (
-              <li className="text-muted-foreground" data-testid="timeline-empty">
-                No timeline events available yet.
-              </li>
-            ) : null}
-          </ul>
         </Card>
+
+        <Card className="border-white/[0.08] bg-[#13161f] text-white">
+          <CardTitle className="mb-4 text-white">Truth Layer</CardTitle>
+          <p className="mb-3 text-sm text-white/45">
+            This screen keeps provenance visible, but it now connects directly into deal capture instead of stopping at the analysis.
+          </p>
+          <ProvenanceDrawer
+            formula={negotiation?.formula_markdown || data?.insights?.renovation_roi?.formula_markdown || "No formula available"}
+            inputs={negotiation?.inputs || data?.insights?.renovation_roi?.inputs || {}}
+            provenance={{
+              metric_provenance: negotiation?.provenance || data?.insights?.renovation_roi?.provenance || {},
+              trace: { freshness: negotiation?.freshness || {} },
+            }}
+          />
+        </Card>
+
+        <InsightCard
+          id="insight-roi-card"
+          title="Renovation ROI"
+          summary={data?.insights?.renovation_roi?.value?.roi_band || "Unknown"}
+          detail={data?.insights?.renovation_roi?.value?.guidance || "No ROI guidance available."}
+        />
+        <InsightCard
+          id="insight-insurance-card"
+          title="Insurance Pressure"
+          summary={data?.insights?.insurance_pressure?.value?.pressure_level || "Unknown"}
+          detail={data?.insights?.insurance_pressure?.value?.note || "No insurance note available."}
+        />
       </div>
->>>>>>> origin/codex/phase2-sources-ui-tests
+
+      <Card className="mt-6 border-white/[0.08] bg-[#13161f] text-white">
+        <CardTitle className="mb-4 text-white">Timeline</CardTitle>
+        {(data?.timeline || []).length ? (
+          <div className="space-y-3">
+            {data?.timeline?.map((item) => (
+              <div key={`${item.event_type}-${item.occurred_at}`} className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4" data-testid={`timeline-event-${item.event_type}`}>
+                <p className="font-medium text-white">{item.title}</p>
+                <p className="mt-1 text-sm text-white/45">{fmtDate(item.occurred_at)}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-white/35" data-testid="timeline-empty">No timeline events available for this parcel.</p>
+        )}
+      </Card>
     </SiteShell>
   );
 }
 
-function StatBox({ label, value, icon, sub, trend }: any) {
+function Badge({ label, testId }: { label: string; testId: string }) {
   return (
-    <div className="rounded-2xl border border-white/[0.08] bg-[#13161f] p-5 flex items-start gap-4">
-      <div className="p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-white/30 flex-shrink-0">
-        {icon}
-      </div>
-      <div>
-        <p className="text-xs text-white/30 font-bold uppercase tracking-widest leading-none mb-2">{label}</p>
-        <p className={`text-xl font-bold tracking-tight leading-none ${trend === 'down' ? 'text-orange-400' : 'text-white'}`}>{value}</p>
-        <p className="text-[10px] text-white/20 font-medium mt-1 uppercase tracking-tighter truncate">{sub}</p>
-      </div>
-    </div>
+    <span
+      className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-xs font-medium text-white/80"
+      data-testid={testId}
+    >
+      {label}
+    </span>
   );
 }
 
-function ActionIcon({ icon }: any) {
+function InsightCard({
+  id,
+  title,
+  summary,
+  detail,
+}: {
+  id: string;
+  title: string;
+  summary: string;
+  detail: string;
+}) {
   return (
-    <button className="p-2.5 rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/40 hover:text-white/70 hover:bg-white/10 transition-all">
-      {icon}
-    </button>
+    <Card className="border-white/[0.08] bg-[#13161f] text-white" data-testid={id}>
+      <CardTitle className="text-white">{title}</CardTitle>
+      <p className="mt-3 text-3xl font-bold text-orange-300">{summary}</p>
+      <p className="mt-2 text-sm text-white/50">{detail}</p>
+      <p className="mt-4 inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-white/35">
+        <ShieldCheck className="h-3.5 w-3.5" />
+        Surface this in the client conversation, not just the analysis.
+      </p>
+    </Card>
   );
 }

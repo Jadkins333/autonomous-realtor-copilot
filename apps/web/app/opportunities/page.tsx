@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { Zap, TrendingUp, AlertTriangle, ArrowRight, Filter, RefreshCw } from "lucide-react";
+import { Zap, TrendingUp, AlertTriangle, ArrowRight, BriefcaseBusiness, CheckCircle2, Filter, RefreshCw } from "lucide-react";
 
 import { useRequireAuth } from "@/components/auth-guard";
 import { SiteShell } from "@/components/site-shell";
@@ -41,6 +41,13 @@ type OpportunitiesResponse = {
   items: OpportunityItem[];
 };
 
+type CapturePayload = {
+  deal_id: string;
+  task_id: string;
+  deal_title: string;
+  task_title: string;
+};
+
 const FLAG_LABELS: Record<string, { label: string; color: string }> = {
   flood_exposure: { label: "Flood Risk", color: "bg-blue-500/15 text-blue-300 border-blue-500/30" },
   distress_signal: { label: "Distress Signal", color: "bg-red-500/15 text-red-300 border-red-500/30" },
@@ -63,33 +70,48 @@ function HeatBar({ score }: { score: number }) {
 export default function OpportunitiesPage() {
   const { status } = useRequireAuth();
   const { data: session } = useSession();
+  const apiToken = (session as { apiToken?: string } | null)?.apiToken;
   const [payload, setPayload] = useState<OpportunitiesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [minHeat, setMinHeat] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [capturingId, setCapturingId] = useState<string | null>(null);
+  const [captureResults, setCaptureResults] = useState<Record<string, CapturePayload>>({});
 
-  const load = async () => {
-    if (!session) return;
+  const load = useCallback(async () => {
+    if (!apiToken) return;
     setRefreshing(true);
     try {
-      const data = await apiFetch<OpportunitiesResponse>("/opportunities", (session as any).apiToken);
+      const data = await apiFetch<OpportunitiesResponse>("/opportunities", apiToken);
       setPayload(data);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [apiToken]);
 
   useEffect(() => {
-    if (status !== "authenticated" || !session) return;
+    if (status !== "authenticated" || !apiToken) return;
     load();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, status]);
+  }, [apiToken, load, status]);
 
   const rows = useMemo(() => {
     const all = payload?.items || [];
     return all.filter((item) => Number(item.neighborhood_heat?.value?.score_0_100 || 0) >= minHeat);
   }, [payload, minHeat]);
+
+  async function capture(parcelId: string) {
+    if (!apiToken) return;
+    setCapturingId(parcelId);
+    try {
+      const result = await apiFetch<CapturePayload>(`/workspace/capture/opportunity/${parcelId}`, apiToken, {
+        method: "POST",
+      });
+      setCaptureResults((current) => ({ ...current, [parcelId]: result }));
+    } finally {
+      setCapturingId(null);
+    }
+  }
 
   if (status !== "authenticated") return null;
 
@@ -159,6 +181,7 @@ export default function OpportunitiesPage() {
             const heat = Number(row.neighborhood_heat?.value?.score_0_100 || 0);
             const distress = Number(row.distress_likelihood?.value?.score_0_1 || 0);
             const isHigh = distress >= 0.55;
+            const captureResult = captureResults[row.parcel_id];
             return (
               <div
                 key={row.parcel_id}
@@ -217,6 +240,25 @@ export default function OpportunitiesPage() {
                 >
                   Open property profile <ArrowRight className="w-3 h-3" />
                 </Link>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={() => capture(row.parcel_id)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-orange-500/25 bg-orange-500/10 px-3 py-2 text-xs font-semibold text-orange-100 transition hover:bg-orange-500/15"
+                  >
+                    {captureResult ? <CheckCircle2 className="h-3.5 w-3.5" /> : <BriefcaseBusiness className="h-3.5 w-3.5" />}
+                    {capturingId === row.parcel_id ? "Adding..." : captureResult ? "Added to Pipeline" : "Add to Pipeline"}
+                  </button>
+                  {captureResult ? (
+                    <Link href={`/deals/${captureResult.deal_id}`} className="text-xs text-emerald-300 hover:text-emerald-200">
+                      Open deal →
+                    </Link>
+                  ) : null}
+                </div>
+                {captureResult ? (
+                  <p className="mt-3 text-xs text-emerald-100/85">
+                    Created <span className="font-semibold">{captureResult.deal_title}</span> with first task: {captureResult.task_title}.
+                  </p>
+                ) : null}
               </div>
             );
           })}

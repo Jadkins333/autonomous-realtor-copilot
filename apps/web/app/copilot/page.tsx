@@ -13,8 +13,15 @@ import { COPILOT_COMMANDS } from "@/lib/commands";
 type CopilotResponse = {
   status: string;
   text: string;
-  data?: unknown;
-  trace?: unknown;
+  data?: {
+    formula_markdown?: string;
+    inputs?: Record<string, unknown>;
+    provenance?: Record<string, unknown>;
+  };
+  trace?: {
+    selected_agent?: string;
+    [key: string]: unknown;
+  };
   missing_inputs?: string[];
 };
 

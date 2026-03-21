@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 
 import { ProvenanceModal } from "../../components/provenance-modal";
-import { getCitySnapshot, getMetrics } from "../../lib/api";
+import { getCitySnapshot, getTodayWorkspace } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
 
 export default function DashboardScreen() {
@@ -12,7 +12,7 @@ export default function DashboardScreen() {
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [snapshot, setSnapshot] = useState<any>(null);
-  const [metrics, setMetrics] = useState<Record<string, unknown> | null>(null);
+  const [workspace, setWorkspace] = useState<any>(null);
   const [provenanceOpen, setProvenanceOpen] = useState(false);
   const [tourDismissed, setTourDismissed] = useState(false);
 
@@ -25,12 +25,12 @@ export default function DashboardScreen() {
     if (!token) return;
     setRefreshing(true);
     try {
-      const [snapshotPayload, metricsPayload] = await Promise.all([
+      const [snapshotPayload, workspacePayload] = await Promise.all([
         getCitySnapshot(token),
-        getMetrics(token)
+        getTodayWorkspace(token)
       ]);
       setSnapshot(snapshotPayload);
-      setMetrics(metricsPayload);
+      setWorkspace(workspacePayload);
     } finally {
       setRefreshing(false);
     }
@@ -73,8 +73,8 @@ export default function DashboardScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Tour Mode</Text>
           <Text style={styles.detail}>
-            1. Search a property. 2. Open insight + provenance. 3. Draft outreach in sandbox. 4. Run a copilot
-            command.
+            1. Review what is due today. 2. Work the follow-up queue. 3. Move deals forward. 4. Open property intel
+            only when it helps a live conversation.
           </Text>
           <Pressable onPress={() => void dismissTour()} style={styles.secondaryButton}>
             <Text style={styles.secondaryButtonText}>Dismiss tour</Text>
@@ -92,8 +92,25 @@ export default function DashboardScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>System Metrics</Text>
-        <Text style={styles.json}>{JSON.stringify(metrics, null, 2)}</Text>
+        <Text style={styles.cardTitle}>Today</Text>
+        <Text style={styles.detail}>Open tasks: {workspace?.summary?.open_tasks ?? 0}</Text>
+        <Text style={styles.detail}>Overdue: {workspace?.summary?.overdue_tasks ?? 0}</Text>
+        <Text style={styles.detail}>Deals at risk: {workspace?.summary?.deals_at_risk ?? 0}</Text>
+        <Text style={styles.detail}>Follow-ups due: {workspace?.summary?.follow_ups_due ?? 0}</Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Coach Alerts</Text>
+        {(workspace?.coach_alerts || []).length === 0 ? (
+          <Text style={styles.detail}>No proactive coach alerts yet.</Text>
+        ) : (
+          workspace.coach_alerts.map((alert: any) => (
+            <View key={alert.id} style={styles.alertItem}>
+              <Text style={styles.alertTitle}>{alert.title}</Text>
+              <Text style={styles.detail}>{alert.detail}</Text>
+            </View>
+          ))
+        )}
       </View>
 
       <Text style={styles.section}>Quick Links</Text>
@@ -212,6 +229,16 @@ const styles = StyleSheet.create({
     borderColor: "#1f2937",
     paddingVertical: 20,
     alignItems: "center"
+  },
+  alertItem: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#1f2937"
+  },
+  alertTitle: {
+    color: "#f8fafc",
+    fontWeight: "700"
   },
   linkLabel: {
     color: "#f8fafc",

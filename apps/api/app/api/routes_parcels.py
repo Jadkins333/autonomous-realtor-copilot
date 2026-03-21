@@ -14,24 +14,19 @@ router = APIRouter(prefix="/parcels", tags=["parcels"])
 
 @router.get("/search", response_model=list[ParcelSearchResult])
 def parcels_search(
-    query: str = Query(..., alias="q", min_length=2),
+    q: str | None = Query(default=None, alias="q", min_length=2),
+    query: str | None = Query(default=None, min_length=2),
     x_client_surface: str | None = Header(default=None),
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ) -> list[ParcelSearchResult]:
-    # NOTE: The instruction only specified changes to the function signature.
-    # The body of the function would likely need to be updated to reflect
-    # the removal of `auth` and `x_client_surface`, and the addition of `tenant_id`.
-    # For example, `auth.tenant_id` would become `tenant_id`.
-    # `user_id` and `surface` would need to be sourced differently if `auth` and
-    # `x_client_surface` are removed.
-    # As per the instructions, I am only applying the requested change to the signature.
-    # The original body is kept as is, which will result in a runtime error
-    # due to `auth` and `x_client_surface` being undefined.
+    search_term = (query or q or "").strip()
+    if len(search_term) < 2:
+        raise HTTPException(status_code=422, detail="Search query must be at least 2 characters")
     return search_parcels(
         db,
         auth.tenant_id,
-        query,
+        search_term,
         user_id=auth.user_id,
         surface=x_client_surface or "authenticated_api",
     )

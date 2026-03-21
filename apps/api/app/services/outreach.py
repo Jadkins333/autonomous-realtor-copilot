@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -23,6 +24,7 @@ from app.models.entities import (
 )
 from app.models.enums import Channel, ConsentStatus, MessageDirection, MessageStatus
 from app.services.audit import record_activity_event
+from app.services.contact_events import log_contact_event
 from app.services.compliance import (
     evaluate_fair_housing_scan,
     evaluate_outbound_policy,
@@ -377,6 +379,16 @@ def submit_draft_pack(db: Session, tenant_id: UUID, pack_id: UUID, *, actor_user
         event_type="approval_requested",
         metadata={"submitted_at": submitted_at.isoformat()},
     )
+    if pack.contact_id:
+        log_contact_event(
+            db,
+            tenant_id=tenant_id,
+            contact_id=pack.contact_id,
+            deal_id=None,
+            event_type="note",
+            body=f"Outreach pack submitted for approval: {pack.objective}.",
+            touch_last_contact=False,
+        )
     db.commit()
     return {"id": pack.id, "status": pack.status, "submitted_at": submitted_at}
 
@@ -454,6 +466,13 @@ def _provider_payload_hash(result: ProviderResult | None, fallback_payload: dict
 
 def _send_idempotency_key(message: Message) -> str:
     return f"message:{message.id}:send:v1"
+
+
+def _outreach_timeline_body(message: Message, *, sandbox: bool) -> str:
+    channel = message.channel.value.upper()
+    if sandbox:
+        return f"{channel} outreach approved and staged in sandbox. No delivery occurred."
+    return f"{channel} outreach sent."
 
 
 def _finalize_attempt(
@@ -702,6 +721,14 @@ async def approve_and_send(
             event_type="send_attempt_completed",
             metadata={"send_attempt_id": str(attempt.id), "final_status": "sandbox_staged"},
         )
+        log_contact_event(
+            db,
+            tenant_id=tenant_id,
+            contact_id=message.contact_id,
+            event_type="note",
+            body=_outreach_timeline_body(message, sandbox=True),
+            touch_last_contact=False,
+        )
         pack_status = _refresh_pack_rollup_status(db, message.pack_id) if message.pack_id else None
         db.commit()
         return {
@@ -834,6 +861,15 @@ async def approve_and_send(
             "provider_message_id": attempt.provider_message_id,
         },
     )
+    if provider_result.ok:
+        log_contact_event(
+            db,
+            tenant_id=tenant_id,
+            contact_id=message.contact_id,
+            event_type="outreach",
+            body=_outreach_timeline_body(message, sandbox=False),
+            touch_last_contact=True,
+        )
 
     pack_status = _refresh_pack_rollup_status(db, message.pack_id) if message.pack_id else None
     db.commit()
@@ -882,6 +918,15 @@ def reject_draft(
         entity_id=str(message.id),
         event_type="approval_action",
         metadata={"approved": False, "reason": reason or "manual_reject"},
+    )
+    log_contact_event(
+        db,
+        tenant_id=tenant_id,
+        contact_id=message.contact_id,
+        deal_id=None,
+        event_type="note",
+        body=f"Outreach draft rejected before send: {reason or 'manual reject'}.",
+        touch_last_contact=False,
     )
     pack_status = _refresh_pack_rollup_status(db, message.pack_id) if message.pack_id else None
     db.commit()
@@ -937,6 +982,15 @@ def handle_inbound_sms(
         entity_id=str(inbound.id),
         event_type="reply_received",
         metadata={"channel": "sms", "provider_message_id": provider_message_id},
+    )
+    log_contact_event(
+        db,
+        tenant_id=tenant_id,
+        contact_id=contact.id,
+        deal_id=None,
+        event_type="note",
+        body=f"Inbound SMS received: {body}",
+        touch_last_contact=True,
     )
 
     convo = db.execute(

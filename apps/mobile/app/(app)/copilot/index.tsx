@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { ProvenanceModal } from "../../../components/provenance-modal";
@@ -7,6 +7,9 @@ import { copilotChat, getCopilotAgents } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth-context";
 
 const DEMO_COMMANDS = [
+  "what should I do today",
+  "who are my hottest buyers right now",
+  "what's the status of my active listings",
   "property profile for 145 N High St",
   "draft outreach to Ava",
   "columbus market snapshot"
@@ -29,7 +32,7 @@ export default function CopilotScreen() {
   const [loading, setLoading] = useState(false);
   const [provenanceOpen, setProvenanceOpen] = useState(false);
   const [latestPayload, setLatestPayload] = useState<unknown>(null);
-  const listRef = useRef<FlatList<ChatMessage>>(null);
+  const listRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -90,13 +93,12 @@ export default function CopilotScreen() {
         </View>
       ) : null}
 
-      <FlatList
+      <ScrollView
         ref={listRef}
         style={styles.list}
-        data={messages}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={[styles.message, item.role === "user" ? styles.userMsg : styles.botMsg]}>
+      >
+        {messages.map((item) => (
+          <View key={item.id} style={[styles.message, item.role === "user" ? styles.userMsg : styles.botMsg]}>
             <Text style={styles.messageText}>{item.text}</Text>
             {item.agent ? <Text style={styles.agentBadge}>agent: {item.agent}</Text> : null}
             {item.role === "assistant" && item.payload ? (
@@ -105,8 +107,8 @@ export default function CopilotScreen() {
               </Pressable>
             ) : null}
           </View>
-        )}
-      />
+        ))}
+      </ScrollView>
 
       <View style={styles.inputRow}>
         <TextInput

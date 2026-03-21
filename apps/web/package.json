@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "node ./scripts/run-with-supported-node.cjs ./node_modules/next/dist/bin/next build",
     "start": "next start",
-    "lint": "node ./scripts/run-with-supported-node.cjs ./node_modules/eslint/bin/eslint.js --max-warnings=0 --ext .ts,.tsx .",
+    "lint": "node ./scripts/run-with-supported-node.cjs ./node_modules/eslint/bin/eslint.js app components lib --ext .ts,.tsx --max-warnings=0",
     "typecheck": "node ./scripts/run-with-supported-node.cjs ./node_modules/typescript/bin/tsc -p tsconfig.typecheck.json --pretty false",
     "test": "node ./scripts/run-with-supported-node.cjs ./node_modules/vitest/vitest.mjs run --passWithNoTests=false"
   },

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -52,14 +52,13 @@ export default function PropertiesScreen() {
         </Pressable>
       </View>
 
-      <FlatList
-        data={rows}
-        keyExtractor={(item) => item.id}
+      <ScrollView
         refreshControl={<RefreshControl tintColor="#f97316" refreshing={loading} onRefresh={runSearch} />}
-        renderItem={({ item }) => {
+      >
+        {rows.map((item) => {
           const view = buildMobilePropertyView(item);
           return (
-            <Pressable onPress={() => router.push(`/(app)/properties/${item.id}`)} style={styles.row}>
+            <Pressable key={item.id} onPress={() => router.push(`/(app)/properties/${item.id}`)} style={styles.row}>
               <Text style={styles.address}>{item.address}</Text>
               <Text style={styles.badge}>{view.originBadgeLabel}</Text>
               <Text style={styles.meta}>{item.parcel_number}</Text>
@@ -69,8 +68,8 @@ export default function PropertiesScreen() {
               {view.blocked ? <Text style={styles.blocked}>{view.blockedMessage}</Text> : null}
             </Pressable>
           );
-        }}
-      />
+        })}
+      </ScrollView>
     </View>
   );
 }

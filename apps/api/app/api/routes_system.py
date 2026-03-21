@@ -17,16 +17,21 @@ def system_diagnostics(
 ) -> dict:
     _ = auth
     return get_system_diagnostics(db)
+
+
 @router.get("/metrics")
 def system_metrics(
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ) -> dict:
-    from app.models.entities import ActivityEvent, OutreachDraftPack, OpportunityEvent, Parcel
+    from app.models.entities import ActivityEvent, Deal, OpportunityEvent, OutreachDraftPack, Parcel, Task
+
     _ = auth
     return {
         "parcels": db.query(Parcel).count(),
         "opportunities": db.query(OpportunityEvent).count(),
+        "deals": db.query(Deal).count(),
+        "tasks": db.query(Task).count(),
         "outreach": db.query(OutreachDraftPack).count(),
         "events": db.query(ActivityEvent).count(),
     }

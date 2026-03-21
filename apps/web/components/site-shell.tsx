@@ -8,7 +8,8 @@ import {
   LayoutDashboard,
   Settings,
   Database,
-  Zap,
+  BriefcaseBusiness,
+  CheckSquare,
   Bot,
   Building2,
   Users,
@@ -22,8 +23,9 @@ import { FixtureModeBanner } from "@/components/fixture-mode-banner";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/opportunities", label: "Opportunities", icon: Zap },
+  { href: "/dashboard", label: "Today", icon: LayoutDashboard },
+  { href: "/pipeline", label: "Pipeline", icon: BriefcaseBusiness },
+  { href: "/opportunities", label: "Opportunities", icon: CheckSquare },
   { href: "/copilot", label: "Copilot", icon: Bot },
   { href: "/properties", label: "Properties", icon: Building2 },
   { href: "/contacts", label: "Contacts", icon: Users },
