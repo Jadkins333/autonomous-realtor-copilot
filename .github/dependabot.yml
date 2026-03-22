@@ -1,0 +1,15 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    # pnpm uses package-lock-like files; Dependabot will operate against package.json and pnpm-lock.yaml
+
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    # If your Python deps are in requirements.txt or pyproject.toml, Dependabot will detect and update them
