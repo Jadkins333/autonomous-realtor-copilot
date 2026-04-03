@@ -6,7 +6,15 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import AuthContext, get_auth_context
 from app.db.session import get_db
-from app.models.entities import Contact, ContactEvent, Deal, Message, Sequence, SequenceEnrollment, Task
+from app.models.entities import (
+    Contact,
+    ContactEvent,
+    Deal,
+    Message,
+    Sequence,
+    SequenceEnrollment,
+    Task,
+)
 from app.schemas.contacts import (
     ContactCreate,
     ContactDealOut,

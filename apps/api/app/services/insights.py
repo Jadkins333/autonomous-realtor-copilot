@@ -145,13 +145,11 @@ def compute_micro_market_nowcast(db: Session, tenant_id: UUID) -> dict:
 
     rate_series = load_seed_json("mortgage_rates.json")
     parsed_rates = [float(item["rate"]) for item in rate_series if isinstance(item, dict) and item.get("rate")]
-    rate_series_proxy = None
     rate_delta = None
     if len(parsed_rates) >= 2:
         first_rate = parsed_rates[0]
         last_rate = parsed_rates[-1]
         rate_delta = last_rate - first_rate
-        rate_series_proxy = {"start_rate": first_rate, "end_rate": last_rate, "delta": rate_delta}
 
     rationale = (
         "Nowcast uses deterministic weighted components from permit intensity, amenity density, "

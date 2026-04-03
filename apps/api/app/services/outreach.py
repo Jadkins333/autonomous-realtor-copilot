@@ -24,13 +24,13 @@ from app.models.entities import (
 )
 from app.models.enums import Channel, ConsentStatus, MessageDirection, MessageStatus
 from app.services.audit import record_activity_event
-from app.services.contact_events import log_contact_event
 from app.services.compliance import (
     evaluate_fair_housing_scan,
     evaluate_outbound_policy,
     persist_policy_decision,
     stop_enrollments_on_reply,
 )
+from app.services.contact_events import log_contact_event
 from app.services.disclosures import evaluate_disclosure_gate, record_blocked_disclosure_workflow
 from app.services.providers import ProviderResult, get_email_provider, get_sms_provider
 

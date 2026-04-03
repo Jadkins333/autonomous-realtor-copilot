@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     debug_diag: bool = False
     log_level: str = "INFO"
     sandbox_mode: bool = True
-    jwt_secret: str = "change-me"
+    jwt_secret: str = "change-me"  # noqa: S105 – placeholder; validated at startup
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 1440
 
@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     default_locale: str = "columbus_oh"
     test_parcel_missing_signals_id: str = "11111111-1111-1111-1111-111111111111"
     demo_user_email: str = "agent@demo.local"
-    demo_user_password: str = "demo123"
+    demo_user_password: str = "demo123"  # noqa: S105 – demo seed credential only
 
     franklin_auditor_base_url: str = "https://audr-api.franklincountyohio.gov/"
     franklin_auditor_path_by_address: str = "/v1/parcels/ByAddress"

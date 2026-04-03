@@ -7,6 +7,7 @@ from collections.abc import Callable
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.docs import get_swagger_ui_html
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -16,12 +17,21 @@ from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 
-from fastapi.openapi.docs import get_swagger_ui_html
-from fastapi.staticfiles import StaticFiles
-
 settings = get_settings()
 configure_logging(settings.log_level)
 logger = logging.getLogger(__name__)
+
+_INSECURE_SECRET_DEFAULT = "change-me"  # noqa: S105 – this is the sentinel value, not a real secret
+if settings.jwt_secret == _INSECURE_SECRET_DEFAULT:
+    if settings.environment.lower() == "production":
+        raise RuntimeError(
+            "JWT_SECRET is still set to the insecure default 'change-me'. "
+            "Set a strong random secret before running in production."
+        )
+    logger.warning(
+        "insecure_jwt_secret_default",
+        extra={"environment": settings.environment},
+    )
 
 # Rate limiter: 60 requests / minute per IP by default.
 # Individual routes may override with a tighter @limiter.limit() decorator.

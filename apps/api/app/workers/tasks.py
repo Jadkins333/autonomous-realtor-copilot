@@ -59,7 +59,7 @@ def async_approve_and_send_task(self, tenant_id: str, message_id: str, actor_use
         return result
     except Exception as exc:
         logger.error("Failed to approve_and_send message %s: %s", message_id, exc)
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc) from exc
     finally:
         db.close()
 

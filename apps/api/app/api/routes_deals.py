@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import AuthContext, get_auth_context
 from app.db.session import get_db
-from app.schemas.deals import DealCreate, DealOut, DealTaskOut, DealUpdate
 from app.schemas.contacts import ContactActivityOut
+from app.schemas.deals import DealCreate, DealOut, DealTaskOut, DealUpdate
 from app.services.workspace import create_deal, get_deal_detail, list_deals, update_deal
 
 router = APIRouter(prefix="/deals", tags=["deals"])

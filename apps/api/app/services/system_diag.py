@@ -104,7 +104,7 @@ def get_system_diagnostics(db: Session) -> dict:
             )
 
     env_checklist = {
-        "SANDBOX_MODE": True,
+        "SANDBOX_MODE": settings.sandbox_mode,
         "DATABASE_URL": bool(settings.database_url),
         "REDIS_URL": bool(settings.redis_url),
         "JWT_SECRET": bool(settings.jwt_secret),

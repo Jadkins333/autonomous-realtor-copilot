@@ -24,7 +24,14 @@ def system_metrics(
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ) -> dict:
-    from app.models.entities import ActivityEvent, Deal, OpportunityEvent, OutreachDraftPack, Parcel, Task
+    from app.models.entities import (
+        ActivityEvent,
+        Deal,
+        OpportunityEvent,
+        OutreachDraftPack,
+        Parcel,
+        Task,
+    )
 
     _ = auth
     return {
