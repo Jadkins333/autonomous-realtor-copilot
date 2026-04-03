@@ -3,6 +3,11 @@ from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_LOCAL_DEFAULTS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -15,6 +20,24 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 1440
+
+    # Comma-separated list of allowed CORS origins.  Set CORS_ALLOW_ORIGINS in
+    # the environment; defaults to localhost dev origins when empty.
+    cors_allow_origins: str = ""
+
+    @property
+    def cors_allow_origins_list(self) -> list[str]:
+        """Return deduplicated list of CORS origins, falling back to local defaults."""
+        if not self.cors_allow_origins or self.cors_allow_origins.strip() == "":
+            return _LOCAL_DEFAULTS[:]
+        if self.cors_allow_origins.strip() == "*":
+            return ["*"]
+        seen: dict[str, None] = {}
+        for origin in self.cors_allow_origins.split(","):
+            o = origin.strip()
+            if o:
+                seen[o] = None
+        return list(seen.keys()) or _LOCAL_DEFAULTS[:]
 
     database_url: str = "postgresql+psycopg2://postgres:postgres@db:5432/realtor_copilot"
     redis_url: str = "redis://redis:6379/0"
@@ -58,6 +81,12 @@ class Settings(BaseSettings):
     ohio_market_enabled: bool = True
     ohio_website_update_window_days: int = 14
     ohio_public_update_window_days: int = 14
+
+    # Data-retention window (days).  Records older than these thresholds are
+    # pruned by the nightly Celery housekeeping task.
+    retention_source_runs_days: int = 30
+    retention_compliance_events_days: int = 90
+    retention_schema_drift_dlq_days: int = 60
 
 
 @lru_cache(maxsize=1)

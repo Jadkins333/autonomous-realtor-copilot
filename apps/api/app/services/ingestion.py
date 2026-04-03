@@ -47,6 +47,18 @@ from app.utils.hash import stable_hash
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+
+def _arcgis_service_url(layer_path: str, base_url: str) -> str:
+    """Return the ArcGIS feature service URL.
+
+    If *layer_path* is already an absolute URL it is returned as-is.
+    Otherwise it is joined to *base_url* so that the old relative-path
+    convention continues to work alongside the new full-URL convention.
+    """
+    if layer_path.startswith("http://") or layer_path.startswith("https://"):
+        return layer_path
+    return f"{base_url.rstrip('/')}/{layer_path.strip('/')}"
+
 BREAKERS = {
     "franklin_auditor": CircuitBreaker(),
     "columbus_permits": CircuitBreaker(),
@@ -650,7 +662,10 @@ async def run_ingestion(db: Session, tenant_id) -> dict:
         if not settings.columbus_permits_layer_path:
             raise RuntimeError("No permits layer path configured")
         client = ArcGISFeatureServiceClient(
-            f"{settings.columbus_arcgis_base_url.rstrip('/')}/{settings.columbus_permits_layer_path.strip('/')}"
+            _arcgis_service_url(
+                settings.columbus_permits_layer_path,
+                settings.columbus_arcgis_base_url,
+            )
         )
         features = await client.query(where="1=1", result_record_count=250)
         normalized = []

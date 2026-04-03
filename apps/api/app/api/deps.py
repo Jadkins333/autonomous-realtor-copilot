@@ -28,7 +28,7 @@ def get_auth_context(authorization: str = Header(default="")) -> AuthContext:
             tenant_id=UUID(payload["tenant_id"]),
             role=payload.get("role", "agent"),
         )
-    except Exception as exc:  # noqa: BLE001
+    except (KeyError, ValueError) as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload") from exc
 
 

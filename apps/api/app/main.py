@@ -7,6 +7,10 @@ from collections.abc import Callable
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 
 from app.api.router import api_router
 from app.core.config import get_settings
@@ -19,14 +23,13 @@ settings = get_settings()
 configure_logging(settings.log_level)
 logger = logging.getLogger(__name__)
 
-cors_allow_origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:8081",
-    "http://127.0.0.1:8081",
-    "exp://127.0.0.1:8081",
-]
-cors_allow_credentials = True
+# Rate limiter: 60 requests / minute per IP by default.
+# Individual routes may override with a tighter @limiter.limit() decorator.
+limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
+
+cors_allow_origins_list = settings.cors_allow_origins_list
+# When wildcard is configured, credentials cannot be sent (CORS spec).
+cors_allow_credentials = "*" not in cors_allow_origins_list
 
 app = FastAPI(
     title=settings.app_name, 
@@ -34,6 +37,10 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 @app.get("/docs", include_in_schema=False)
 async def custom_swagger_ui_html():
@@ -47,7 +54,7 @@ async def custom_swagger_ui_html():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_allow_origins,
+    allow_origins=cors_allow_origins_list,
     allow_credentials=cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],

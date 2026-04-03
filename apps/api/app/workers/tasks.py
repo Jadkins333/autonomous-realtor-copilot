@@ -1,12 +1,15 @@
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from celery.utils.log import get_task_logger
 from redis import Redis
+from redis.exceptions import RedisError
+from sqlalchemy import delete
 
 from app.core.config import get_settings
 from app.db.session import SessionLocal
+from app.models.entities import ComplianceEvent, SchemaDriftDLQ, SourceRun
 from app.services.sequences import advance_sequence_steps
 from app.workers.celery_app import celery_app
 
@@ -25,7 +28,7 @@ def advance_sequences_task() -> dict:
             # Beat schedules this task; timestamp is a best-effort beat heartbeat proxy.
             redis_client.set("heartbeat:beat:last_seen", now)
             redis_client.close()
-        except Exception:  # noqa: BLE001
+        except (RedisError, ConnectionError, OSError):  # noqa: BLE001
             logger.warning("heartbeat update failed")
 
         count = advance_sequence_steps(db)
@@ -57,5 +60,51 @@ def async_approve_and_send_task(self, tenant_id: str, message_id: str, actor_use
     except Exception as exc:
         logger.error("Failed to approve_and_send message %s: %s", message_id, exc)
         raise self.retry(exc=exc)
+    finally:
+        db.close()
+
+
+@celery_app.task(name="app.workers.tasks.prune_old_records_task")
+def prune_old_records_task() -> dict:
+    """Delete records that have exceeded their configured retention window.
+
+    Tables pruned:
+    - source_runs:       completed/failed runs older than retention_source_runs_days
+    - compliance_events: events older than retention_compliance_events_days
+    - schema_drift_dlq:  replayed DLQ items older than retention_schema_drift_dlq_days
+    """
+    db = SessionLocal()
+    try:
+        now = datetime.now(tz=UTC)
+
+        source_run_cutoff = now - timedelta(days=settings.retention_source_runs_days)
+        result_sr = db.execute(
+            delete(SourceRun).where(SourceRun.started_at < source_run_cutoff)
+        )
+        deleted_source_runs = result_sr.rowcount
+
+        compliance_cutoff = now - timedelta(days=settings.retention_compliance_events_days)
+        result_ce = db.execute(
+            delete(ComplianceEvent).where(ComplianceEvent.created_at < compliance_cutoff)
+        )
+        deleted_compliance = result_ce.rowcount
+
+        dlq_cutoff = now - timedelta(days=settings.retention_schema_drift_dlq_days)
+        result_dlq = db.execute(
+            delete(SchemaDriftDLQ).where(
+                SchemaDriftDLQ.last_replayed_at.isnot(None),
+                SchemaDriftDLQ.last_replayed_at < dlq_cutoff,
+            )
+        )
+        deleted_dlq = result_dlq.rowcount
+
+        db.commit()
+        summary = {
+            "deleted_source_runs": deleted_source_runs,
+            "deleted_compliance_events": deleted_compliance,
+            "deleted_schema_drift_dlq": deleted_dlq,
+        }
+        logger.info("prune_old_records_complete", extra=summary)
+        return summary
     finally:
         db.close()

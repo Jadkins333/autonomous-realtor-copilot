@@ -851,7 +851,7 @@ def _seed_flood_zones(db, tenant_id, source: Source) -> None:
                 continue
             try:
                 polygons.append(Polygon([(float(x), float(y)) for x, y in outer]))
-            except Exception as exc: # noqa: BLE001
+            except (ValueError, TypeError) as exc: # noqa: BLE001
                 logger.warning("seed flood zone ring parse failed for %s: %s", external_id, exc)
                 continue
 

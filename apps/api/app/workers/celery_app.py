@@ -17,6 +17,11 @@ celery_app.conf.update(
             "task": "app.workers.tasks.advance_sequences_task",
             "schedule": 60.0,
         },
+        "prune-old-records-nightly": {
+            "task": "app.workers.tasks.prune_old_records_task",
+            # Run at 03:00 America/New_York every day (crontab: minute=0, hour=3)
+            "schedule": 86400.0,
+        },
     },
 )
 
