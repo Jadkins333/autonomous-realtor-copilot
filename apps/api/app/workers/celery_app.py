@@ -1,4 +1,5 @@
 from celery import Celery
+from celery.schedules import crontab
 
 from app.core.config import get_settings
 
@@ -19,8 +20,8 @@ celery_app.conf.update(
         },
         "prune-old-records-nightly": {
             "task": "app.workers.tasks.prune_old_records_task",
-            # Run at 03:00 America/New_York every day (crontab: minute=0, hour=3)
-            "schedule": 86400.0,
+            # Run at 03:00 America/New_York every day.
+            "schedule": crontab(hour=3, minute=0),
         },
     },
 )

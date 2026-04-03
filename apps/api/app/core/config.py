@@ -32,12 +32,14 @@ class Settings(BaseSettings):
             return _LOCAL_DEFAULTS[:]
         if self.cors_allow_origins.strip() == "*":
             return ["*"]
-        seen: dict[str, None] = {}
+        seen: set[str] = set()
+        result: list[str] = []
         for origin in self.cors_allow_origins.split(","):
             o = origin.strip()
-            if o:
-                seen[o] = None
-        return list(seen.keys()) or _LOCAL_DEFAULTS[:]
+            if o and o not in seen:
+                seen.add(o)
+                result.append(o)
+        return result or _LOCAL_DEFAULTS[:]
 
     database_url: str = "postgresql+psycopg2://postgres:postgres@db:5432/realtor_copilot"
     redis_url: str = "redis://redis:6379/0"
